@@ -4,12 +4,24 @@ A browser-based 3D horde survival roguelike inspired by Megabonk — survive wav
 
 ## Play
 
+**Live demo:** [https://pfaustino.github.io/gigazonk/](https://pfaustino.github.io/gigazonk/)
+
+> **First-time setup:** In the repo on GitHub, open **Settings → Pages**, set **Deploy from a branch**, branch **`gh-pages`**, folder **`/ (root)`**. After that, run `npm run deploy` to publish updates.
+
+### Local development
+
 ```bash
 npm install
 npm run dev
 ```
 
 Open the URL shown in the terminal (usually `http://localhost:5173`).
+
+### Publish to GitHub Pages
+
+```bash
+npm run deploy
+```
 
 ## Controls
 

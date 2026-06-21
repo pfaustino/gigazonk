@@ -1,7 +1,14 @@
 import * as THREE from 'three';
+import { ARENA_SIZE, ARENA_REFERENCE_SIZE } from './constants.js';
 
 const _c = new THREE.Color();
 const _b = new THREE.Color();
+
+function terrainTexScale() {
+  return ARENA_SIZE / ARENA_REFERENCE_SIZE;
+}
+
+export { terrainTexScale };
 
 function lerpColors(colors, i, a, b, t) {
   _c.setHex(a);
@@ -13,12 +20,12 @@ function lerpColors(colors, i, a, b, t) {
 }
 
 /** Cobblestone / packed earth — high-friction zones. */
-export function paintPackedGround(geometry) {
+export function paintPackedGround(geometry, texScale = 1) {
   const count = geometry.attributes.position.count;
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    const x = geometry.attributes.position.getX(i);
-    const z = geometry.attributes.position.getZ(i);
+    const x = geometry.attributes.position.getX(i) * texScale;
+    const z = geometry.attributes.position.getZ(i) * texScale;
     const brick = (Math.floor(x * 0.75) + Math.floor(z * 0.75)) % 2;
     const noise = Math.sin(x * 0.5) * Math.sin(z * 0.5) * 0.08;
     lerpColors(colors, i, brick ? 0x5e5448 : 0x4a4238, 0x6a6054, 0.5 + noise);
@@ -27,12 +34,12 @@ export function paintPackedGround(geometry) {
 }
 
 /** Meadow grass with patch variation. */
-export function paintGrassGround(geometry) {
+export function paintGrassGround(geometry, texScale = 1) {
   const count = geometry.attributes.position.count;
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    const x = geometry.attributes.position.getX(i);
-    const z = geometry.attributes.position.getZ(i);
+    const x = geometry.attributes.position.getX(i) * texScale;
+    const z = geometry.attributes.position.getZ(i) * texScale;
     const patch = Math.sin(x * 0.12) * Math.cos(z * 0.1) + Math.sin(x * 0.35 + z * 0.25);
     const t = (patch + 1) * 0.5;
     lerpColors(colors, i, 0x2f5c2a, 0x4a8a42, t);
@@ -41,36 +48,32 @@ export function paintGrassGround(geometry) {
 }
 
 /** Arena biome surfaces — color matches slipperiness feel. */
-export function paintBiomeGround(geometry, biome) {
+export function paintBiomeGround(geometry, biome, texScale = 1) {
   const count = geometry.attributes.position.count;
   const colors = new Float32Array(count * 3);
 
   for (let i = 0; i < count; i++) {
-    const x = geometry.attributes.position.getX(i);
-    const z = geometry.attributes.position.getZ(i);
+    const x = geometry.attributes.position.getX(i) * texScale;
+    const z = geometry.attributes.position.getZ(i) * texScale;
     const n = Math.sin(x * 0.14) * Math.cos(z * 0.11) + Math.sin(x * 0.38 + z * 0.29) * 0.45;
 
     switch (biome.id) {
       case 'frost': {
-        // Pale icy patches — visibly slick.
         const ice = (n + 1) * 0.5;
         lerpColors(colors, i, 0x4a6a88, 0xd8eeff, ice * 0.75);
         break;
       }
       case 'waste': {
-        // Dry sand & cracked dirt — medium-high grip.
         const sand = (n + 1) * 0.5;
         lerpColors(colors, i, 0x7a6348, 0xb89a72, sand * 0.55);
         break;
       }
       case 'volcanic': {
-        // Charred rock with magma veins — medium-low grip.
         const crack = Math.max(0, Math.sin(x * 0.09) * Math.sin(z * 0.09));
         lerpColors(colors, i, 0x2a1810, 0x6a2810, crack * 0.65 + (n + 1) * 0.1);
         break;
       }
       default: {
-        // Lush meadow — good grip.
         const lush = (n + 1) * 0.5;
         lerpColors(colors, i, 0x3a5c32, 0x5a8a48, lush * 0.5);
         break;
@@ -85,9 +88,9 @@ export function createGroundMaterial() {
   return new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
 }
 
-export function createSpawnPad(radius) {
+export function createSpawnPad(radius, texScale = 1) {
   const geo = new THREE.CircleGeometry(radius, 64);
-  paintPackedGround(geo);
+  paintPackedGround(geo, texScale);
   const mesh = new THREE.Mesh(geo, createGroundMaterial());
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.04;

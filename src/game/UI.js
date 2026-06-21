@@ -1,7 +1,7 @@
 import { SHOP_ITEMS, CHARACTERS, QUESTS, SYNERGY_ELEMENTS } from './constants.js';
 import { saveData } from './SaveData.js';
 import { GameMenu } from './GameMenu.js';
-import { getUpgradePreview, getActiveBuffs } from './UpgradeSystem.js';
+import { getUpgradePreview, getActiveBuffs, RARITIES } from './UpgradeSystem.js';
 
 const CONFIRM_KEYS = ['Enter', 'NumpadEnter', 'Space', 'KeyF'];
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
@@ -17,7 +17,10 @@ export class UI {
   }
 
   clear() {
-    this.layer.innerHTML = '';
+    for (const child of [...this.layer.children]) {
+      if (child.id === 'damage-numbers' || child.id === 'enemy-hp-bars') continue;
+      child.remove();
+    }
   }
 
   showTitle(onAction) {
@@ -203,6 +206,7 @@ export class UI {
           <div class="bar-track"><div class="bar-fill combo" id="combo-bar"></div></div>
         </div>
         <div class="hud-stat" id="level-stat">Level 1</div>
+        <div class="hud-stat" id="run-coins-stat" style="color:#f7c948">Run 🪙 0</div>
         <div class="hud-stat" id="time-stat">0:00</div>
         <div class="hud-stat" id="wave-stat">Wave 1</div>
         <div class="hud-stat" id="enemy-stat">Enemies: 0</div>
@@ -264,6 +268,12 @@ export class UI {
     this.layer.append(hud, hudRight, synergy, prompt, toasts, rewardStrip, hint);
   }
 
+  _rarityBadgeHTML(rarity) {
+    if (!rarity || !RARITIES[rarity]) return '';
+    const r = RARITIES[rarity];
+    return `<div class="rarity-badge rarity-${rarity}" style="color:${r.color}">${r.label}</div>`;
+  }
+
   _rewardStatsHTML(stats) {
     return stats.slice(0, 2).map((row) => `
       <div class="reward-tile-stat">
@@ -286,9 +296,10 @@ export class UI {
     const largeClass = large ? ' reward-tile-large' : '';
 
     return `
-      <div class="reward-tile${hiddenClass}${largeClass}"
+      <div class="reward-tile${hiddenClass}${largeClass}${reward.rarity ? ` rarity-${reward.rarity}` : ''}"
         data-reward-id="${reward.id}"
         style="--tile-scale:${scale};--tile-opacity:${opacity}">
+        ${reward.rarity ? this._rarityBadgeHTML(reward.rarity) : ''}
         <div class="reward-tile-icon">${reward.icon}</div>
         <div class="reward-tile-name">${reward.name}</div>
         ${statsHtml ? `<div class="reward-tile-stats">${statsHtml}</div>` : ''}
@@ -296,7 +307,7 @@ export class UI {
     `;
   }
 
-  pushReward({ icon, name, stats = [] }) {
+  pushReward({ icon, name, stats = [], rarity = null }) {
     const track = document.getElementById('reward-strip-track');
     const prevById = new Map();
     if (track) {
@@ -310,6 +321,7 @@ export class UI {
       icon,
       name,
       stats,
+      rarity,
       entering: true,
     };
 
@@ -451,6 +463,8 @@ export class UI {
     comboBar.style.width = `${Math.min(player.combo * 5, 100)}%`;
 
     document.getElementById('level-stat').textContent = `Level ${player.level}`;
+    const coinsEl = document.getElementById('run-coins-stat');
+    if (coinsEl) coinsEl.textContent = `Run 🪙 ${extras.runCoins ?? 0}`;
     const mins = Math.floor(elapsed / 60);
     const secs = Math.floor(elapsed % 60);
     const night = extras.night ? ' 🌙' : '';
@@ -535,8 +549,9 @@ export class UI {
       `).join('');
 
       const card = document.createElement('div');
-      card.className = 'upgrade-card';
+      card.className = `upgrade-card rarity-${upgrade.rarity || 'common'}`;
       card.innerHTML = `
+        ${this._rarityBadgeHTML(upgrade.rarity)}
         <div class="icon">${upgrade.icon}</div>
         <h4>${upgrade.name}</h4>
         <p>${upgrade.desc}</p>

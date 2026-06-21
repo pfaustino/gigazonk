@@ -1,13 +1,29 @@
 import * as THREE from 'three';
+import {
+  ARENA_LOOT_MAX_RADIUS,
+  ARENA_LOOT_MIN_RADIUS,
+  ARENA_SHRINE_RADIUS,
+  ARENA_SIZE,
+} from './constants.js';
+import { isLootSpotClear } from './TerrainFeatures.js';
 import { getLootPreview, getShrinePreview, LOOT_REWARD_ICONS } from './UpgradeSystem.js';
 
 const LOOT_TABLE = [
-  { weight: 30, type: 'xp', value: 15, label: '+15 XP' },
-  { weight: 20, type: 'heal', value: 25, label: 'Healed!' },
-  { weight: 15, type: 'damage', value: 0.1, label: '+10% Damage' },
-  { weight: 15, type: 'speed', value: 0.1, label: '+10% Speed' },
-  { weight: 10, type: 'coins', value: 5, label: '+5 Zonk Coins' },
-  { weight: 10, type: 'magnet', value: 1, label: 'Instant Magnet!' },
+  { weight: 22, type: 'xp', value: 15, label: '+15 XP' },
+  { weight: 14, type: 'heal', value: 25, label: 'Heal +25' },
+  { weight: 12, type: 'damage', value: 0.1, label: '+10% Damage' },
+  { weight: 10, type: 'speed', value: 0.1, label: '+10% Speed' },
+  { weight: 8, type: 'coins', value: 5, label: '+5 Zonk Coins' },
+  { weight: 8, type: 'magnet', value: 1, label: 'Instant Magnet!' },
+  { weight: 6, type: 'crit', value: 0.05, label: '+5% Crit' },
+  { weight: 6, type: 'regen', value: 0.25, label: '+0.25 HP/s' },
+  { weight: 5, type: 'armor', value: 0.05, label: '+5% Armor' },
+  { weight: 5, type: 'evasion', value: 0.05, label: '+5% Evasion' },
+  { weight: 4, type: 'lifesteal', value: 0.02, label: '+2% Lifesteal' },
+  { weight: 4, type: 'maxhp', value: 15, label: '+15 Max HP' },
+  { weight: 3, type: 'area', value: 0.1, label: '+10% Area' },
+  { weight: 2, type: 'proj', value: 1, label: '+1 Projectile' },
+  { weight: 2, type: 'xp_boost', value: 0.05, label: '+5% XP Gain' },
 ];
 
 function pickLoot() {
@@ -66,17 +82,33 @@ export class Interactables {
     this.items.push({ type: 'shrine', mesh, x, z, used: false, radius: 2.5 });
   }
 
-  scatterField(size, count) {
+  _randomScatterPoint(minR, maxR) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = minR + Math.random() * (maxR - minR);
+    const half = ARENA_SIZE / 2 - 4;
+    const x = THREE.MathUtils.clamp(Math.cos(angle) * r, -half, half);
+    const z = THREE.MathUtils.clamp(Math.sin(angle) * r, -half, half);
+    return { x, z };
+  }
+
+  scatterField(_size, count, arena = null) {
     for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * size * 0.8;
-      const z = (Math.random() - 0.5) * size * 0.8;
+      let x;
+      let z;
+      for (let attempt = 0; attempt < 32; attempt++) {
+        ({ x, z } = this._randomScatterPoint(ARENA_LOOT_MIN_RADIUS, ARENA_LOOT_MAX_RADIUS));
+        if (!arena || isLootSpotClear(x, z, arena.obstacles, arena.mesas)) break;
+      }
       if (Math.random() < 0.7) this.spawnPot(x, z);
       else this.spawnChest(x, z);
     }
     const shrineCount = 3;
     for (let i = 0; i < shrineCount; i++) {
       const angle = (i / shrineCount) * Math.PI * 2;
-      this.spawnShrine(Math.cos(angle) * size * 0.3, Math.sin(angle) * size * 0.3);
+      this.spawnShrine(
+        Math.cos(angle) * ARENA_SHRINE_RADIUS,
+        Math.sin(angle) * ARENA_SHRINE_RADIUS
+      );
     }
   }
 
@@ -160,6 +192,34 @@ export class Interactables {
       case 'magnet':
         player.magnetActive = true;
         setTimeout(() => { player.magnetActive = false; }, 2000);
+        break;
+      case 'crit':
+        player.critChance = Math.min(0.75, player.critChance + loot.value);
+        break;
+      case 'regen':
+        player.hpRegen += loot.value;
+        break;
+      case 'armor':
+        player.armor = Math.min(0.5, player.armor + loot.value);
+        break;
+      case 'evasion':
+        player.evasion = Math.min(0.75, player.evasion + loot.value);
+        break;
+      case 'lifesteal':
+        player.lifesteal += loot.value;
+        break;
+      case 'maxhp':
+        player.maxHp += loot.value;
+        player.hp += loot.value;
+        break;
+      case 'area':
+        player.area *= (1 + loot.value);
+        break;
+      case 'proj':
+        player.projectileCount += loot.value;
+        break;
+      case 'xp_boost':
+        player.runXpMult += loot.value;
         break;
     }
   }

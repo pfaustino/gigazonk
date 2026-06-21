@@ -6,7 +6,7 @@ export class CameraController {
     this.pitch = 0.72;
     this.distance = 26;
     this.minDistance = 10;
-    this.maxDistance = 42;
+    this.maxDistance = 80;
     this.minPitch = 0.3;
     this.maxPitch = 1.25;
     this.rotateSpeed = 0.0055;

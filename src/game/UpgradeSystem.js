@@ -1,4 +1,10 @@
-import { UPGRADES, SYNERGY_ELEMENTS, SYNERGY_NAME } from './constants.js';
+import { SYNERGY_ELEMENTS, SYNERGY_NAME } from './constants.js';
+import {
+  RARITIES,
+  UPGRADE_TEMPLATES,
+  buildUpgradeOffer,
+  getTemplateId,
+} from './Awards.js';
 
 function fmtNum(v, decimals = 0) {
   if (decimals > 0) return Number(v).toFixed(decimals);
@@ -71,6 +77,78 @@ export function getUpgradePreview(player, upgrade) {
   if (e.doubleJump) {
     add('Air jumps', player.maxAirJumps, Math.min(5, player.maxAirJumps + e.doubleJump));
   }
+  if (e.hpRegen) {
+    add('HP regen', player.hpRegen, player.hpRegen + e.hpRegen, v => fmtNum(v, 2));
+  }
+  if (e.runXpMult) {
+    add('XP gain', player.runXpMult, player.runXpMult + e.runXpMult, fmtPct);
+  }
+  if (e.killXpMult) {
+    add('Kill XP', player.killXpMult, player.killXpMult + e.killXpMult, fmtPct);
+  }
+  if (e.coinMult) {
+    add('Coin bonus', player.coinMult, player.coinMult + e.coinMult, fmtPct);
+  }
+  if (e.evasion) {
+    add('Evasion', player.evasion, Math.min(0.75, player.evasion + e.evasion), fmtPct);
+  }
+  if (e.armor) {
+    add('Armor', player.armor, Math.min(0.5, player.armor + e.armor), fmtPct);
+  }
+  if (e.jumpPeakMult) {
+    add('Jump height', player.jumpPeakMult, player.jumpPeakMult + e.jumpPeakMult, fmtPct);
+  }
+  if (e.meleeBonus) {
+    add('Melee dmg', player.meleeBonus, player.meleeBonus + e.meleeBonus, fmtPct);
+  }
+  if (e.airDamageMult) {
+    add('Airborne dmg', player.airDamageMult, player.airDamageMult + e.airDamageMult, fmtPct);
+  }
+  if (e.critDamageMult) {
+    add('Crit damage', player.critDamageMult, player.critDamageMult + e.critDamageMult, v => `${v.toFixed(1)}×`);
+  }
+  if (e.bossDamageMult) {
+    add('Boss dmg', player.bossDamageMult, player.bossDamageMult + e.bossDamageMult, fmtPct);
+  }
+  if (e.poisonChance) {
+    add('Poison chance', player.poisonChance, Math.min(1, player.poisonChance + e.poisonChance), fmtPct);
+  }
+  if (e.bonkChance) {
+    add('Bonk chance', player.bonkChance, player.bonkChance + e.bonkChance, fmtPct);
+  }
+  if (e.explodeChance) {
+    add('Explode chance', player.explodeChance, Math.min(1, player.explodeChance + e.explodeChance), fmtPct);
+  }
+  if (e.healOnKill) {
+    add('Heal on kill', player.healOnKill, player.healOnKill + e.healOnKill, fmtPct);
+  }
+  if (e.projectileSpeedMult) {
+    add('Proj speed', player.projectileSpeedMult, player.projectileSpeedMult + e.projectileSpeedMult, fmtPct);
+  }
+  if (e.magnetRadius) {
+    add('Magnet radius', player.magnetRadius, player.magnetRadius + e.magnetRadius, v => fmtNum(v, 1));
+  }
+  if (e.damagePerKill) {
+    add('Dmg per kill', player.killDamageBonus, Math.min(0.1, player.killDamageBonus + e.damagePerKill), fmtPct);
+  }
+  if (e.maxHpMult) {
+    add('Max HP', player.maxHp, player.maxHp * (1 + e.maxHpMult));
+  }
+  if (e.upgradeBoost) {
+    add('Future upgrades', player.upgradeBoost, player.upgradeBoost + e.upgradeBoost, fmtPct);
+  }
+  if (e.critSplash) {
+    add('Crit splash', player.critSplash, player.critSplash + e.critSplash, fmtPct);
+  }
+  if (e.idleDamageMult) {
+    add('Idle damage', player.idleDamageMult, player.idleDamageMult + e.idleDamageMult, fmtPct);
+  }
+  if (e.moveAtkSpeed) {
+    add('Move atk spd', player.moveAtkSpeed, player.moveAtkSpeed + e.moveAtkSpeed, fmtPct);
+  }
+  if (e.hurtSpeedBurst) {
+    add('Hurt speed', player.hurtSpeedBurst, player.hurtSpeedBurst + e.hurtSpeedBurst, fmtPct);
+  }
 
   return lines;
 }
@@ -82,6 +160,15 @@ export const LOOT_REWARD_ICONS = {
   speed: '👟',
   coins: '🪙',
   magnet: '🧲',
+  crit: '🎯',
+  regen: '🩹',
+  armor: '🛡️',
+  evasion: '💍',
+  lifesteal: '🩸',
+  maxhp: '❤️',
+  area: '💫',
+  proj: '🔫',
+  xp_boost: '⌚',
 };
 
 export function getLootPreview(player, loot) {
@@ -108,6 +195,34 @@ export function getLootPreview(player, loot) {
       break;
     case 'magnet':
       add('Magnet', 'Off', 'Pulse', v => v);
+      break;
+    case 'crit':
+      add('Crit chance', player.critChance, Math.min(0.75, player.critChance + loot.value), fmtPct);
+      break;
+    case 'regen':
+      add('HP regen', player.hpRegen, player.hpRegen + loot.value, v => fmtNum(v, 2));
+      break;
+    case 'armor':
+      add('Armor', player.armor, Math.min(0.5, player.armor + loot.value), fmtPct);
+      break;
+    case 'evasion':
+      add('Evasion', player.evasion, Math.min(0.75, player.evasion + loot.value), fmtPct);
+      break;
+    case 'lifesteal':
+      add('Lifesteal', player.lifesteal, player.lifesteal + loot.value, fmtPct);
+      break;
+    case 'maxhp':
+      add('Max HP', player.maxHp, player.maxHp + loot.value);
+      add('HP', player.hp, player.hp + loot.value);
+      break;
+    case 'area':
+      add('Blast radius', player.area, player.area * (1 + loot.value), v => fmtNum(v, 2));
+      break;
+    case 'proj':
+      add('Projectiles', player.projectileCount, player.projectileCount + loot.value);
+      break;
+    case 'xp_boost':
+      add('XP gain', player.runXpMult, player.runXpMult + loot.value, fmtPct);
       break;
     default:
       break;
@@ -163,6 +278,9 @@ export function getActiveBuffs(player) {
   const critPct = Math.round((player.critChance - base.critChance) * 100);
   if (critPct > 0) add('🎯', `+${critPct}%`, 'Crit');
 
+  const critDmgPct = Math.round((player.critDamageMult / base.critDamageMult - 1) * 100);
+  if (critDmgPct > 0) add('🍴', `+${critDmgPct}%`, 'Crit damage');
+
   const lsPct = Math.round((player.lifesteal - base.lifesteal) * 100);
   if (lsPct > 0) add('🩸', `+${lsPct}%`, 'Lifesteal');
 
@@ -183,6 +301,21 @@ export function getActiveBuffs(player) {
 
   if (player.magnetActive) add('🧲', 'ON', 'Magnet pulse');
 
+  if (player.hpRegen > 0) add('🩹', fmtNum(player.hpRegen, 1), 'HP regen');
+  if (player.runXpMult > 0) add('⌚', fmtPct(player.runXpMult), 'XP gain');
+  if (player.evasion > 0) add('💍', fmtPct(player.evasion), 'Evasion');
+  if (player.armor > 0) add('🛡️', fmtPct(player.armor), 'Armor');
+  if (player.meleeBonus > 0) add('👊', fmtPct(player.meleeBonus), 'Melee');
+  if (player.airDamageMult > 0) add('🧣', fmtPct(player.airDamageMult), 'Air dmg');
+  if (player.bossDamageMult > 0) add('💀', fmtPct(player.bossDamageMult), 'Boss dmg');
+  if (player.poisonChance > 0) add('🧀', fmtPct(player.poisonChance), 'Poison');
+  if (player.bonkChance > 0) add('🔨', fmtPct(player.bonkChance), 'Bonk');
+  if (player.explodeChance > 0) add('🧆', fmtPct(player.explodeChance), 'Explode');
+  if (player.killDamageBonus > 0) add('👿', fmtPct(player.killDamageBonus), 'Kill dmg');
+  if (player.projectileSpeedMult > 0) add('💨', fmtPct(player.projectileSpeedMult), 'Proj speed');
+  if (player.jumpPeakMult > 0) add('🪶', fmtPct(player.jumpPeakMult), 'Jump');
+  if (player.coinMult > 0) add('🧤', fmtPct(player.coinMult), 'Coins');
+
   return buffs;
 }
 
@@ -195,23 +328,79 @@ export class UpgradeSystem {
     this.taken = new Set();
   }
 
-  getRandomChoices(count = 3, player = null) {
-    const available = UPGRADES.filter(u => {
-      if (u.id === 'fire' && this.hasElement('fire')) return false;
-      if (u.id === 'ice' && this.hasElement('ice')) return false;
-      if (u.id === 'lightning' && this.hasElement('lightning')) return false;
-      if (u.id === 'double_jump' && player && player.maxAirJumps >= 5) return false;
-      if (u.id === 'proj_pierce' && player && player.projectilePierce >= 5) return false;
-      if (u.id !== 'double_jump' && u.id !== 'proj_pierce' && this.taken.has(u.id)) return false;
-      return true;
-    });
+  _templateId(offerOrTemplate) {
+    return getTemplateId(offerOrTemplate) || offerOrTemplate.id;
+  }
 
-    const choices = [];
-    const pool = [...available];
-    for (let i = 0; i < count && pool.length > 0; i++) {
-      const idx = Math.floor(Math.random() * pool.length);
-      choices.push(pool.splice(idx, 1)[0]);
+  _isCapped(templateId, player) {
+    if (!player) return false;
+    const template = UPGRADE_TEMPLATES.find(t => t.id === templateId);
+    if (!template) return false;
+    const e = template.baseEffect;
+    if (templateId === 'double_jump' && player.maxAirJumps >= 5) return true;
+    if (templateId === 'proj_pierce' && player.projectilePierce >= 5) return true;
+    if (e.evasion && player.evasion >= 0.75) return true;
+    if (e.armor && player.armor >= 0.5) return true;
+    if (e.critChance && player.critChance >= 0.75) return true;
+    if (e.poisonChance && player.poisonChance >= 1) return true;
+    if (e.explodeChance && player.explodeChance >= 1) return true;
+    if (e.damagePerKill && player.killDamageBonus >= 0.1) return true;
+    return false;
+  }
+
+  _isTemplateAvailable(template, player) {
+    const id = template.id;
+    if (template.baseEffect.element && this.hasElement(template.baseEffect.element)) return false;
+    if (id === 'fire' && this.hasElement('fire')) return false;
+    if (id === 'ice' && this.hasElement('ice')) return false;
+    if (id === 'lightning' && this.hasElement('lightning')) return false;
+    if (this._isCapped(id, player)) return false;
+    if (template.onceOnly && this.taken.has(id)) return false;
+    return true;
+  }
+
+  _buildWeightedPool(player, excludeTemplates = new Set()) {
+    const entries = [];
+    for (const template of UPGRADE_TEMPLATES) {
+      if (excludeTemplates.has(template.id)) continue;
+      if (!this._isTemplateAvailable(template, player)) continue;
+      for (const rarity of template.rarities) {
+        entries.push({
+          template,
+          rarity,
+          weight: RARITIES[rarity].weight,
+        });
+      }
     }
+    return entries;
+  }
+
+  _pickWeighted(entries) {
+    if (entries.length === 0) return null;
+    let total = 0;
+    for (const e of entries) total += e.weight;
+    let roll = Math.random() * total;
+    for (const entry of entries) {
+      roll -= entry.weight;
+      if (roll <= 0) return entry;
+    }
+    return entries[entries.length - 1];
+  }
+
+  getRandomChoices(count = 3, player = null) {
+    const choices = [];
+    const usedTemplates = new Set();
+    let pool = this._buildWeightedPool(player);
+
+    for (let i = 0; i < count && pool.length > 0; i++) {
+      const available = pool.filter(e => !usedTemplates.has(e.template.id));
+      const pick = this._pickWeighted(available);
+      if (!pick) break;
+      usedTemplates.add(pick.template.id);
+      choices.push(buildUpgradeOffer(pick.template, pick.rarity));
+      pool = pool.filter(e => e.template.id !== pick.template.id);
+    }
+
     return choices;
   }
 
@@ -220,8 +409,10 @@ export class UpgradeSystem {
   }
 
   apply(upgrade, player) {
-    if (upgrade.id !== 'double_jump' && upgrade.id !== 'proj_pierce') {
-      this.taken.add(upgrade.id);
+    const templateId = this._templateId(upgrade);
+    const template = UPGRADE_TEMPLATES.find(t => t.id === templateId);
+    if (template?.onceOnly) {
+      this.taken.add(templateId);
     }
     if (upgrade.effect.element) this.taken.add(upgrade.effect.element);
     player.applyUpgrade(upgrade);
@@ -237,4 +428,4 @@ export class UpgradeSystem {
   }
 }
 
-export { SYNERGY_NAME };
+export { SYNERGY_NAME, RARITIES };

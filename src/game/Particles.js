@@ -15,10 +15,17 @@ export class ParticleSystem {
 
     this.hpBarLayer = document.createElement('div');
     this.hpBarLayer.id = 'enemy-hp-bars';
-    this.hpBarLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+    this.hpBarLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:6;';
     document.getElementById('ui-layer')?.appendChild(this.hpBarLayer);
     this.enemyHpBars = new Map();
     this._hpVec = new THREE.Vector3();
+  }
+
+  ensureOverlayLayers() {
+    const layer = document.getElementById('ui-layer');
+    if (!layer) return;
+    if (this.dmgLayer && !this.dmgLayer.isConnected) layer.appendChild(this.dmgLayer);
+    if (this.hpBarLayer && !this.hpBarLayer.isConnected) layer.appendChild(this.hpBarLayer);
   }
 
   reset() {
@@ -118,6 +125,7 @@ export class ParticleSystem {
   }
 
   update(dt, camera, renderer, enemies = []) {
+    this.ensureOverlayLayers();
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;

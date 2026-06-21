@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ENEMY_TYPES } from './constants.js';
+import { ENEMY_TYPES, BASE_SPAWN_GROUP_SIZE, GROUP_CLUSTER_RADIUS, ARENA_SIZE } from './constants.js';
 import {
   ENEMY_MESH_CAPS,
   buildEnemyGeometry,
@@ -43,6 +43,7 @@ export class EnemyManager {
     this.enemies = [];
     this.grid.clear();
     this.spawnTimer = 0;
+    this.lastGroupAnchor = null;
     for (const type of Object.keys(this.meshes)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
       this.freeSlots[type] = [];
@@ -95,7 +96,7 @@ export class EnemyManager {
     if (!enemy.alive) {
       dummy.scale.set(0, 0, 0);
     } else {
-      dummy.position.set(enemy.x, 0.9 * enemy.scale, enemy.z);
+      dummy.position.set(enemy.x, 0.9 * enemy.scale + (enemy.groundY || 0), enemy.z);
       dummy.scale.set(enemy.scale, enemy.scale, enemy.scale);
       dummy.rotation.y = Date.now() * 0.003 + enemy.slot;
     }
@@ -135,7 +136,7 @@ export class EnemyManager {
     return results;
   }
 
-  update(dt, playerPos) {
+  update(dt, playerPos, terrain = null) {
     this.rebuildGrid();
 
     for (const e of this.enemies) {
@@ -143,6 +144,7 @@ export class EnemyManager {
 
       if (e.burnTimer > 0) {
         e.burnTimer -= dt;
+        e.hpBarVisible = true;
         e.hp -= 5 * dt;
         if (e.hp <= 0) { this.killEnemy(e); continue; }
       }
@@ -156,6 +158,14 @@ export class EnemyManager {
         e.x += (dx / dist) * e.speed * slowMult * dt;
         e.z += (dz / dist) * e.speed * slowMult * dt;
       }
+
+      if (terrain?.resolveObstacleCollision) {
+        const resolved = terrain.resolveObstacleCollision(e.x, e.z, e.scale * 0.42);
+        e.x = resolved.x;
+        e.z = resolved.z;
+      }
+      e.groundY = terrain?.getGroundHeight?.(e.x, e.z) ?? 0;
+
       this.updateInstance(e);
     }
   }
@@ -198,7 +208,43 @@ export class EnemyManager {
     return totalDamage;
   }
 
-  spawnWave(playerPos, elapsed, inRift, diffMult = 1, dt = 0, hpMultBonus = 1, playerDmg = 10) {
+  _pickEnemyType(elapsed) {
+    const roll = Math.random();
+    if (elapsed > 180 && roll < 0.03) return 'elite';
+    if (elapsed > 120 && roll < 0.08) return 'brute';
+    if (elapsed > 60 && roll < 0.15) return 'runner';
+    if (elapsed > 30 && roll < 0.25) return 'wisp';
+    return 'grunt';
+  }
+
+  _resolveType(type) {
+    if (this.freeSlots[type]?.length) return type;
+    const fallback = Object.keys(this.freeSlots).find(t => this.freeSlots[t].length > 0);
+    return fallback || type;
+  }
+
+  _getGroupSize(elapsed, isGigaspawn) {
+    const base = Math.min(10, BASE_SPAWN_GROUP_SIZE + Math.floor(elapsed / 50));
+    if (!isGigaspawn) return base;
+    const mult = 3 + Math.floor(Math.random() * 3);
+    return Math.min(45, base * mult);
+  }
+
+  _spawnCluster(anchorX, anchorZ, count, type, playerDmg, hpMult, speedMult) {
+    type = this._resolveType(type);
+    let spawned = 0;
+    for (let i = 0; i < count; i++) {
+      if (this.count >= 790) break;
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * GROUP_CLUSTER_RADIUS;
+      const x = anchorX + Math.cos(angle) * r;
+      const z = anchorZ + Math.sin(angle) * r;
+      if (this.spawn(type, x, z, playerDmg, hpMult, speedMult)) spawned++;
+    }
+    return spawned;
+  }
+
+  spawnWave(playerPos, elapsed, inRift, diffMult = 1, dt = 0, hpMultBonus = 1, playerDmg = 10, isGigaspawn = false) {
     const baseInterval = 3;
     const minInterval = 0.55;
     const ramp = 1 + elapsed * 0.015;
@@ -208,33 +254,33 @@ export class EnemyManager {
     );
 
     this.spawnTimer += dt;
-    if (this.spawnTimer < interval || this.count >= 790) return;
+    if (this.spawnTimer < interval || this.count >= 790) return { spawned: 0, isGigaspawn: false };
     this.spawnTimer -= interval;
 
     const minDist = 12;
     const maxDist = 22;
     const angle = Math.random() * Math.PI * 2;
     const dist = minDist + Math.random() * (maxDist - minDist);
-    const x = playerPos.x + Math.cos(angle) * dist;
-    const z = playerPos.z + Math.sin(angle) * dist;
+    const anchorX = THREE.MathUtils.clamp(
+      playerPos.x + Math.cos(angle) * dist,
+      -ARENA_SIZE / 2 + 4,
+      ARENA_SIZE / 2 - 4
+    );
+    const anchorZ = THREE.MathUtils.clamp(
+      playerPos.z + Math.sin(angle) * dist,
+      -ARENA_SIZE / 2 + 4,
+      ARENA_SIZE / 2 - 4
+    );
+    this.lastGroupAnchor = { x: anchorX, z: anchorZ };
 
-    const roll = Math.random();
-    let type = 'grunt';
-    if (elapsed > 60 && roll < 0.15) type = 'runner';
-    if (elapsed > 120 && roll < 0.08) type = 'brute';
-    if (elapsed > 30 && roll < 0.25) type = 'wisp';
-    if (elapsed > 180 && roll < 0.03) type = 'elite';
-
-    if (!this.freeSlots[type]?.length) {
-      const fallback = Object.keys(this.freeSlots).find(t => this.freeSlots[t].length > 0);
-      if (!fallback) return;
-      type = fallback;
-    }
-
+    const type = this._pickEnemyType(elapsed);
+    const groupSize = this._getGroupSize(elapsed, isGigaspawn);
     const timeHpBonus = 1 + elapsed * 0.002;
-    const hpMult = timeHpBonus * diffMult * hpMultBonus;
+    const hpMult = timeHpBonus * diffMult * hpMultBonus * (isGigaspawn ? 1.1 : 1);
     const speedMult = (1 + elapsed * 0.002) * (1 + (diffMult - 1) * 0.3);
-    this.spawn(type, x, z, playerDmg, hpMult, speedMult);
+    const spawned = this._spawnCluster(anchorX, anchorZ, groupSize, type, playerDmg, hpMult, speedMult);
+
+    return { spawned, isGigaspawn, groupSize, anchorX, anchorZ };
   }
 
   spawnBoss(x, z, playerDmg = 10) {

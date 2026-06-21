@@ -158,7 +158,7 @@ export class SynergyNova {
     for (const { enemy } of nearby) {
       const result = enemyManager.damageEnemy(enemy, player.getEffectiveDamage() * 3, 'fire');
       if (result) {
-        gemManager.spawn(result.pos.x, result.pos.z, result.xp * 2);
+        gemManager.spawn(result.pos.x, result.pos.z, result.xp * 2, player.position.x, player.position.z);
         onHit(player.getEffectiveDamage() * 3, result, 'fire');
       }
     }

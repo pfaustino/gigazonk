@@ -331,7 +331,34 @@ html, body {
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
   text-align: center;
+  position: relative;
 }
+
+.upgrade-card.rarity-common { border-color: #8a919e; }
+.upgrade-card.rarity-rare { border-color: #4da6ff; box-shadow: 0 0 12px rgba(77, 166, 255, 0.25); }
+.upgrade-card.rarity-epic { border-color: #b56cff; box-shadow: 0 0 16px rgba(181, 108, 255, 0.3); }
+.upgrade-card.rarity-legendary { border-color: #f7c948; box-shadow: 0 0 20px rgba(247, 201, 72, 0.35); }
+
+.rarity-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.upgrade-card .rarity-badge {
+  margin-bottom: 6px;
+}
+
+.reward-tile .rarity-badge {
+  font-size: 8px;
+  margin-bottom: 2px;
+}
+
+.reward-tile.rarity-rare { border-color: rgba(77, 166, 255, 0.55); }
+.reward-tile.rarity-epic { border-color: rgba(181, 108, 255, 0.6); }
+.reward-tile.rarity-legendary { border-color: rgba(247, 201, 72, 0.75); }
 
 .upgrade-card:hover {
   transform: scale(1.05);

@@ -27,13 +27,37 @@ export class GemManager {
     this.mesh.count = 0;
   }
 
-  spawn(x, z, value = 3) {
-    if (this.freeSlots.length === 0) return;
+  spawn(x, z, value = 3, nearX = 0, nearZ = 0) {
+    if (this.freeSlots.length === 0) {
+      this._evictFarthestGem(nearX, nearZ);
+    }
+    if (this.freeSlots.length === 0) return value;
+
     const slot = this.freeSlots.pop();
     const g = { slot, x, z, value, alive: true, vy: 2 + Math.random() * 2 };
     this.gems.push(g);
     this.mesh.count = Math.max(this.mesh.count, slot + 1);
     this.updateInstance(g);
+    return 0;
+  }
+
+  _evictFarthestGem(nearX, nearZ) {
+    let farthest = null;
+    let maxDist = -1;
+    for (const g of this.gems) {
+      if (!g.alive) continue;
+      const dist = Math.hypot(g.x - nearX, g.z - nearZ);
+      if (dist > maxDist) {
+        maxDist = dist;
+        farthest = g;
+      }
+    }
+    if (!farthest) return;
+    farthest.alive = false;
+    this.freeSlots.push(farthest.slot);
+    dummy.scale.set(0, 0, 0);
+    dummy.updateMatrix();
+    this.mesh.setMatrixAt(farthest.slot, dummy.matrix);
   }
 
   updateInstance(g) {

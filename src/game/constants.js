@@ -1,4 +1,16 @@
-export const ARENA_SIZE = 120;
+export const ARENA_SIZE = 1200;
+export const ARENA_REFERENCE_SIZE = 120;
+export const ARENA_GROUND_SEGMENTS = 96;
+export const ARENA_SPAWN_PAD_RADIUS = 30;
+export const ARENA_FOG_NEAR = 80;
+export const ARENA_FOG_FAR = ARENA_SIZE * 0.92;
+export const VILLAGE_FOG_NEAR = 80;
+export const VILLAGE_FOG_FAR = 320;
+export const ARENA_ROCK_COUNT = 150;
+export const ARENA_INTERACTABLE_COUNT = 38;
+export const ARENA_LOOT_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
+export const ARENA_LOOT_MAX_RADIUS = ARENA_SIZE * 0.5 - 24;
+export const ARENA_SHRINE_RADIUS = ARENA_SIZE * 0.38;
 export const VILLAGE_SIZE = 80;
 
 export const PLAYER_BASE = {
@@ -13,6 +25,7 @@ export const PLAYER_BASE = {
   pickupRadius: 3,
   magnetRadius: 8,
   critChance: 0.05,
+  critDamageMult: 2,
   area: 1,
 };
 
@@ -26,26 +39,13 @@ export const ENEMY_TYPES = {
 
 export const MAX_ENEMIES = 800;
 export const MAX_PROJECTILES = 200;
-export const MAX_GEMS = 500;
+export const MAX_GEMS = 1200;
 
-export const UPGRADES = [
-  { id: 'proj_count', name: 'Multi-Zonk', icon: '🔫', desc: '+1 projectile', effect: { projectileCount: 1 } },
-  { id: 'proj_pierce', name: 'Pierce Zonk', icon: '🏹', desc: 'Projectiles penetrate +1 enemy (max 5)', effect: { pierce: 1 } },
-  { id: 'proj_power', name: 'Power Zonk', icon: '💥', desc: '+25% damage', effect: { damageMult: 0.25 } },
-  { id: 'proj_speed', name: 'Rapid Zonk', icon: '⚡', desc: '+20% attack speed', effect: { attackRateMult: 0.2 } },
-  { id: 'move_speed', name: 'Swift Zonk', icon: '👟', desc: '+15% move speed', effect: { speedMult: 0.15 } },
-  { id: 'double_jump', name: 'Air Zonk', icon: '🦘', desc: '+1 mid-air boost jump (max 5)', effect: { doubleJump: 1 } },
-  { id: 'max_hp', name: 'Thick Skin', icon: '❤️', desc: '+20 max HP & heal', effect: { maxHp: 20, heal: 20 } },
-  { id: 'pickup', name: 'Magnet Heart', icon: '🧲', desc: '+50% pickup radius', effect: { pickupMult: 0.5 } },
-  { id: 'area', name: 'Blast Radius', icon: '💫', desc: '+20% projectile size & AoE', effect: { areaMult: 0.2 } },
-  { id: 'crit', name: 'Lucky Strike', icon: '🎯', desc: '+10% crit chance', effect: { critChance: 0.1 } },
-  { id: 'fire', name: 'Flame Zonk', icon: '🔥', desc: 'Fire element — burn damage', effect: { element: 'fire' } },
-  { id: 'ice', name: 'Frost Zonk', icon: '❄️', desc: 'Ice element — slow enemies', effect: { element: 'ice' } },
-  { id: 'lightning', name: 'Storm Zonk', icon: '⚡', desc: 'Lightning — chain hits', effect: { element: 'lightning' } },
-  { id: 'orbit', name: 'Zonk Familiar', icon: '🌀', desc: '+1 orbiting familiar', effect: { familiars: 1 } },
-  { id: 'lifesteal', name: 'Vampiric Zonk', icon: '🩸', desc: 'Heal 5% of damage dealt', effect: { lifesteal: 0.05 } },
-  { id: 'thorn', name: 'Thorn Aura', icon: '🌵', desc: 'Damage nearby enemies', effect: { thorns: 8 } },
-];
+export const GIGA_SPAWN_INTERVAL = 180;
+export const BASE_SPAWN_GROUP_SIZE = 3;
+export const GROUP_CLUSTER_RADIUS = 3.5;
+
+// Level-up awards live in Awards.js (UPGRADE_TEMPLATES + rarity tiers).
 
 export const SHOP_ITEMS = [
   { id: 'meta_damage', name: 'Sharpened Blades', desc: '+5% base damage (permanent)', cost: 50, effect: { metaDamage: 0.05 } },
@@ -58,13 +58,20 @@ export const SHOP_ITEMS = [
 
 export const QUESTS = [
   { id: 'kill_50', desc: 'Slay 50 monsters', target: 50, type: 'kills', reward: 30 },
+  { id: 'kill_100', desc: 'Slay 100 monsters', target: 100, type: 'kills', reward: 45 },
   { id: 'kill_200', desc: 'Slay 200 monsters', target: 200, type: 'kills', reward: 80 },
+  { id: 'kill_500', desc: 'Slay 500 monsters', target: 500, type: 'kills', reward: 150 },
+  { id: 'kill_1000', desc: 'Slay 1000 monsters', target: 1000, type: 'kills', reward: 300 },
   { id: 'chests_3', desc: 'Open 3 chests', target: 3, type: 'chests', reward: 25 },
   { id: 'pots_10', desc: 'Break 10 pots', target: 10, type: 'pots', reward: 20 },
   { id: 'survive_5', desc: 'Survive 5 minutes', target: 300, type: 'time', reward: 50 },
+  { id: 'survive_10', desc: 'Survive 10 minutes', target: 600, type: 'time', reward: 90 },
   { id: 'level_10', desc: 'Reach level 10', target: 10, type: 'level', reward: 60 },
   { id: 'boss_1', desc: 'Defeat a Zonk Lord', target: 1, type: 'bosses', reward: 100 },
   { id: 'rift_1', desc: 'Enter a Zonk Rift', target: 1, type: 'rifts', reward: 40 },
+  { id: 'gigaspawn_1', desc: 'Survive a Gigaspawn', target: 1, type: 'gigaspawns', reward: 75 },
+  { id: 'gigaspawn_3', desc: 'Survive 3 Gigaspawns', target: 3, type: 'gigaspawns', reward: 180 },
+  { id: 'gigaspawn_5', desc: 'Survive 5 Gigaspawns', target: 5, type: 'gigaspawns', reward: 320 },
 ];
 
 export const SYNERGY_ELEMENTS = ['fire', 'ice', 'lightning'];

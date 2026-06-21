@@ -33,7 +33,7 @@ export class ProjectileManager {
     this.mesh.count = 0;
   }
 
-  fire(px, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null) {
+  fire(px, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null, isCrit = false) {
     if (this.freeSlots.length === 0) return;
     const slot = this.freeSlots.pop();
     const p = {
@@ -43,6 +43,7 @@ export class ProjectileManager {
       speed,
       damage, area, element,
       pierce,
+      isCrit,
       hitEnemies: new Set(),
       targetEnemy,
       life: 3,
@@ -55,10 +56,10 @@ export class ProjectileManager {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
-  fireVolley(px, pz, targetEnemies, speed, damage, area, element, pierce = 0) {
+  fireVolley(px, pz, targetEnemies, speed, damage, area, element, pierce = 0, isCrit = false) {
     for (const enemy of targetEnemies) {
       const angle = Math.atan2(enemy.x - px, enemy.z - pz);
-      this.fire(px, pz, angle, speed, damage, area, element, pierce, enemy);
+      this.fire(px, pz, angle, speed, damage, area, element, pierce, enemy, isCrit);
     }
   }
 
@@ -131,7 +132,7 @@ export class ProjectileManager {
           p.hitEnemies.add(enemy);
           if (p.targetEnemy === enemy) p.targetEnemy = null;
           const result = enemyManager.damageEnemy(enemy, p.damage, p.element);
-          onHit(p.damage, result, p.element, enemy);
+          onHit(p.damage, result, p.element, enemy, p.isCrit);
 
           if (p.element === 'lightning' && enemy.alive) {
             this.chainLightning(enemy, p.damage * 0.6, enemyManager, onHit, 3, new Set([enemy]));

@@ -16,6 +16,7 @@ export class QuestSystem {
       level: 1,
       bosses: 0,
       rifts: 0,
+      gigaspawns: 0,
     };
   }
 

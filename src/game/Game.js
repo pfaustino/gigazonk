@@ -14,7 +14,7 @@ import { FamiliarManager, RiftManager, SynergyNova } from './Effects.js';
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, BIOMES } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, ARENA_FOG_NEAR, ARENA_FOG_FAR, VILLAGE_FOG_NEAR, VILLAGE_FOG_FAR } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 
@@ -37,9 +37,9 @@ export class Game {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1a1030);
-    this.scene.fog = new THREE.Fog(0x1a1030, 40, 100);
+    this.scene.fog = new THREE.Fog(0x1a1030, VILLAGE_FOG_NEAR, VILLAGE_FOG_FAR);
 
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2500);
     this.camera.position.set(0, 25, 20);
     this.camera.lookAt(0, 0, 0);
 
@@ -71,6 +71,9 @@ export class Game {
     this.inRift = false;
     this.bossTimer = 0;
     this.bossCount = 0;
+    this.gigaSpawnTimer = 0;
+    this.pendingGigaSpawn = false;
+    this.gigaSpawnSurvivalTimer = 0;
     this.runCoins = 0;
     this.currentBiome = null;
     this.pendingAction = null;
@@ -86,6 +89,28 @@ export class Game {
     this.animate();
   }
 
+  setShadowFrustum(halfExtent) {
+    const cam = this.sunLight.shadow.camera;
+    cam.left = -halfExtent;
+    cam.right = halfExtent;
+    cam.top = halfExtent;
+    cam.bottom = -halfExtent;
+    cam.far = halfExtent * 2.5;
+    cam.updateProjectionMatrix();
+  }
+
+  applyArenaFog() {
+    this.scene.fog.near = ARENA_FOG_NEAR;
+    this.scene.fog.far = ARENA_FOG_FAR;
+    this.setShadowFrustum(ARENA_SIZE * 0.55);
+  }
+
+  applyVillageFog() {
+    this.scene.fog.near = VILLAGE_FOG_NEAR;
+    this.scene.fog.far = VILLAGE_FOG_FAR;
+    this.setShadowFrustum(120);
+  }
+
   setupLights() {
     this.ambientLight = new THREE.AmbientLight(0x404060, 0.6);
     this.scene.add(this.ambientLight);
@@ -94,11 +119,11 @@ export class Game {
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
     this.sunLight.shadow.camera.near = 1;
-    this.sunLight.shadow.camera.far = 80;
-    this.sunLight.shadow.camera.left = -40;
-    this.sunLight.shadow.camera.right = 40;
-    this.sunLight.shadow.camera.top = 40;
-    this.sunLight.shadow.camera.bottom = -40;
+    this.sunLight.shadow.camera.far = 200;
+    this.sunLight.shadow.camera.left = -120;
+    this.sunLight.shadow.camera.right = 120;
+    this.sunLight.shadow.camera.top = 120;
+    this.sunLight.shadow.camera.bottom = -120;
     this.scene.add(this.sunLight);
   }
 
@@ -123,13 +148,14 @@ export class Game {
     this.state = 'village';
     this.village.setVisible(true);
     this.arena.setVisible(false);
+    this.applyVillageFog();
     this.hideCombat();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
     this.player.position.set(0, 0, 5);
     this.player.mesh.visible = true;
     this.cameraController.reset();
-    this.cameraController.apply(this.camera, this.player.position, 1);
+    this.cameraController.apply(this.camera, this.player.position, this.player.groundY + 1);
     this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
     this.quests.assignNewQuests();
   }
@@ -138,13 +164,14 @@ export class Game {
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
+    this.applyArenaFog();
     this.resetRun();
     this.ui.clear();
     this.ui.buildHUD();
     this.currentBiome = this.arena.pickRandomBiome();
     this.scene.fog.color.setHex(this.currentBiome.fog);
     this.scene.background.setHex(this.currentBiome.fog);
-    this.interactables.scatterField(ARENA_SIZE, 30);
+    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
     this.player.position.set(0, 0, 0);
     this.player.mesh.visible = true;
     this.cameraController.reset();
@@ -161,6 +188,9 @@ export class Game {
     this.inRift = false;
     this.bossTimer = 0;
     this.bossCount = 0;
+    this.gigaSpawnTimer = 0;
+    this.pendingGigaSpawn = false;
+    this.gigaSpawnSurvivalTimer = 0;
     this.runCoins = 0;
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
@@ -303,10 +333,11 @@ export class Game {
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
+    this.applyArenaFog();
     this.resetRun();
     this.ui.clear();
     this.ui.buildHUD();
-    this.interactables.scatterField(ARENA_SIZE, 30);
+    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
     this.player.mesh.visible = true;
     this.cameraController.reset();
     this.restoreArenaFromSnapshot(snap);
@@ -363,16 +394,30 @@ export class Game {
     this.ui.toast('Thanks for playing GigaZonk!');
   }
 
-  handleCombatHit(damage, killResult, element, enemy) {
-    const isCrit = damage > this.player.damage * this.player.getComboMult() * 1.5;
+  handleCombatHit(damage, killResult, element, enemy, opts = {}) {
+    const { skipProcs = false, isCrit = false } = opts;
+    const critHit = isCrit || damage > this.player.damage * this.player.getComboMult() * (this.player.getCritMultiplier() - 0.05);
     if (enemy) {
-      this.particles.damageNumber(enemy.x, enemy.z, damage, isCrit);
+      this.particles.damageNumber(enemy.x, enemy.z, damage, critHit);
     }
     this.audio.hit();
 
+    if (!skipProcs && enemy) {
+      this._applyHitProcs(damage, enemy, critHit);
+    }
+
     if (killResult) {
       this.player.addKill();
-      this.gems.spawn(killResult.pos.x, killResult.pos.z, killResult.xp * (this.inRift ? 2 : 1));
+      const xpMult = (this.inRift ? 2 : 1) * (1 + this.player.killXpMult);
+      const xpValue = killResult.xp * xpMult;
+      const overflow = this.gems.spawn(
+        killResult.pos.x, killResult.pos.z, xpValue,
+        this.player.position.x, this.player.position.z
+      );
+      if (overflow > 0 && this.player.addXp(overflow)) this.onLevelUp();
+      if (this.player.coinMult > 0) {
+        this.runCoins += Math.max(1, Math.floor(this.player.coinMult * 10));
+      }
       this.quests.track('kills');
       if (killResult.isBoss) {
         this.quests.track('bosses');
@@ -387,14 +432,58 @@ export class Game {
     }
   }
 
+  _applyHitProcs(damage, enemy, isCrit) {
+    const alive = enemy.alive;
+    const ex = enemy.x;
+    const ez = enemy.z;
+
+    if (alive && this.player.poisonChance > 0 && Math.random() < this.player.poisonChance) {
+      enemy.burnTimer = Math.max(enemy.burnTimer, 3);
+    }
+
+    if (alive && this.player.bonkChance > 0 && Math.random() < this.player.bonkChance) {
+      const bonkDmg = damage * 19;
+      const result = this.enemies.damageEnemy(enemy, bonkDmg, null);
+      this.handleCombatHit(bonkDmg, result, null, enemy, { skipProcs: true, isCrit: true });
+    }
+
+    if (this.player.explodeChance > 0 && Math.random() < this.player.explodeChance) {
+      const explodeDmg = damage * 0.65;
+      const nearby = this.enemies.getNearby(ex, ez, 4);
+      for (const { enemy: e2 } of nearby) {
+        if (!e2.alive || e2 === enemy) continue;
+        const result = this.enemies.damageEnemy(e2, explodeDmg, null);
+        this.handleCombatHit(explodeDmg, result, null, e2, { skipProcs: true });
+      }
+      this.particles.burst(ex, ez, 0xff8844);
+    }
+
+    if (isCrit && this.player.critSplash > 0 && Math.random() < this.player.critSplash) {
+      const splashDmg = damage * 0.5;
+      const nearby = this.enemies.getNearby(ex, ez, 3.5);
+      for (const { enemy: e2 } of nearby) {
+        if (!e2.alive || e2 === enemy) continue;
+        const result = this.enemies.damageEnemy(e2, splashDmg, null);
+        this.handleCombatHit(splashDmg, result, null, e2, { skipProcs: true });
+      }
+    }
+  }
+
   spawnBoss() {
     this.bossCount++;
     const angle = Math.random() * Math.PI * 2;
-    this.enemies.spawnBoss(
+    const half = ARENA_SIZE / 2 - 6;
+    const bx = THREE.MathUtils.clamp(
       this.player.position.x + Math.cos(angle) * 20,
-      this.player.position.z + Math.sin(angle) * 20,
-      this.player.damage
+      -half,
+      half
     );
+    const bz = THREE.MathUtils.clamp(
+      this.player.position.z + Math.sin(angle) * 20,
+      -half,
+      half
+    );
+    this.enemies.spawnBoss(bx, bz, this.player.damage);
     this.audio.boss();
     this.ui.toast(`⚠️ ZONK LORD #${this.bossCount} APPROACHES!`, 'synergy');
   }
@@ -430,10 +519,29 @@ export class Game {
     }
     this.rifts.update(dt, this.elapsed, this.player.position);
 
-    this.enemies.spawnWave(
+    this.gigaSpawnTimer += dt;
+    if (this.gigaSpawnTimer >= GIGA_SPAWN_INTERVAL) {
+      this.gigaSpawnTimer = 0;
+      this.pendingGigaSpawn = true;
+    }
+
+    if (this.gigaSpawnSurvivalTimer > 0) {
+      this.gigaSpawnSurvivalTimer -= dt;
+      if (this.gigaSpawnSurvivalTimer <= 0 && this.player.hp > 0) {
+        this.quests.track('gigaspawns');
+      }
+    }
+
+    const spawnResult = this.enemies.spawnWave(
       this.player.position, this.elapsed, this.inRift, diffMult, dt, diffSetting.hpMult,
-      this.player.damage
+      this.player.damage, this.pendingGigaSpawn
     );
+    if (spawnResult.spawned > 0 && this.pendingGigaSpawn) {
+      this.pendingGigaSpawn = false;
+      this.gigaSpawnSurvivalTimer = 12;
+      this.audio.boss();
+      this.ui.toast(`🌊 GIGASPAWN — ${spawnResult.groupSize} monsters!`, 'synergy');
+    }
 
     this.bossTimer += dt;
     if (this.bossTimer >= 120) {
@@ -441,20 +549,22 @@ export class Game {
       this.spawnBoss();
     }
 
-    this.enemies.update(dt, this.player.position, this.elapsed);
+    this.enemies.update(dt, this.player.position, this.arena);
 
     if (this.player.canAttack()) {
       const nearby = this.enemies.getNearby(this.player.position.x, this.player.position.z, 20);
       if (nearby.length > 0) {
         const sorted = nearby.slice().sort((a, b) => a.dist - b.dist);
-        const dmg = this.player.getEffectiveDamage();
+        const primary = sorted[0]?.enemy;
+        const baseDmg = this.player.computeDamageForEnemy(primary);
         const isCrit = Math.random() < this.player.critChance;
-        const finalDmg = isCrit ? dmg * 2 : dmg;
+        const finalDmg = isCrit ? baseDmg * this.player.getCritMultiplier() : baseDmg;
         const element = this.player.elements.size > 0
           ? [...this.player.elements][Math.floor(Math.random() * this.player.elements.size)]
           : null;
         const px = this.player.position.x;
         const pz = this.player.position.z;
+        const projSpeed = this.player.projectileSpeed * (1 + this.player.projectileSpeedMult);
         const targets = [];
         for (let i = 0; i < this.player.projectileCount; i++) {
           const pick = i < sorted.length ? sorted[i] : sorted[0];
@@ -462,17 +572,18 @@ export class Game {
         }
         this.projectiles.fireVolley(
           px, pz, targets,
-          this.player.projectileSpeed, finalDmg,
+          projSpeed, finalDmg,
           this.player.area, element,
-          this.player.projectilePierce
+          this.player.projectilePierce,
+          isCrit
         );
         this.player.resetAttackTimer();
         this.audio.shoot();
       }
     }
 
-    this.projectiles.update(dt, this.enemies, (dmg, result, el, enemy) =>
-      this.handleCombatHit(dmg, result, el, enemy)
+    this.projectiles.update(dt, this.enemies, (dmg, result, el, enemy, isCrit) =>
+      this.handleCombatHit(dmg, result, el, enemy, { isCrit })
     );
 
     const xp = this.gems.update(dt, this.player);
@@ -554,6 +665,7 @@ export class Game {
         wave: this.arena.getWave(this.elapsed),
         biome: this.currentBiome?.name,
         night: nightFactor > 0.5,
+        runCoins: this.runCoins,
       }
     );
   }
@@ -602,7 +714,7 @@ export class Game {
   }
 
   updateCamera() {
-    this.cameraController.apply(this.camera, this.player.position, 1);
+    this.cameraController.apply(this.camera, this.player.position, this.player.groundY + 1);
   }
 
   onLevelUp() {
@@ -611,6 +723,13 @@ export class Game {
     this.input.releaseCameraLook();
     this.audio.levelUp();
     const choices = this.upgrades.getRandomChoices(3, this.player);
+    if (choices.length === 0) {
+      this.player.heal(this.player.maxHp * 0.25);
+      this.ui.toast('Power surge! +25% HP — all upgrades capped', 'synergy');
+      this.modalPause = false;
+      this.paused = false;
+      return;
+    }
     this.ui.showLevelUp(choices, this.player, (upgrade) => {
       const preview = getUpgradePreview(this.player, upgrade);
       this.upgrades.apply(upgrade, this.player);
@@ -618,6 +737,7 @@ export class Game {
         icon: upgrade.icon,
         name: upgrade.name,
         stats: preview,
+        rarity: upgrade.rarity,
       });
       if (this.upgrades.checkSynergy(this.player)) {
         this.ui.toast(`🔥 Synergy unlocked: ${SYNERGY_NAME}!`, 'synergy');

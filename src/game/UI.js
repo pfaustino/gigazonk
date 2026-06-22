@@ -1,4 +1,4 @@
-import { SHOP_ITEMS, CHARACTERS, QUESTS, SYNERGY_ELEMENTS, GAME_VERSION } from './constants.js';
+import { SHOP_ITEMS, SHOP_MAX_LEVEL, getShopUpgradeCost, CHARACTERS, QUESTS, SYNERGY_ELEMENTS, GAME_VERSION } from './constants.js';
 import { saveData } from './SaveData.js';
 import { GameMenu } from './GameMenu.js';
 import { getUpgradePreview, getActiveBuffs, RARITIES } from './UpgradeSystem.js';
@@ -655,12 +655,15 @@ export class UI {
     this._navCleanup = null;
     const screen = this._screen();
     const items = SHOP_ITEMS.map(item => {
-      const owned = saveData.data.purchasedShop.includes(item.id);
+      const level = saveData.getShopLevel(item.id);
+      const maxed = level >= SHOP_MAX_LEVEL;
+      const cost = getShopUpgradeCost(item, level);
       return `
-        <div class="shop-item ${owned ? 'owned' : ''}" data-id="${item.id}">
+        <div class="shop-item ${maxed ? 'maxed' : ''}" data-id="${item.id}">
           <h4>${item.name}</h4>
           <p>${item.desc}</p>
-          <div class="cost">${owned ? 'OWNED' : item.cost + ' coins'}</div>
+          <div class="shop-level">Level ${level}/${SHOP_MAX_LEVEL}</div>
+          <div class="cost">${maxed ? 'MAX' : `${cost} coins`}</div>
         </div>
       `;
     }).join('');
@@ -673,22 +676,13 @@ export class UI {
       <button class="btn btn-secondary" id="btn-close">Leave Shop</button>
     `;
 
-    const purchasable = [...screen.querySelectorAll('.shop-item:not(.owned)')];
+    const purchasable = [...screen.querySelectorAll('.shop-item:not(.maxed)')];
     purchasable.forEach((el) => {
       el.onclick = () => {
         const item = SHOP_ITEMS.find(i => i.id === el.dataset.id);
         if (!item) return;
-        if (saveData.spendCoins(item.cost)) {
-          saveData.buyShopItem(item.id);
-          const meta = saveData.data.meta;
-          if (item.effect.metaDamage) meta.damage += item.effect.metaDamage;
-          if (item.effect.metaHp) meta.hp += item.effect.metaHp;
-          if (item.effect.metaSpeed) meta.speed += item.effect.metaSpeed;
-          if (item.effect.metaXp) meta.xp += item.effect.metaXp;
-          if (item.effect.metaPickup) meta.pickup += item.effect.metaPickup;
-          if (item.effect.startLevel) meta.startLevel += item.effect.startLevel;
-          saveData.save();
-          this.toast(`Purchased ${item.name}!`);
+        if (saveData.applyShopUpgrade(item)) {
+          this.toast(`Upgraded ${item.name}!`);
           this.showShop(onClose);
         } else {
           this.toast('Not enough coins!');

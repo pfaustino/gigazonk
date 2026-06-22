@@ -1,7 +1,7 @@
 export const ARENA_SIZE = 1200;
 
 /** Bump this on each release. */
-export const GAME_VERSION = '0.1.4';
+export const GAME_VERSION = '0.1.5';
 
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;
@@ -68,14 +68,22 @@ export const MAX_GIGA_GROUP_SIZE = 28;
 
 // Level-up awards live in Awards.js (UPGRADE_TEMPLATES + rarity tiers).
 
+export const SHOP_MAX_LEVEL = 10;
+
 export const SHOP_ITEMS = [
-  { id: 'meta_damage', name: 'Sharpened Blades', desc: '+5% base damage (permanent)', cost: 50, effect: { metaDamage: 0.05 } },
-  { id: 'meta_hp', name: 'Iron Constitution', desc: '+10 base HP (permanent)', cost: 40, effect: { metaHp: 10 } },
-  { id: 'meta_speed', name: 'Light Boots', desc: '+5% base speed (permanent)', cost: 45, effect: { metaSpeed: 0.05 } },
-  { id: 'meta_xp', name: 'Scholar Tome', desc: '+10% XP gain (permanent)', cost: 60, effect: { metaXp: 0.1 } },
-  { id: 'meta_start_level', name: 'Head Start', desc: 'Begin runs at level 2', cost: 100, effect: { startLevel: 1 } },
-  { id: 'meta_magnet', name: 'Silver Magnet', desc: '+2 pickup radius (permanent)', cost: 35, effect: { metaPickup: 2 } },
+  { id: 'meta_damage', name: 'Sharpened Blades', desc: '+5% base damage per level', baseCost: 50, costStep: 25, effect: { metaDamage: 0.05 } },
+  { id: 'meta_hp', name: 'Iron Constitution', desc: '+10 base HP per level', baseCost: 40, costStep: 20, effect: { metaHp: 10 } },
+  { id: 'meta_speed', name: 'Light Boots', desc: '+5% base speed per level', baseCost: 45, costStep: 22, effect: { metaSpeed: 0.05 } },
+  { id: 'meta_xp', name: 'Scholar Tome', desc: '+10% XP gain per level', baseCost: 60, costStep: 30, effect: { metaXp: 0.1 } },
+  { id: 'meta_start_level', name: 'Head Start', desc: '+1 starting level per upgrade', baseCost: 100, costStep: 50, effect: { startLevel: 1 } },
+  { id: 'meta_magnet', name: 'Silver Magnet', desc: '+2 pickup radius per level', baseCost: 35, costStep: 18, effect: { metaPickup: 2 } },
 ];
+
+/** Cost for the next upgrade at `currentLevel` (0 = never bought). */
+export function getShopUpgradeCost(item, currentLevel) {
+  if (currentLevel >= SHOP_MAX_LEVEL) return null;
+  return item.baseCost + item.costStep * currentLevel;
+}
 
 export const QUESTS = [
   { id: 'kill_50', desc: 'Slay 50 monsters', target: 50, type: 'kills', reward: 30 },

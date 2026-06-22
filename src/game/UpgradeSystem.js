@@ -1,4 +1,4 @@
-import { SYNERGY_ELEMENTS, SYNERGY_NAME, SHOP_ITEMS } from './constants.js';
+import { SYNERGY_ELEMENTS, SYNERGY_NAME, SHOP_ITEMS, SHOP_MAX_LEVEL } from './constants.js';
 import { saveData } from './SaveData.js';
 import {
   RARITIES,
@@ -269,15 +269,14 @@ function shopBuffAmount(item) {
   return '✓';
 }
 
-/** Permanent village shop upgrades — always shown in the buff bar when owned. */
+/** Permanent village shop upgrades — shown in the buff bar when leveled. */
 export function getMetaBuffs() {
-  const purchased = new Set(saveData.data.purchasedShop);
   return SHOP_ITEMS
-    .filter((item) => purchased.has(item.id))
+    .filter((item) => saveData.getShopLevel(item.id) > 0)
     .map((item) => ({
       icon: SHOP_BUFF_ICONS[item.id] || '🏪',
       amount: shopBuffAmount(item),
-      title: `${item.name} — ${item.desc}`,
+      title: `${item.name} — ${item.desc} (Lv ${saveData.getShopLevel(item.id)}/${SHOP_MAX_LEVEL})`,
       meta: true,
     }));
 }

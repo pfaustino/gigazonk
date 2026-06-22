@@ -500,19 +500,25 @@ html, body {
   transition: border-color 0.15s;
 }
 
-.shop-item:hover:not(.owned),
-.shop-item.focused:not(.owned) {
+.shop-item:hover:not(.maxed),
+.shop-item.focused:not(.maxed) {
   border-color: #f7c948;
 }
 
-.shop-item.owned {
-  opacity: 0.5;
+.shop-item.maxed {
+  opacity: 0.55;
   cursor: default;
 }
 
 .shop-item h4 { color: #f7c948; font-size: 14px; margin-bottom: 4px; }
 .shop-item p { font-size: 11px; color: #999; }
-.shop-item .cost { color: #4ade80; font-weight: 700; margin-top: 6px; }
+.shop-level {
+  font-size: 11px;
+  color: #b8a8ff;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.shop-item .cost { color: #4ade80; font-weight: 700; margin-top: 4px; }
 
 .currency-display {
   font-size: 20px;

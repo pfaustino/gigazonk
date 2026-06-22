@@ -82,9 +82,28 @@ export class Interactables {
     this.items.push({ type: 'shrine', mesh, x, z, used: false, radius: 2.5 });
   }
 
-  _randomScatterPoint(minR, maxR) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = minR + Math.random() * (maxR - minR);
+  spawnVillagePortal(x = 0, z = 0) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.6, 0.22, 8, 24),
+      new THREE.MeshBasicMaterial({ color: 0x6b4fd4 })
+    );
+    ring.position.set(x, 1.8, z);
+    ring.rotation.x = Math.PI / 2;
+    this.group.add(ring);
+
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.18, 2.2, 6),
+      new THREE.MeshLambertMaterial({ color: 0x4a2080, emissive: 0x2a1050 })
+    );
+    pillar.position.set(x, 1.1, z);
+    pillar.castShadow = true;
+    this.group.add(pillar);
+
+    this.items.push({ type: 'village_portal', mesh: ring, x, z, radius: 3.2 });
+  }
+
+  _pickScatterPoint(bandMin, bandMax, angle) {
+    const r = bandMin + Math.random() * (bandMax - bandMin);
     const half = ARENA_SIZE / 2 - 4;
     const x = THREE.MathUtils.clamp(Math.cos(angle) * r, -half, half);
     const z = THREE.MathUtils.clamp(Math.sin(angle) * r, -half, half);
@@ -92,15 +111,33 @@ export class Interactables {
   }
 
   scatterField(_size, count, arena = null) {
-    for (let i = 0; i < count; i++) {
-      let x;
-      let z;
-      for (let attempt = 0; attempt < 32; attempt++) {
-        ({ x, z } = this._randomScatterPoint(ARENA_LOOT_MIN_RADIUS, ARENA_LOOT_MAX_RADIUS));
-        if (!arena || isLootSpotClear(x, z, arena.obstacles, arena.mesas)) break;
+    const radialBands = 10;
+    const perBand = Math.ceil(count / radialBands);
+    let placed = 0;
+
+    for (let band = 0; band < radialBands && placed < count; band++) {
+      const bandMin =
+        ARENA_LOOT_MIN_RADIUS +
+        (band / radialBands) * (ARENA_LOOT_MAX_RADIUS - ARENA_LOOT_MIN_RADIUS);
+      const bandMax =
+        ARENA_LOOT_MIN_RADIUS +
+        ((band + 1) / radialBands) * (ARENA_LOOT_MAX_RADIUS - ARENA_LOOT_MIN_RADIUS);
+      const inBand = Math.min(perBand, count - placed);
+
+      for (let i = 0; i < inBand; i++) {
+        const baseAngle = (i / inBand) * Math.PI * 2;
+        const angle = baseAngle + (Math.random() - 0.5) * ((Math.PI * 2) / inBand);
+        let x;
+        let z;
+        for (let attempt = 0; attempt < 24; attempt++) {
+          ({ x, z } = this._pickScatterPoint(bandMin, bandMax, angle));
+          if (!arena || isLootSpotClear(x, z, arena.obstacles, arena.mesas)) break;
+          ({ x, z } = this._pickScatterPoint(bandMin, bandMax, angle + Math.random() * 0.8));
+        }
+        if (Math.random() < 0.7) this.spawnPot(x, z);
+        else this.spawnChest(x, z);
+        placed++;
       }
-      if (Math.random() < 0.7) this.spawnPot(x, z);
-      else this.spawnChest(x, z);
     }
     const shrineCount = 3;
     for (let i = 0; i < shrineCount; i++) {
@@ -177,6 +214,11 @@ export class Interactables {
         name: 'Ascension',
         label: `Sacrificed ${sacrifice} HP for power!`,
       };
+    }
+
+    if (item.type === 'village_portal') {
+      callbacks.onVillagePortal?.();
+      return { type: 'village_portal' };
     }
 
     return null;

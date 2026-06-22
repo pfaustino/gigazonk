@@ -1,10 +1,12 @@
-import { SHOP_ITEMS, CHARACTERS, QUESTS, SYNERGY_ELEMENTS } from './constants.js';
+import { SHOP_ITEMS, CHARACTERS, QUESTS, SYNERGY_ELEMENTS, GAME_VERSION } from './constants.js';
 import { saveData } from './SaveData.js';
 import { GameMenu } from './GameMenu.js';
 import { getUpgradePreview, getActiveBuffs, RARITIES } from './UpgradeSystem.js';
 
 const CONFIRM_KEYS = ['Enter', 'NumpadEnter', 'Space', 'KeyF'];
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
+const REWARD_SHOWCASE_HOLD_MS = 2000;
+const REWARD_FLY_MS = 700;
 
 export class UI {
   constructor() {
@@ -14,6 +16,8 @@ export class UI {
     this.runRewards = [];
     this.maxRewardTiles = 14;
     this._rewardSeq = 0;
+    this._rewardQueue = [];
+    this._rewardShowcaseActive = false;
   }
 
   clear() {
@@ -37,6 +41,7 @@ export class UI {
       <p style="margin-top:24px;font-size:12px;color:#666">
         Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
       </p>
+      <p class="title-version">v${GAME_VERSION}</p>
     `;
     const village = screen.querySelector('#btn-village');
     const arena = screen.querySelector('#btn-arena');
@@ -265,6 +270,8 @@ export class UI {
 
     this.runRewards = [];
     this._rewardSeq = 0;
+    this._rewardQueue = [];
+    this._rewardShowcaseActive = false;
     this.layer.append(hud, hudRight, synergy, prompt, toasts, rewardStrip, hint);
   }
 
@@ -331,23 +338,39 @@ export class UI {
     }
     this.renderRewardStrip();
 
+    this._rewardQueue.push({ rewardId: reward.id, prevById });
+    this._drainRewardQueue();
+  }
+
+  _drainRewardQueue() {
+    if (this._rewardShowcaseActive || this._rewardQueue.length === 0) return;
+    const { rewardId, prevById } = this._rewardQueue.shift();
+    this._rewardShowcaseActive = true;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        this._animateRewardEntrance(reward.id, prevById);
+        this._animateRewardEntrance(rewardId, prevById, () => {
+          this._rewardShowcaseActive = false;
+          this._drainRewardQueue();
+        });
       });
     });
   }
 
-  _animateRewardEntrance(rewardId, prevById) {
+  _animateRewardEntrance(rewardId, prevById, onComplete) {
     const track = document.getElementById('reward-strip-track');
     const target = track?.querySelector(`[data-reward-id="${rewardId}"]`);
-    if (!track || !target) return;
+    if (!track || !target) {
+      onComplete?.();
+      return;
+    }
 
     const reward = this.runRewards.find((r) => r.id === rewardId);
-    if (!reward) return;
+    if (!reward) {
+      onComplete?.();
+      return;
+    }
 
     const tiles = [...track.querySelectorAll('.reward-tile')];
-    const targetRect = target.getBoundingClientRect();
     const endOpacity = parseFloat(getComputedStyle(target).getPropertyValue('--tile-opacity')) || 1;
 
     const flyer = document.createElement('div');
@@ -356,16 +379,18 @@ export class UI {
     this.layer.appendChild(flyer);
 
     const tileSize = 76;
-    const startScale = 2;
+    const startScale = 2.35;
     const startW = tileSize * startScale;
     const startH = tileSize * startScale;
     const centerX = window.innerWidth * 0.5;
-    const centerY = window.innerHeight - 95;
+    const centerY = window.innerHeight - 118;
+    const centerLeft = centerX - startW / 2;
+    const centerTop = centerY - startH / 2;
 
     Object.assign(flyer.style, {
       position: 'fixed',
-      left: `${centerX - startW / 2}px`,
-      top: `${centerY - startH / 2}px`,
+      left: `${centerLeft}px`,
+      top: `${centerTop}px`,
       width: `${startW}px`,
       height: `${startH}px`,
       margin: '0',
@@ -386,6 +411,17 @@ export class UI {
       tile.style.transform = `scale(var(--tile-scale)) translate(${dx}px, ${dy}px)`;
     });
 
+    const finishEntrance = () => {
+      flyer.remove();
+      target.classList.remove('reward-tile-hidden');
+      reward.entering = false;
+      tiles.forEach((tile) => {
+        tile.style.transition = '';
+        tile.style.transform = '';
+      });
+      onComplete?.();
+    };
+
     requestAnimationFrame(() => {
       tiles.forEach((tile) => {
         if (tile === target || !prevById.has(tile.dataset.rewardId)) return;
@@ -393,51 +429,42 @@ export class UI {
         tile.style.transform = 'scale(var(--tile-scale))';
       });
 
-      const anim = flyer.animate([
-        {
-          left: `${centerX - startW / 2}px`,
-          top: `${centerY - startH / 2}px`,
-          width: `${startW}px`,
-          height: `${startH}px`,
-          opacity: 0,
-        },
-        {
-          left: `${centerX - startW / 2}px`,
-          top: `${centerY - startH / 2}px`,
-          width: `${startW}px`,
-          height: `${startH}px`,
-          opacity: 1,
-          offset: 0.12,
-        },
-        {
-          left: `${centerX - startW / 2}px`,
-          top: `${centerY - startH / 2}px`,
-          width: `${startW}px`,
-          height: `${startH}px`,
-          opacity: 1,
-          offset: 0.32,
-        },
-        {
-          left: `${targetRect.left}px`,
-          top: `${targetRect.top}px`,
-          width: `${targetRect.width}px`,
-          height: `${targetRect.height}px`,
-          opacity: endOpacity,
-        },
+      const fadeIn = flyer.animate([
+        { opacity: 0, transform: 'scale(0.92)' },
+        { opacity: 1, transform: 'scale(1)' },
       ], {
-        duration: 850,
+        duration: 220,
         easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
         fill: 'forwards',
       });
 
-      anim.onfinish = () => {
-        flyer.remove();
-        target.classList.remove('reward-tile-hidden');
-        reward.entering = false;
-        tiles.forEach((tile) => {
-          tile.style.transition = '';
-          tile.style.transform = '';
-        });
+      fadeIn.onfinish = () => {
+        setTimeout(() => {
+          const dest = target.getBoundingClientRect();
+          const fly = flyer.animate([
+            {
+              left: `${centerLeft}px`,
+              top: `${centerTop}px`,
+              width: `${startW}px`,
+              height: `${startH}px`,
+              opacity: 1,
+              transform: 'scale(1)',
+            },
+            {
+              left: `${dest.left}px`,
+              top: `${dest.top}px`,
+              width: `${dest.width}px`,
+              height: `${dest.height}px`,
+              opacity: endOpacity,
+              transform: 'scale(1)',
+            },
+          ], {
+            duration: REWARD_FLY_MS,
+            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            fill: 'forwards',
+          });
+          fly.onfinish = finishEntrance;
+        }, REWARD_SHOWCASE_HOLD_MS);
       };
     });
   }
@@ -600,6 +627,27 @@ export class UI {
     retry.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onAction('retry'); };
     village.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onAction('village'); };
     this._navCleanup = this._bindMenuList([retry, village]);
+  }
+
+  showArenaPortalChoice(onResume, onNewRun, onCancel) {
+    this._navCleanup?.();
+    this._navCleanup = null;
+    const screen = this._screen();
+    screen.innerHTML = `
+      <h2 style="color:#f7c948">Arena Portal</h2>
+      <p style="color:#aaa;margin:12px 0">You have a run in progress. Coins already banked are safe in your wallet.</p>
+      <p class="menu-hint" style="margin-bottom:20px">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
+      <button class="btn btn-primary" id="btn-resume">Resume Arena Run</button>
+      <button class="btn btn-secondary" id="btn-new">Abandon & Start New Run</button>
+      <button class="btn btn-secondary" id="btn-cancel">Stay in Village</button>
+    `;
+    const resume = screen.querySelector('#btn-resume');
+    const newRun = screen.querySelector('#btn-new');
+    const cancel = screen.querySelector('#btn-cancel');
+    resume.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onResume(); };
+    newRun.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onNewRun(); };
+    cancel.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onCancel(); };
+    this._navCleanup = this._bindMenuList([resume, newRun, cancel]);
   }
 
   showShop(onClose) {

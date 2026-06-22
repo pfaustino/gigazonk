@@ -1,7 +1,6 @@
 import { saveData } from './SaveData.js';
 import { DIFFICULTIES, LANGUAGES } from './settings.js';
-
-const GAME_VERSION = '0.1.0';
+import { GAME_VERSION } from './constants.js';
 
 const MENU_HINT = '↑ ↓ or W S to navigate | Enter, Space, or F to select | Esc back';
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
@@ -13,7 +12,7 @@ RMB drag — Orbit camera
 Shift — Sprint
 Space — Jump / vault over enemies
 Q — Dodge roll
-F — Interact (chests, NPCs, pots)
+F — Interact (chests, NPCs, village portal)
 Mouse wheel — Zoom camera
 Esc — Game menu
 `.trim();
@@ -73,8 +72,18 @@ export class GameMenu {
       ? new Date(saveData.data.savedAt).toLocaleString()
       : 'No save yet';
 
-    this.renderPanel('Game Menu', [
+    const items = [
       { id: 'resume', label: '▶ Resume', action: () => this.close() },
+    ];
+    if (h.inArena) {
+      items.push({
+        id: 'village',
+        label: '🏘️ Return to Village',
+        desc: 'Bank coins & visit the shop',
+        action: () => h.onReturnToVillage?.(),
+      });
+    }
+    items.push(
       { id: 'save', label: '💾 Save Game', desc: `Last: ${saved}`, action: () => { h.onSave?.(); this.flash('Game saved!'); } },
       { id: 'load', label: '📂 Load Game', action: () => { h.onLoad?.(); } },
       { id: 'audio', label: '🔊 Audio', action: () => this.renderAudio() },
@@ -85,7 +94,9 @@ export class GameMenu {
       { id: 'about', label: 'ℹ️ About', action: () => this.renderAbout() },
       { id: 'donation', label: '❤️ Support / Donate', action: () => this.renderDonation() },
       { id: 'exit', label: '🚪 Exit Game', action: () => h.onExit?.() },
-    ], false, 2);
+    );
+
+    this.renderPanel('Game Menu', items, false, 2);
   }
 
   renderPanel(title, items, showBack = true, columns = 1) {

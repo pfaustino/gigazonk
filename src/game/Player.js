@@ -81,9 +81,10 @@ export class Player {
     this.bonkChance = 0;
     this.explodeChance = 0;
     this.healOnKill = 0;
+    this.fireTrailLevel = 0;
     this.projectileSpeedMult = 0;
     this.jumpPeakMult = 0;
-    this.baseJumpPeak = 2.4;
+    this.baseJumpPeak = 4.8;
     this.damagePerKill = 0;
     this.killDamageBonus = 0;
     this.upgradeBoost = 0;
@@ -108,8 +109,7 @@ export class Player {
     this.jumping = false;
     this.jumpTimer = 0;
     this.jumpDuration = 0.45;
-    this.jumpBaseY = 0;
-    this.jumpPeak = 2.4;
+    this.jumpPeak = 4.8;
     this.maxAirJumps = 0;
     this.airJumpsUsed = 0;
     this.level = 1 + meta.startLevel;
@@ -119,6 +119,10 @@ export class Player {
     this.comboTimer = 0;
     this.kills = 0;
     this.groundY = 0;
+    this.worldY = 0;
+    this.airborne = false;
+    this.verticalVel = 0;
+    this.jumpStartWorldY = 0;
     this.position.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
     this.invincible = 0;
@@ -209,12 +213,6 @@ export class Player {
       }
       this.position.addScaledVector(this.velocity, dt);
       this.invincible = Math.max(this.invincible, this.jumpTimer);
-      if (this.jumpTimer <= 0) {
-        this.jumping = false;
-        this.airJumpsUsed = 0;
-        this.jumpBaseY = this.groundY;
-        this.jumpPeak = this.baseJumpPeak * (1 + this.jumpPeakMult);
-      }
     } else if (this.dodging) {
       this.dodgeTimer -= dt;
       this.position.x += this.dodgeDir.x * 28 * dt;
@@ -242,7 +240,12 @@ export class Player {
     }
 
     if (terrain?.resolveObstacleCollision) {
-      const resolved = terrain.resolveObstacleCollision(this.position.x, this.position.z, 0.5);
+      const resolved = terrain.resolveObstacleCollision(
+        this.position.x,
+        this.position.z,
+        0.5,
+        this.jumping || this.airborne ? this.worldY : Math.max(this.worldY, this.groundY)
+      );
       this.position.x = resolved.x;
       this.position.z = resolved.z;
     }
@@ -265,6 +268,7 @@ export class Player {
 
     this.mesh.position.copy(this.position);
     this.groundY = terrain?.getGroundHeight?.(this.position.x, this.position.z) ?? 0;
+    this._updateVertical(dt, terrain);
     this.mesh.rotation.y = this.facing;
     for (const part of this.visualParts) {
       const airy = this.dodging || this.jumping;
@@ -296,25 +300,75 @@ export class Player {
     }
 
     const bob = this._getBob();
-    const jumpHeight = this._getJumpHeight();
-    this.mesh.position.y = this.groundY + jumpHeight + bob;
+    this.mesh.position.y = this.worldY + bob;
 
     this.shadow.position.set(this.position.x, this.groundY + 0.02, this.position.z);
     this.shadow.visible = this.mesh.visible;
-    const heightAboveGround = jumpHeight + bob;
+    const heightAboveGround = Math.max(0, this.worldY - this.groundY) + bob;
     const heightFactor = THREE.MathUtils.clamp(1 - heightAboveGround / 10, 0.2, 1);
     this.shadow.scale.setScalar(0.65 + heightFactor * 0.55);
     this.shadow.material.opacity = 0.12 + heightFactor * 0.33;
   }
 
   _getBob() {
-    return this.jumping ? 0 : Math.sin(Date.now() * 0.008) * 0.05;
+    return (this.jumping || this.airborne || this.dodging) ? 0 : Math.sin(Date.now() * 0.008) * 0.05;
   }
 
-  _getJumpHeight() {
-    if (!this.jumping) return 0;
-    const t = (this.jumpDuration - this.jumpTimer) / this.jumpDuration;
-    return this.jumpBaseY + Math.sin(t * Math.PI) * this.jumpPeak;
+  _updateVertical(dt, terrain) {
+    if (this.jumping) {
+      if (this.jumpTimer <= 0) {
+        this.jumping = false;
+        this.airJumpsUsed = 0;
+        this.worldY = this.jumpStartWorldY;
+        if (this.worldY > this.groundY + 0.2) {
+          this.airborne = true;
+          this.verticalVel = 0;
+        } else {
+          this.worldY = this.groundY;
+          this.airborne = false;
+        }
+        return;
+      }
+      const t = THREE.MathUtils.clamp(
+        (this.jumpDuration - this.jumpTimer) / this.jumpDuration,
+        0,
+        1
+      );
+      this.worldY = this.jumpStartWorldY + Math.sin(t * Math.PI) * this.jumpPeak;
+      return;
+    }
+
+    if (this.airborne) {
+      this.verticalVel -= 28 * dt;
+      this.worldY += this.verticalVel * dt;
+      if (this.worldY <= this.groundY + 0.05) {
+        this.worldY = this.groundY;
+        this.airborne = false;
+        this.verticalVel = 0;
+      }
+      return;
+    }
+
+    if (this.dodging) {
+      this.worldY = this.groundY;
+      return;
+    }
+
+    if (this.worldY > this.groundY + 0.55) {
+      this.airborne = true;
+      this.verticalVel = 0;
+      return;
+    }
+
+    this.worldY = this.groundY;
+  }
+
+  getProjectileY() {
+    return this.mesh.position.y + 0.85;
+  }
+
+  getViewY() {
+    return this.mesh.position.y + 0.9;
   }
 
   takeDamage(amount) {
@@ -384,14 +438,14 @@ export class Player {
   }
 
   _startJump(isAirJump) {
+    this.jumpStartWorldY = this.worldY;
+    this.jumpPeak = this.baseJumpPeak * (1 + this.jumpPeakMult);
     if (isAirJump) {
-      this.jumpBaseY = this._getJumpHeight();
-      this.jumpPeak = this.baseJumpPeak * (1 + this.jumpPeakMult) + this.airJumpsUsed * 1.5;
-    } else {
-      this.jumpBaseY = this.groundY;
-      this.jumpPeak = this.baseJumpPeak * (1 + this.jumpPeakMult);
+      this.jumpPeak += this.airJumpsUsed * 1.5;
     }
     this.jumping = true;
+    this.airborne = false;
+    this.verticalVel = 0;
     this.jumpTimer = this.jumpDuration;
     this.invincible = Math.max(this.invincible, this.jumpDuration);
     this._onJump?.();
@@ -438,6 +492,7 @@ export class Player {
     if (e.projectileSpeedMult) this.projectileSpeedMult += mul(e.projectileSpeedMult);
     if (e.magnetRadius) this.magnetRadius += mul(e.magnetRadius);
     if (e.magnetCooldownMult) this.magnetCooldownMult += e.magnetCooldownMult;
+    if (e.fireTrail) this.fireTrailLevel += mul(e.fireTrail);
     if (e.damagePerKill) this.damagePerKill += mul(e.damagePerKill);
     if (e.upgradeBoost) this.upgradeBoost += e.upgradeBoost;
     if (e.critSplash) this.critSplash += mul(e.critSplash);

@@ -10,11 +10,11 @@ import { UpgradeSystem, SYNERGY_NAME, getUpgradePreview } from './UpgradeSystem.
 import { UI } from './UI.js';
 import { Village } from './Village.js';
 import { Arena } from './Arena.js';
-import { FamiliarManager, RiftManager, SynergyNova } from './Effects.js';
+import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager } from './Effects.js';
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, ARENA_FOG_NEAR, ARENA_FOG_FAR, VILLAGE_FOG_NEAR, VILLAGE_FOG_FAR } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, ARENA_FOG_NEAR, ARENA_FOG_FAR, VILLAGE_FOG_NEAR, VILLAGE_FOG_FAR, PLAYER_BASE } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 
@@ -51,6 +51,7 @@ export class Game {
     this.gems = new GemManager(this.scene);
     this.interactables = new Interactables(this.scene);
     this.familiars = new FamiliarManager(this.scene);
+    this.fireTrail = new FireTrailManager(this.scene);
     this.rifts = new RiftManager(this.scene);
     this.synergy = new SynergyNova(this.scene);
     this.particles = new ParticleSystem(this.scene);
@@ -75,6 +76,7 @@ export class Game {
     this.pendingGigaSpawn = false;
     this.gigaSpawnSurvivalTimer = 0;
     this.runCoins = 0;
+    this.coinsAlreadyBanked = 0;
     this.currentBiome = null;
     this.pendingAction = null;
 
@@ -145,6 +147,8 @@ export class Game {
   }
 
   enterVillage() {
+    saveData.data.runSnapshot = null;
+    saveData.save();
     this.state = 'village';
     this.village.setVisible(true);
     this.arena.setVisible(false);
@@ -155,12 +159,13 @@ export class Game {
     this.player.position.set(0, 0, 5);
     this.player.mesh.visible = true;
     this.cameraController.reset();
-    this.cameraController.apply(this.camera, this.player.position, this.player.groundY + 1);
+    this.cameraController.apply(this.camera, this.player.position, this.player.getViewY());
     this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
     this.quests.assignNewQuests();
   }
 
   startArena() {
+    saveData.data.runSnapshot = null;
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
@@ -172,6 +177,7 @@ export class Game {
     this.scene.fog.color.setHex(this.currentBiome.fog);
     this.scene.background.setHex(this.currentBiome.fog);
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
+    this.interactables.spawnVillagePortal(0, 0);
     this.player.position.set(0, 0, 0);
     this.player.mesh.visible = true;
     this.cameraController.reset();
@@ -192,6 +198,7 @@ export class Game {
     this.pendingGigaSpawn = false;
     this.gigaSpawnSurvivalTimer = 0;
     this.runCoins = 0;
+    this.coinsAlreadyBanked = 0;
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
     this.enemies.reset();
@@ -199,6 +206,7 @@ export class Game {
     this.gems.reset();
     this.interactables.reset();
     this.familiars.reset();
+    this.fireTrail.reset();
     this.rifts.reset();
     this.synergy.reset();
     this.particles.reset();
@@ -212,6 +220,7 @@ export class Game {
     this.gems.reset();
     this.interactables.reset();
     this.familiars.reset();
+    this.fireTrail.reset();
     this.rifts.reset();
     this.synergy.reset();
     this.particles.reset();
@@ -229,7 +238,9 @@ export class Game {
     this.menuPause = true;
     this.paused = true;
     this.ui.gameMenu.open({
+      inArena: this.state === 'arena',
       onResume: () => this.closeGameMenu(),
+      onReturnToVillage: () => this.leaveArenaForVillage(),
       onSave: () => this.saveGame(),
       onLoad: () => this.loadGame(),
       onSettingsChanged: () => {
@@ -239,6 +250,104 @@ export class Game {
       onMainMenu: () => this.returnToTitle(),
       onExit: () => this.exitGame(),
     });
+  }
+
+  computeTotalRunCoins() {
+    return Math.floor(this.elapsed * 0.5) + this.runCoins + this.player.kills;
+  }
+
+  bankRunCoins() {
+    const total = this.computeTotalRunCoins();
+    const delta = total - this.coinsAlreadyBanked;
+    if (delta > 0) {
+      saveData.addCoins(delta);
+      this.coinsAlreadyBanked = total;
+    }
+    return delta;
+  }
+
+  leaveArenaForVillage() {
+    if (this.state !== 'arena') return;
+
+    this.ui._navCleanup?.();
+    this.ui.gameMenu.screen?.remove();
+    this.ui.gameMenu.screen = null;
+    this.ui.gameMenu.handlers = null;
+    this.menuPause = false;
+    this.modalPause = false;
+    this.paused = false;
+    this.input.releaseCameraLook();
+
+    const banked = this.bankRunCoins();
+    const snap = this.captureRunSnapshot();
+    snap.pausedInVillage = true;
+    saveData.data.runSnapshot = snap;
+    saveData.save();
+
+    this.state = 'village';
+    this.village.setVisible(true);
+    this.arena.setVisible(false);
+    this.applyVillageFog();
+    this.hideCombat();
+    this.player.position.set(0, 0, 5);
+    this.player.mesh.visible = true;
+    this.cameraController.reset();
+    this.cameraController.apply(this.camera, this.player.position, 0.9);
+    this.ui.clear();
+    this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+    this.ui.toast(
+      banked > 0
+        ? `Banked ${banked} coins — talk to Merchant Bonk (F)!`
+        : 'Welcome to Zonka Village — visit Merchant Bonk!',
+      'synergy'
+    );
+  }
+
+  resumeArenaRun() {
+    const snap = saveData.data.runSnapshot;
+    if (!snap?.pausedInVillage) return;
+
+    this.input.releaseCameraLook();
+    this.menuPause = false;
+    this.modalPause = false;
+    this.paused = false;
+    this.ui.removeScreens();
+
+    this.state = 'arena';
+    this.village.setVisible(false);
+    this.arena.setVisible(true);
+    this.applyArenaFog();
+    this.enemies.reset();
+    this.projectiles.reset();
+    this.gems.reset();
+    this.interactables.reset();
+    this.familiars.reset();
+    this.fireTrail.reset();
+    this.rifts.reset();
+    this.synergy.reset();
+    this.particles.reset();
+    this.ui.clear();
+    this.ui.buildHUD();
+    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
+    this.interactables.spawnVillagePortal(0, 0);
+    this.player.mesh.visible = true;
+    this.cameraController.reset();
+
+    if (snap.biomeId) {
+      const biome = BIOMES.find(b => b.id === snap.biomeId);
+      if (biome) {
+        this.currentBiome = biome;
+        this.arena.setBiome(biome);
+        this.scene.fog.color.setHex(biome.fog);
+        this.scene.background.setHex(biome.fog);
+      }
+    }
+
+    this.restoreArenaFromSnapshot(snap);
+    snap.pausedInVillage = false;
+    saveData.data.runSnapshot = snap;
+    saveData.save();
+    this.ui.toast('Arena run resumed!', 'synergy');
   }
 
   closeGameMenu() {
@@ -279,9 +388,14 @@ export class Game {
       state: this.state,
       elapsed: this.elapsed,
       runCoins: this.runCoins,
+      coinsAlreadyBanked: this.coinsAlreadyBanked,
       bossTimer: this.bossTimer,
       bossCount: this.bossCount,
       inRift: this.inRift,
+      gigaSpawnTimer: this.gigaSpawnTimer,
+      pendingGigaSpawn: this.pendingGigaSpawn,
+      gigaSpawnSurvivalTimer: this.gigaSpawnSurvivalTimer,
+      pausedInVillage: false,
       characterId: p.characterId,
       player: {
         hp: p.hp,
@@ -296,13 +410,21 @@ export class Game {
         projectileCount: p.projectileCount,
         projectilePierce: p.projectilePierce,
         projectileSpeed: p.projectileSpeed,
+        projectileSpeedMult: p.projectileSpeedMult,
         area: p.area,
         critChance: p.critChance,
+        critDamageMult: p.critDamageMult,
         lifesteal: p.lifesteal,
         thorns: p.thorns,
         familiars: p.familiars,
         pickupRadius: p.pickupRadius,
+        magnetRadius: p.magnetRadius,
         maxAirJumps: p.maxAirJumps,
+        hpRegen: p.hpRegen,
+        coinMult: p.coinMult,
+        armor: p.armor,
+        evasion: p.evasion,
+        fireTrailLevel: p.fireTrailLevel,
         elements: [...p.elements],
         x: p.position.x,
         z: p.position.z,
@@ -314,9 +436,13 @@ export class Game {
   restoreArenaFromSnapshot(snap) {
     this.elapsed = snap.elapsed;
     this.runCoins = snap.runCoins;
+    this.coinsAlreadyBanked = snap.coinsAlreadyBanked ?? 0;
     this.bossTimer = snap.bossTimer;
     this.bossCount = snap.bossCount;
     this.inRift = snap.inRift;
+    this.gigaSpawnTimer = snap.gigaSpawnTimer ?? 0;
+    this.pendingGigaSpawn = snap.pendingGigaSpawn ?? false;
+    this.gigaSpawnSurvivalTimer = snap.gigaSpawnSurvivalTimer ?? 0;
     this.applyPlayerSnapshot(snap);
     if (snap.biomeId) {
       const biome = BIOMES.find(b => b.id === snap.biomeId);
@@ -338,6 +464,7 @@ export class Game {
     this.ui.clear();
     this.ui.buildHUD();
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
+    this.interactables.spawnVillagePortal(0, 0);
     this.player.mesh.visible = true;
     this.cameraController.reset();
     this.restoreArenaFromSnapshot(snap);
@@ -359,13 +486,21 @@ export class Game {
     this.player.projectileCount = p.projectileCount;
     this.player.projectilePierce = p.projectilePierce ?? 0;
     this.player.projectileSpeed = p.projectileSpeed;
+    this.player.projectileSpeedMult = p.projectileSpeedMult ?? 0;
     this.player.area = p.area;
     this.player.critChance = p.critChance;
+    this.player.critDamageMult = p.critDamageMult ?? PLAYER_BASE.critDamageMult;
     this.player.lifesteal = p.lifesteal;
     this.player.thorns = p.thorns;
     this.player.familiars = p.familiars;
     this.player.pickupRadius = p.pickupRadius;
+    this.player.magnetRadius = p.magnetRadius ?? PLAYER_BASE.magnetRadius;
     this.player.maxAirJumps = p.maxAirJumps ?? 0;
+    this.player.hpRegen = p.hpRegen ?? 0;
+    this.player.coinMult = p.coinMult ?? 0;
+    this.player.armor = p.armor ?? 0;
+    this.player.evasion = p.evasion ?? 0;
+    this.player.fireTrailLevel = p.fireTrailLevel ?? 0;
     this.player.airJumpsUsed = 0;
     this.player.elements = new Set(p.elements);
     this.player.position.set(p.x, 0, p.z);
@@ -563,6 +698,7 @@ export class Game {
           ? [...this.player.elements][Math.floor(Math.random() * this.player.elements.size)]
           : null;
         const px = this.player.position.x;
+        const py = this.player.getProjectileY();
         const pz = this.player.position.z;
         const projSpeed = this.player.projectileSpeed * (1 + this.player.projectileSpeedMult);
         const targets = [];
@@ -571,7 +707,7 @@ export class Game {
           targets.push(pick.enemy);
         }
         this.projectiles.fireVolley(
-          px, pz, targets,
+          px, py, pz, targets,
           projSpeed, finalDmg,
           this.player.area, element,
           this.player.projectilePierce,
@@ -605,6 +741,10 @@ export class Game {
       this.handleCombatHit(dmg, result, null, null)
     );
 
+    this.fireTrail.update(dt, this.player, this.enemies, (dmg, result, el) =>
+      this.handleCombatHit(dmg, result, el, null)
+    );
+
     let novaFired = false;
     this.synergy.update(dt, this.player, this.enemies, this.gems, (dmg, result, el) => {
       if (!novaFired) {
@@ -627,9 +767,15 @@ export class Game {
     const nearItem = this.interactables.getNearest(this.player.position.x, this.player.position.z);
     if (nearItem) {
       const label = nearItem.type === 'chest' ? '[F] Open Chest' :
-        nearItem.type === 'pot' ? '[F] Break Pot' : '[F] Ascension Shrine';
+        nearItem.type === 'pot' ? '[F] Break Pot' :
+        nearItem.type === 'village_portal' ? '[F] Return to Village (bank coins)' :
+        '[F] Ascension Shrine';
       this.ui.showInteractPrompt(true, label);
       if (this.input.wasPressed('KeyF')) {
+        if (nearItem.type === 'village_portal') {
+          this.audio.ui();
+          this.leaveArenaForVillage();
+        } else {
         const result = this.interactables.interact(nearItem, this.player, {
           onChest: () => { this.quests.track('chests'); this.audio.chest(); },
           onPot: () => { this.quests.track('pots'); this.audio.chest(); },
@@ -645,6 +791,7 @@ export class Game {
           });
         }
         if (result?.label) this.ui.toast(result.label);
+        }
       }
     } else {
       this.ui.showInteractPrompt(false);
@@ -692,12 +839,29 @@ export class Game {
           this.quests.assignNewQuests();
           this.ui.showQuestBoard(this.quests.getActiveQuests(), () => {});
         } else if (npc.id === 'merchant') {
-          this.ui.showShop(() => {});
+          this.ui.showShop(() => {
+            this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+          });
         } else if (npc.id === 'portal') {
-          this.ui.showCharacterSelect(
-            () => { this.ui.removeScreens(); this.startArena(); },
-            () => { this.ui.removeScreens(); }
-          );
+          if (saveData.data.runSnapshot?.pausedInVillage) {
+            this.ui.showArenaPortalChoice(
+              () => this.resumeArenaRun(),
+              () => {
+                saveData.data.runSnapshot = null;
+                saveData.save();
+                this.ui.showCharacterSelect(
+                  () => { this.ui.removeScreens(); this.startArena(); },
+                  () => { this.ui.removeScreens(); }
+                );
+              },
+              () => { this.ui.removeScreens(); }
+            );
+          } else {
+            this.ui.showCharacterSelect(
+              () => { this.ui.removeScreens(); this.startArena(); },
+              () => { this.ui.removeScreens(); }
+            );
+          }
         }
       }
     } else {
@@ -714,7 +878,7 @@ export class Game {
   }
 
   updateCamera() {
-    this.cameraController.apply(this.camera, this.player.position, this.player.groundY + 1);
+    this.cameraController.apply(this.camera, this.player.position, this.player.getViewY());
   }
 
   onLevelUp() {
@@ -751,8 +915,8 @@ export class Game {
     this.modalPause = true;
     this.paused = true;
     this.input.releaseCameraLook();
-    const coins = Math.floor(this.elapsed * 0.5) + this.runCoins + this.player.kills;
-    saveData.addCoins(coins);
+    const coins = this.bankRunCoins();
+    saveData.data.runSnapshot = null;
     saveData.data.totalKills += this.player.kills;
     if (this.elapsed > saveData.data.bestTime) saveData.data.bestTime = this.elapsed;
     saveData.save();

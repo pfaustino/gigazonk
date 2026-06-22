@@ -74,7 +74,9 @@ export class GemManager {
   }
 
   update(dt, player) {
-    const magnetR = player.magnetActive ? player.magnetRadius * 2 : player.pickupRadius;
+    const collectR = player.magnetActive
+      ? player.magnetRadius * 2
+      : Math.max(player.pickupRadius, player.magnetRadius * 0.55);
     let collectedXp = 0;
 
     for (const g of this.gems) {
@@ -83,7 +85,7 @@ export class GemManager {
       const dz = player.position.z - g.z;
       const dist = Math.hypot(dx, dz);
 
-      if (dist < magnetR) {
+      if (dist < collectR) {
         const pull = player.magnetActive ? 30 : 15;
         if (dist > 0.5) {
           g.x += (dx / dist) * pull * dt;

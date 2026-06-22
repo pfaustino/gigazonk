@@ -186,3 +186,109 @@ export class SynergyNova {
     animate();
   }
 }
+
+const FIRE_PATCH_CAP = 52;
+const FIRE_PATCH_GEO = new THREE.CircleGeometry(1, 12);
+
+export class FireTrailManager {
+  constructor(scene) {
+    this.scene = scene;
+    this.group = new THREE.Group();
+    scene.add(this.group);
+    this.patches = [];
+    this._spawnDistAcc = 0;
+  }
+
+  reset() {
+    for (const p of this.patches) {
+      this.group.remove(p.mesh);
+      p.mesh.material?.dispose();
+    }
+    this.patches = [];
+    this._spawnDistAcc = 0;
+  }
+
+  _spawnPatch(x, z, level, playerDamage) {
+    while (this.patches.length >= FIRE_PATCH_CAP) {
+      const old = this.patches.shift();
+      this.group.remove(old.mesh);
+      old.mesh.material?.dispose();
+    }
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xff6622,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(FIRE_PATCH_GEO, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.08, z);
+    this.group.add(mesh);
+
+    const radius = 1.55 + level * 0.28;
+    const life = 0.95 + level * 0.18;
+    mesh.scale.set(radius, radius, 1);
+
+    this.patches.push({
+      mesh,
+      x,
+      z,
+      life,
+      maxLife: life,
+      radius,
+      tick: 0,
+      damage: Math.max(4, playerDamage * (0.1 + level * 0.035)),
+    });
+  }
+
+  update(dt, player, enemyManager, onHit) {
+    const level = player.fireTrailLevel;
+    if (level <= 0) return;
+
+    const px = player.position.x;
+    const pz = player.position.z;
+    const move = Math.hypot(px - (player._lastPosX ?? px), pz - (player._lastPosZ ?? pz));
+    const speed = Math.hypot(player.velocity.x, player.velocity.z);
+    const spawnGap = Math.max(0.55, 1.35 - level * 0.12);
+
+    if (speed > 0.35 && move > 0.02) {
+      this._spawnDistAcc += move;
+      if (this._spawnDistAcc >= spawnGap) {
+        this._spawnDistAcc = 0;
+        const backX = px - Math.sin(player.facing) * 0.65;
+        const backZ = pz - Math.cos(player.facing) * 0.65;
+        this._spawnPatch(backX, backZ, level, player.getEffectiveDamage());
+      }
+    } else {
+      this._spawnDistAcc = 0;
+    }
+
+    for (let i = this.patches.length - 1; i >= 0; i--) {
+      const p = this.patches[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        this.group.remove(p.mesh);
+        p.mesh.material?.dispose();
+        this.patches.splice(i, 1);
+        continue;
+      }
+
+      const fade = p.life / p.maxLife;
+      p.mesh.material.opacity = 0.25 + fade * 0.65;
+      p.mesh.scale.set(p.radius * (0.75 + fade * 0.35), p.radius * (0.75 + fade * 0.35), 1);
+
+      p.tick -= dt;
+      if (p.tick <= 0) {
+        p.tick = 0.22;
+        const nearby = enemyManager.getNearby(p.x, p.z, p.radius);
+        for (const { enemy } of nearby) {
+          if (!enemy.alive) continue;
+          if (Math.hypot(enemy.x - p.x, enemy.z - p.z) > p.radius + enemy.scale * 0.35) continue;
+          const result = enemyManager.damageEnemy(enemy, p.damage, 'fire');
+          if (result) onHit(p.damage, result, 'fire');
+        }
+      }
+    }
+  }
+}

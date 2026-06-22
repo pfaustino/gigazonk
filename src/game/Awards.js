@@ -45,6 +45,7 @@ export const UPGRADE_TEMPLATES = [
   { id: 'proj_count', name: 'Backpack', icon: '🎒', baseEffect: { projectileCount: 1 }, rarities: RARE_UP, integerEffect: true },
   { id: 'double_jump', name: 'Air Zonk', icon: '🦘', baseEffect: { doubleJump: 1 }, rarities: EPIC_UP, integerEffect: true },
   { id: 'familiar', name: 'Soul Orb', icon: '🌀', baseEffect: { familiars: 1 }, rarities: EPIC_UP, integerEffect: true },
+  { id: 'greased_fire', name: 'Greased Fire', icon: '🛢️', baseEffect: { fireTrail: 1 }, rarities: EPIC_UP, integerEffect: true },
   { id: 'fire', name: 'Dragonfire', icon: '🔥', baseEffect: { element: 'fire' }, rarities: EPIC_UP, onceOnly: true },
   { id: 'ice', name: 'Ice Cube', icon: '❄️', baseEffect: { element: 'ice' }, rarities: EPIC_UP, onceOnly: true },
   { id: 'lightning', name: 'Lightning Orb', icon: '⚡', baseEffect: { element: 'lightning' }, rarities: LEGENDARY_ONLY, onceOnly: true },
@@ -119,6 +120,7 @@ export function formatOfferDesc(template, effect) {
   if (effect.familiars) return `+${effect.familiars} orbiting familiar`;
   if (effect.element) return `${effect.element.charAt(0).toUpperCase() + effect.element.slice(1)} element`;
   if (effect.magnetRadius) return `+${effect.magnetRadius.toFixed(1)} magnet radius`;
+  if (effect.fireTrail) return `Drop burning oil (+${effect.fireTrail} trail level)`;
   return template.name;
 }
 

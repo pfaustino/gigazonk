@@ -143,7 +143,7 @@ export class Arena {
     return h1 - h0 <= this.maxClimb;
   }
 
-  resolveObstacleCollision(x, z, playerRadius = 0.5) {
+  resolveObstacleCollision(x, z, radius = 0.5, entityY = 0) {
     let px = x;
     let pz = z;
     for (let pass = 0; pass < 4; pass++) {
@@ -152,7 +152,7 @@ export class Arena {
           const dx = px - obs.x;
           const dz = pz - obs.z;
           const dist = Math.hypot(dx, dz);
-          const minDist = obs.radius + playerRadius;
+          const minDist = obs.radius + radius;
           if (dist >= minDist) continue;
           if (dist > 0.001) {
             const push = (minDist - dist) / dist;
@@ -162,7 +162,12 @@ export class Arena {
             px += minDist;
           }
         } else if (obs.type === 'aabb') {
-          const resolved = resolveCircleAabb(px, pz, playerRadius, obs);
+          const resolved = resolveCircleAabb(px, pz, radius, obs);
+          px = resolved.x;
+          pz = resolved.z;
+        } else if (obs.type === 'mesa_wall') {
+          if (entityY >= obs.blockBelowY - 0.35) continue;
+          const resolved = resolveCircleAabb(px, pz, radius, obs);
           px = resolved.x;
           pz = resolved.z;
         }

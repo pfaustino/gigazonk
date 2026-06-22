@@ -128,6 +128,9 @@ export function getUpgradePreview(player, upgrade) {
   if (e.magnetRadius) {
     add('Magnet radius', player.magnetRadius, player.magnetRadius + e.magnetRadius, v => fmtNum(v, 1));
   }
+  if (e.fireTrail) {
+    add('Fire trail', player.fireTrailLevel, player.fireTrailLevel + e.fireTrail);
+  }
   if (e.damagePerKill) {
     add('Dmg per kill', player.killDamageBonus, Math.min(0.1, player.killDamageBonus + e.damagePerKill), fmtPct);
   }

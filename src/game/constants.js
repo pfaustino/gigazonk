@@ -1,4 +1,8 @@
 export const ARENA_SIZE = 1200;
+
+/** Bump this on each release. */
+export const GAME_VERSION = '0.1.2';
+
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;
 export const ARENA_SPAWN_PAD_RADIUS = 30;
@@ -7,9 +11,16 @@ export const ARENA_FOG_FAR = ARENA_SIZE * 0.92;
 export const VILLAGE_FOG_NEAR = 80;
 export const VILLAGE_FOG_FAR = 320;
 export const ARENA_ROCK_COUNT = 150;
-export const ARENA_INTERACTABLE_COUNT = 38;
 export const ARENA_LOOT_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_LOOT_MAX_RADIUS = ARENA_SIZE * 0.5 - 24;
+export const ARENA_LOOT_RING_AREA =
+  Math.PI * (ARENA_LOOT_MAX_RADIUS ** 2 - ARENA_LOOT_MIN_RADIUS ** 2);
+/** ~1 chest/pot per 3k sq units in the loot ring (~325 at current arena size). */
+export const ARENA_INTERACTABLE_DENSITY = 3200;
+export const ARENA_INTERACTABLE_COUNT = Math.max(
+  80,
+  Math.round(ARENA_LOOT_RING_AREA / ARENA_INTERACTABLE_DENSITY)
+);
 export const ARENA_SHRINE_RADIUS = ARENA_SIZE * 0.38;
 export const VILLAGE_SIZE = 80;
 
@@ -22,8 +33,8 @@ export const PLAYER_BASE = {
   projectileCount: 1,
   projectilePierce: 0,
   projectileSpeed: 25,
-  pickupRadius: 3,
-  magnetRadius: 8,
+  pickupRadius: 6,
+  magnetRadius: 14,
   critChance: 0.05,
   critDamageMult: 2,
   area: 1,
@@ -37,13 +48,23 @@ export const ENEMY_TYPES = {
   elite: { hpHits: 6, speed: 1.75, damage: 25, xp: 25, color: 0xff44ff, scale: 1.6 },
 };
 
-export const MAX_ENEMIES = 800;
+export const MAX_ENEMIES = 420;
+/** Start slowing spawns above this count (~75% of cap). */
+export const ENEMY_SOFT_CAP = 315;
+/** Despawn non-boss enemies beyond this distance from the player. */
+export const ENEMY_DESPAWN_DISTANCE = 58;
+/** Max despawn per frame to avoid hitches. */
+export const ENEMY_DESPAWN_BATCH = 24;
+/** Full terrain physics only within this radius. */
+export const ENEMY_NEAR_RADIUS = 42;
 export const MAX_PROJECTILES = 200;
 export const MAX_GEMS = 1200;
 
 export const GIGA_SPAWN_INTERVAL = 180;
 export const BASE_SPAWN_GROUP_SIZE = 3;
 export const GROUP_CLUSTER_RADIUS = 3.5;
+export const MAX_SPAWN_GROUP_SIZE = 7;
+export const MAX_GIGA_GROUP_SIZE = 28;
 
 // Level-up awards live in Awards.js (UPGRADE_TEMPLATES + rarity tiers).
 

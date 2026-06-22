@@ -1,12 +1,18 @@
 import * as THREE from 'three';
-import { ARENA_LOOT_MAX_RADIUS, ARENA_SPAWN_PAD_RADIUS } from './constants.js';
+import {
+  ARENA_LOOT_MAX_RADIUS,
+  ARENA_SIZE,
+  ARENA_SPAWN_PAD_RADIUS,
+} from './constants.js';
 
 const WALL_HEIGHT = 2.8;
 const WALL_THICK = 1.35;
+const MESA_BASE_TOP_Y = 3.6;
+const MESA_MAX_HEIGHT_MULT = 5;
+const RAMP_SIDES = ['north', 'south', 'east', 'west'];
 
-/** Wall segments in world units — inner ring near spawn, outer rings fill the 1200 arena. */
-const WALL_BLUEPRINTS = [
-  // Inner — just outside spawn pad (~30)
+/** Hand-tuned inner landmarks — procedural generation fills the rest of the arena. */
+const WALL_SEEDS = [
   { x: 0, z: 34, w: 20, d: WALL_THICK },
   { x: 0, z: -34, w: 20, d: WALL_THICK },
   { x: 34, z: 0, w: WALL_THICK, d: 20 },
@@ -21,50 +27,14 @@ const WALL_BLUEPRINTS = [
   { x: -18, z: 42, w: WALL_THICK, d: 14 },
   { x: 0, z: 48, w: 18, d: WALL_THICK },
   { x: 48, z: 0, w: WALL_THICK, d: 18 },
-  // Mid field
-  { x: 0, z: 95, w: 26, d: WALL_THICK },
-  { x: 0, z: -95, w: 26, d: WALL_THICK },
-  { x: 95, z: 0, w: WALL_THICK, d: 26 },
-  { x: -95, z: 0, w: WALL_THICK, d: 26 },
-  { x: 70, z: 70, w: 18, d: WALL_THICK },
-  { x: -70, z: 70, w: WALL_THICK, d: 18 },
-  { x: 70, z: -70, w: WALL_THICK, d: 18 },
-  { x: -70, z: -70, w: 18, d: WALL_THICK },
-  { x: 120, z: 45, w: 16, d: WALL_THICK },
-  { x: -110, z: -50, w: WALL_THICK, d: 16 },
-  // Outer field
-  { x: 0, z: 210, w: 32, d: WALL_THICK },
-  { x: 0, z: -210, w: 32, d: WALL_THICK },
-  { x: 210, z: 0, w: WALL_THICK, d: 32 },
-  { x: -210, z: 0, w: WALL_THICK, d: 32 },
-  { x: 155, z: 155, w: 22, d: WALL_THICK },
-  { x: -155, z: 155, w: WALL_THICK, d: 22 },
-  { x: 155, z: -155, w: WALL_THICK, d: 22 },
-  { x: -155, z: -155, w: 22, d: WALL_THICK },
-  { x: 260, z: 90, w: 20, d: WALL_THICK },
-  { x: -240, z: -100, w: WALL_THICK, d: 20 },
-  // Far edge
-  { x: 0, z: 420, w: 36, d: WALL_THICK },
-  { x: 0, z: -420, w: 36, d: WALL_THICK },
-  { x: 420, z: 0, w: WALL_THICK, d: 36 },
-  { x: -420, z: 0, w: WALL_THICK, d: 36 },
-  { x: 300, z: 300, w: 24, d: WALL_THICK },
-  { x: -300, z: 300, w: WALL_THICK, d: 24 },
-  { x: 300, z: -300, w: WALL_THICK, d: 24 },
-  { x: -300, z: -300, w: 24, d: WALL_THICK },
 ];
 
-const MESA_BLUEPRINTS = [
-  { cx: 38, cz: 22, w: 14, d: 12, topY: 3.6, rampSide: 'south', rampLen: 6 },
-  { cx: -36, cz: -28, w: 13, d: 13, topY: 4, rampSide: 'east', rampLen: 6.5 },
-  { cx: -20, cz: 44, w: 12, d: 11, topY: 3.2, rampSide: 'north', rampLen: 5.5 },
-  { cx: 105, cz: 65, w: 16, d: 14, topY: 3.8, rampSide: 'west', rampLen: 6 },
-  { cx: -90, cz: -110, w: 15, d: 13, topY: 3.5, rampSide: 'south', rampLen: 6 },
-  { cx: 200, cz: -140, w: 18, d: 15, topY: 4, rampSide: 'east', rampLen: 7 },
-  { cx: -220, cz: 180, w: 17, d: 14, topY: 3.7, rampSide: 'north', rampLen: 6.5 },
-  { cx: 350, cz: 250, w: 20, d: 16, topY: 4.2, rampSide: 'west', rampLen: 7.5 },
-  { cx: -380, cz: -320, w: 19, d: 17, topY: 4, rampSide: 'south', rampLen: 7 },
-  { cx: 460, cz: -200, w: 18, d: 15, topY: 3.9, rampSide: 'east', rampLen: 7 },
+const MESA_SEEDS = [
+  { cx: 38, cz: 22, w: 14, d: 12, rampSide: 'south', rampLen: 6 },
+  { cx: -36, cz: -28, w: 13, d: 13, rampSide: 'east', rampLen: 6.5 },
+  { cx: -20, cz: 44, w: 12, d: 11, rampSide: 'north', rampLen: 5.5 },
+  { cx: 105, cz: 65, w: 16, d: 14, rampSide: 'west', rampLen: 6 },
+  { cx: -90, cz: -110, w: 15, d: 13, rampSide: 'south', rampLen: 6 },
 ];
 
 function wallClearOfSpawn(wall) {
@@ -75,12 +45,304 @@ function wallClearOfSpawn(wall) {
   return Math.hypot(nearX, nearZ) >= ARENA_SPAWN_PAD_RADIUS;
 }
 
+function mesaOverlaps(cx, cz, w, d, mesas, pad = 8) {
+  for (const m of mesas) {
+    const dx = Math.abs(cx - m.cx);
+    const dz = Math.abs(cz - m.cz);
+    const minX = (w + m.w) / 2 + pad;
+    const minZ = (d + m.d) / 2 + pad;
+    if (dx < minX && dz < minZ) return true;
+  }
+  return false;
+}
+
+function finalizeMesa(mesa, heightMult = null) {
+  const baseTopY = mesa.baseTopY ?? MESA_BASE_TOP_Y;
+  const baseRampLen = mesa.rampLen ?? 6;
+  const mult = heightMult ?? (1 + Math.random() * (MESA_MAX_HEIGHT_MULT - 1));
+  const topY = baseTopY * mult;
+  return {
+    cx: mesa.cx,
+    cz: mesa.cz,
+    w: mesa.w,
+    d: mesa.d,
+    topY,
+    rampSide: mesa.rampSide,
+    rampLen: baseRampLen * mult,
+    heightMult: mult,
+  };
+}
+
+function generateProceduralWalls() {
+  const walls = [];
+  const half = ARENA_SIZE * 0.5 - 28;
+
+  for (let r = 52; r < half; r += 34) {
+    const segments = Math.max(10, Math.round(5 + r / 18));
+    for (let i = 0; i < segments; i++) {
+      if (Math.random() > 0.78) continue;
+      const angle = (i / segments) * Math.PI * 2 + (Math.random() - 0.5) * 0.55;
+      const x = Math.cos(angle) * (r + (Math.random() - 0.5) * 16);
+      const z = Math.sin(angle) * (r + (Math.random() - 0.5) * 16);
+      const radial = Math.random() < 0.45;
+      const len = 10 + Math.random() * 14;
+      const wall = radial
+        ? { x, z, w: WALL_THICK, d: len }
+        : { x, z, w: len, d: WALL_THICK };
+      if (!wallClearOfSpawn(wall)) continue;
+      walls.push(wall);
+    }
+  }
+
+  for (let r = 68; r < half; r += 52) {
+    if (Math.random() > 0.82) continue;
+    const span = 14 + Math.random() * 18;
+    walls.push({ x: 0, z: r, w: span, d: WALL_THICK });
+    walls.push({ x: 0, z: -r, w: span, d: WALL_THICK });
+    walls.push({ x: r, z: 0, w: WALL_THICK, d: span });
+    walls.push({ x: -r, z: 0, w: WALL_THICK, d: span });
+  }
+
+  const gridStep = 88;
+  for (let gx = -half; gx <= half; gx += gridStep) {
+    for (let gz = -half; gz <= half; gz += gridStep) {
+      if (Math.random() > 0.68) continue;
+      const x = gx + (Math.random() - 0.5) * gridStep * 0.65;
+      const z = gz + (Math.random() - 0.5) * gridStep * 0.65;
+      if (Math.hypot(x, z) < ARENA_SPAWN_PAD_RADIUS + 14) continue;
+      const alongX = Math.random() < 0.5;
+      const len = 11 + Math.random() * 16;
+      const wall = alongX
+        ? { x, z, w: len, d: WALL_THICK }
+        : { x, z, w: WALL_THICK, d: len };
+      if (!wallClearOfSpawn(wall)) continue;
+      walls.push(wall);
+    }
+  }
+
+  return walls;
+}
+
+function generateProceduralMesas() {
+  const mesas = [];
+  const half = ARENA_SIZE * 0.5 - 36;
+  const gridStep = 78;
+
+  for (let gx = -half; gx <= half; gx += gridStep) {
+    for (let gz = -half; gz <= half; gz += gridStep) {
+      if (Math.random() > 0.58) continue;
+      const cx = gx + (Math.random() - 0.5) * gridStep * 0.72;
+      const cz = gz + (Math.random() - 0.5) * gridStep * 0.72;
+      if (Math.hypot(cx, cz) < ARENA_SPAWN_PAD_RADIUS + 16) continue;
+
+      const w = 10 + Math.random() * 12;
+      const d = 9 + Math.random() * 11;
+      if (mesaOverlaps(cx, cz, w, d, mesas)) continue;
+
+      mesas.push(
+        finalizeMesa({
+          cx,
+          cz,
+          w,
+          d,
+          rampSide: RAMP_SIDES[Math.floor(Math.random() * RAMP_SIDES.length)],
+          rampLen: 5 + Math.random() * 2.5,
+        })
+      );
+    }
+  }
+
+  return mesas;
+}
+
+function addMesaWallObstacles(mesa, obstacles) {
+  const { cx, cz, w, d, rampSide, rampLen } = mesa;
+  const hw = w / 2;
+  const hd = d / 2;
+  const t = WALL_THICK;
+
+  const zMin = rampSide === 'south' ? cz - hd - rampLen : cz - hd;
+  const zMax = rampSide === 'north' ? cz + hd + rampLen : cz + hd;
+  const xMin = rampSide === 'west' ? cx - hw - rampLen : cx - hw;
+  const xMax = rampSide === 'east' ? cx + hw + rampLen : cx + hw;
+
+  if (rampSide !== 'west') {
+    obstacles.push({
+      type: 'mesa_wall',
+      minX: cx - hw - t,
+      maxX: cx - hw + t,
+      minZ: zMin,
+      maxZ: zMax,
+      blockBelowY: mesa.topY,
+    });
+  }
+  if (rampSide !== 'east') {
+    obstacles.push({
+      type: 'mesa_wall',
+      minX: cx + hw - t,
+      maxX: cx + hw + t,
+      minZ: zMin,
+      maxZ: zMax,
+      blockBelowY: mesa.topY,
+    });
+  }
+  if (rampSide !== 'north') {
+    obstacles.push({
+      type: 'mesa_wall',
+      minX: cx - hw,
+      maxX: cx + hw,
+      minZ: cz + hd - t,
+      maxZ: cz + hd + t,
+      blockBelowY: mesa.topY,
+    });
+  }
+  if (rampSide !== 'south') {
+    obstacles.push({
+      type: 'mesa_wall',
+      minX: cx - hw,
+      maxX: cx + hw,
+      minZ: cz - hd - t,
+      maxZ: cz - hd + t,
+      blockBelowY: mesa.topY,
+    });
+  }
+}
+
+function pushTri(positions, indices, a, b, c) {
+  const base = positions.length / 3;
+  positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  indices.push(base, base + 1, base + 2);
+}
+
+function triNormal(a, b, c) {
+  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  return [
+    ab[1] * ac[2] - ab[2] * ac[1],
+    ab[2] * ac[0] - ab[0] * ac[2],
+    ab[0] * ac[1] - ab[1] * ac[0],
+  ];
+}
+
+function dot3(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function orientTri(a, b, c, outwardHint) {
+  if (dot3(triNormal(a, b, c), outwardHint) < 0) return [a, c, b];
+  return [a, b, c];
+}
+
+function pushOrientedTri(positions, indices, a, b, c, outwardHint) {
+  [a, b, c] = orientTri(a, b, c, outwardHint);
+  pushTri(positions, indices, a, b, c);
+}
+
+function pushOrientedQuad(positions, indices, a, b, c, d, outwardHint) {
+  let tri = orientTri(a, b, c, outwardHint);
+  pushTri(positions, indices, tri[0], tri[1], tri[2]);
+  tri = orientTri(a, c, d, outwardHint);
+  pushTri(positions, indices, tri[0], tri[1], tri[2]);
+}
+
+/** Closed triangular prism — winding corrected per face so nothing is backface-culled. */
+function createSolidRampGeometry(mesa) {
+  const { cx, cz, w, d, topY, rampSide, rampLen } = mesa;
+  const hw = w / 2;
+  const hd = d / 2;
+  const positions = [];
+  const indices = [];
+
+  let farL;
+  let farR;
+  let nearL;
+  let nearR;
+  let nearLTop;
+  let nearRTop;
+  let slopeHint;
+  let sideLeftHint;
+  let sideRightHint;
+  let backHint;
+
+  if (rampSide === 'south') {
+    const zFar = cz - hd - rampLen;
+    const zNear = cz - hd;
+    farL = [cx - hw, 0, zFar];
+    farR = [cx + hw, 0, zFar];
+    nearL = [cx - hw, 0, zNear];
+    nearR = [cx + hw, 0, zNear];
+    nearLTop = [cx - hw, topY, zNear];
+    nearRTop = [cx + hw, topY, zNear];
+    slopeHint = [0, topY, -rampLen];
+    sideLeftHint = [-1, 0, 0];
+    sideRightHint = [1, 0, 0];
+    backHint = [0, 0, 1];
+  } else if (rampSide === 'north') {
+    const zNear = cz + hd;
+    const zFar = cz + hd + rampLen;
+    farL = [cx - hw, 0, zFar];
+    farR = [cx + hw, 0, zFar];
+    nearL = [cx - hw, 0, zNear];
+    nearR = [cx + hw, 0, zNear];
+    nearLTop = [cx - hw, topY, zNear];
+    nearRTop = [cx + hw, topY, zNear];
+    slopeHint = [0, topY, rampLen];
+    sideLeftHint = [-1, 0, 0];
+    sideRightHint = [1, 0, 0];
+    backHint = [0, 0, -1];
+  } else if (rampSide === 'east') {
+    const xNear = cx + hw;
+    const xFar = cx + hw + rampLen;
+    farL = [xFar, 0, cz - hd];
+    farR = [xFar, 0, cz + hd];
+    nearL = [xNear, 0, cz - hd];
+    nearR = [xNear, 0, cz + hd];
+    nearLTop = [xNear, topY, cz - hd];
+    nearRTop = [xNear, topY, cz + hd];
+    slopeHint = [rampLen, topY, 0];
+    sideLeftHint = [0, 0, -1];
+    sideRightHint = [0, 0, 1];
+    backHint = [-1, 0, 0];
+  } else {
+    const xNear = cx - hw;
+    const xFar = cx - hw - rampLen;
+    farL = [xFar, 0, cz - hd];
+    farR = [xFar, 0, cz + hd];
+    nearL = [xNear, 0, cz - hd];
+    nearR = [xNear, 0, cz + hd];
+    nearLTop = [xNear, topY, cz - hd];
+    nearRTop = [xNear, topY, cz + hd];
+    slopeHint = [-rampLen, topY, 0];
+    sideLeftHint = [0, 0, -1];
+    sideRightHint = [0, 0, 1];
+    backHint = [1, 0, 0];
+  }
+
+  pushOrientedQuad(positions, indices, farL, nearL, nearR, farR, [0, -1, 0]);
+  pushOrientedQuad(positions, indices, farL, farR, nearRTop, nearLTop, slopeHint);
+  pushOrientedTri(positions, indices, farL, nearL, nearLTop, sideLeftHint);
+  pushOrientedTri(positions, indices, farR, nearRTop, nearR, sideRightHint);
+  pushOrientedQuad(positions, indices, nearL, nearLTop, nearRTop, nearR, backHint);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
 export function generateArenaFeatures() {
-  const mesas = MESA_BLUEPRINTS.map(m => ({ ...m }));
+  const wallBlueprints = [...WALL_SEEDS, ...generateProceduralWalls()];
+  const mesaBlueprints = [
+    ...MESA_SEEDS.map(m => finalizeMesa(m)),
+    ...generateProceduralMesas(),
+  ];
+
+  const mesas = mesaBlueprints;
   const obstacles = [];
   const featureMeshes = [];
 
-  for (const wall of WALL_BLUEPRINTS) {
+  for (const wall of wallBlueprints) {
     if (!wallClearOfSpawn(wall)) continue;
     const halfW = wall.w / 2;
     const halfD = wall.d / 2;
@@ -95,6 +357,7 @@ export function generateArenaFeatures() {
   }
 
   for (const mesa of mesas) {
+    addMesaWallObstacles(mesa, obstacles);
     featureMeshes.push({ kind: 'mesa', ...mesa });
   }
 
@@ -198,30 +461,8 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
       group.add(plat);
       meshes.push(plat);
 
-      const rampGeo = new THREE.BoxGeometry(
-        rampSide === 'east' || rampSide === 'west' ? rampLen : w,
-        0.01,
-        rampSide === 'north' || rampSide === 'south' ? rampLen : d
-      );
+      const rampGeo = createSolidRampGeometry(f);
       const ramp = new THREE.Mesh(rampGeo, rampMat.clone());
-      const rampAngle = Math.atan2(topY, rampLen);
-      if (rampSide === 'south') {
-        ramp.rotation.x = rampAngle;
-        ramp.position.set(cx, topY / 2, cz - d / 2 - rampLen / 2);
-        ramp.scale.set(1, 1, 1 / Math.cos(rampAngle));
-      } else if (rampSide === 'north') {
-        ramp.rotation.x = -rampAngle;
-        ramp.position.set(cx, topY / 2, cz + d / 2 + rampLen / 2);
-        ramp.scale.set(1, 1, 1 / Math.cos(rampAngle));
-      } else if (rampSide === 'east') {
-        ramp.rotation.z = -rampAngle;
-        ramp.position.set(cx + w / 2 + rampLen / 2, topY / 2, cz);
-        ramp.scale.set(1 / Math.cos(rampAngle), 1, 1);
-      } else if (rampSide === 'west') {
-        ramp.rotation.z = rampAngle;
-        ramp.position.set(cx - w / 2 - rampLen / 2, topY / 2, cz);
-        ramp.scale.set(1 / Math.cos(rampAngle), 1, 1);
-      }
       ramp.castShadow = true;
       ramp.receiveShadow = true;
       group.add(ramp);
@@ -242,7 +483,7 @@ export function tintFeatureMeshes(meshes, rockColor) {
 export function isLootSpotClear(x, z, obstacles, mesas) {
   if (Math.hypot(x, z) > ARENA_LOOT_MAX_RADIUS) return false;
   for (const obs of obstacles) {
-    if (obs.type === 'aabb') {
+    if (obs.type === 'aabb' || obs.type === 'mesa_wall') {
       if (x >= obs.minX - 2 && x <= obs.maxX + 2 && z >= obs.minZ - 2 && z <= obs.maxZ + 2) {
         return false;
       }

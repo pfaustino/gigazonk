@@ -1,5 +1,17 @@
 import * as THREE from 'three';
-import { ENEMY_TYPES, BASE_SPAWN_GROUP_SIZE, GROUP_CLUSTER_RADIUS, ARENA_SIZE } from './constants.js';
+import {
+  ENEMY_TYPES,
+  BASE_SPAWN_GROUP_SIZE,
+  GROUP_CLUSTER_RADIUS,
+  ARENA_SIZE,
+  MAX_ENEMIES,
+  ENEMY_SOFT_CAP,
+  ENEMY_DESPAWN_DISTANCE,
+  ENEMY_DESPAWN_BATCH,
+  ENEMY_NEAR_RADIUS,
+  MAX_SPAWN_GROUP_SIZE,
+  MAX_GIGA_GROUP_SIZE,
+} from './constants.js';
 import {
   ENEMY_MESH_CAPS,
   buildEnemyGeometry,
@@ -17,6 +29,7 @@ export class EnemyManager {
     this.spatialCell = 8;
     this.grid = new Map();
     this.spawnTimer = 0;
+    this._deadSinceCompact = 0;
 
     this.meshes = {};
     this.freeSlots = {};
@@ -43,6 +56,7 @@ export class EnemyManager {
     this.enemies = [];
     this.grid.clear();
     this.spawnTimer = 0;
+    this._deadSinceCompact = 0;
     this.lastGroupAnchor = null;
     for (const type of Object.keys(this.meshes)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
@@ -79,6 +93,9 @@ export class EnemyManager {
       burnTimer: 0,
       hpBarVisible: false,
       alive: true,
+      feetY: null,
+      airborne: false,
+      verticalVel: 0,
     };
     this.enemies.push(enemy);
     this.count++;
@@ -109,6 +126,10 @@ export class EnemyManager {
   }
 
   rebuildGrid() {
+    if (this._deadSinceCompact >= 40) {
+      this.enemies = this.enemies.filter(e => e.alive);
+      this._deadSinceCompact = 0;
+    }
     this.grid.clear();
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -136,8 +157,119 @@ export class EnemyManager {
     return results;
   }
 
+  _getEnemyFeetY(enemy, terrain, x, z) {
+    const surfaceY = terrain?.getGroundHeight?.(x, z) ?? 0;
+    if (enemy.airborne) return enemy.feetY ?? surfaceY;
+    if (enemy.feetY == null || enemy.feetY < surfaceY - 0.1) return surfaceY;
+    return enemy.feetY;
+  }
+
+  _canEnemyStep(enemy, fromX, fromZ, toX, toZ, terrain) {
+    if (terrain?.canTraverse && !terrain.canTraverse(fromX, fromZ, toX, toZ)) {
+      return false;
+    }
+    if (!terrain?.getGroundHeight) return true;
+
+    const feet = this._getEnemyFeetY(enemy, terrain, fromX, fromZ);
+    const toH = terrain.getGroundHeight(toX, toZ);
+    if (!enemy.airborne && feet > toH + 0.55) {
+      enemy.airborne = true;
+      enemy.verticalVel = 0;
+      return false;
+    }
+    return true;
+  }
+
+  _moveEnemyOnTerrain(enemy, moveX, moveZ, terrain) {
+    const startX = enemy.x;
+    const startZ = enemy.z;
+    const total = Math.hypot(moveX, moveZ);
+    if (total < 0.0001) return;
+
+    const maxStep = 0.28;
+    const steps = Math.max(1, Math.ceil(total / maxStep));
+    let lastX = startX;
+    let lastZ = startZ;
+
+    for (let s = 1; s <= steps; s++) {
+      const targetX = startX + moveX * (s / steps);
+      const targetZ = startZ + moveZ * (s / steps);
+      if (!this._canEnemyStep(enemy, lastX, lastZ, targetX, targetZ, terrain)) {
+        break;
+      }
+      lastX = targetX;
+      lastZ = targetZ;
+    }
+
+    if (lastX === startX && lastZ === startZ && terrain) {
+      const endX = startX + moveX;
+      const endZ = startZ + moveZ;
+      if (this._canEnemyStep(enemy, startX, startZ, endX, startZ, terrain)) lastX = endX;
+      else if (this._canEnemyStep(enemy, startX, startZ, startX, endZ, terrain)) lastZ = endZ;
+    }
+
+    enemy.x = lastX;
+    enemy.z = lastZ;
+  }
+
+  _updateEnemyVertical(enemy, terrain, dt) {
+    const terrainY = terrain?.getGroundHeight?.(enemy.x, enemy.z) ?? 0;
+    if (enemy.feetY == null) enemy.feetY = terrainY;
+
+    if (enemy.airborne) {
+      enemy.verticalVel -= 28 * dt;
+      enemy.feetY += enemy.verticalVel * dt;
+      if (enemy.feetY <= terrainY + 0.05) {
+        enemy.feetY = terrainY;
+        enemy.airborne = false;
+        enemy.verticalVel = 0;
+      }
+    } else if (enemy.feetY > terrainY + 0.55) {
+      enemy.airborne = true;
+      enemy.verticalVel = 0;
+    } else if (enemy.feetY == null || enemy.feetY <= terrainY + 0.55) {
+      enemy.feetY = terrainY;
+    }
+
+    enemy.groundY = enemy.feetY;
+  }
+
+  _despawnEnemy(enemy) {
+    if (!enemy.alive) return;
+    enemy.alive = false;
+    this.count--;
+    this._deadSinceCompact++;
+    const mesh = this._meshFor(enemy);
+    dummy.position.set(0, 0, 0);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(0, 0, 0);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(enemy.slot, dummy.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
+    this.freeSlots[enemy.type].push(enemy.slot);
+  }
+
+  _cullDistant(playerPos) {
+    let culled = 0;
+    for (const e of this.enemies) {
+      if (!e.alive || e.isBoss) continue;
+      const dist = Math.hypot(e.x - playerPos.x, e.z - playerPos.z);
+      if (dist <= ENEMY_DESPAWN_DISTANCE) continue;
+      this._despawnEnemy(e);
+      culled++;
+      if (culled >= ENEMY_DESPAWN_BATCH) break;
+    }
+  }
+
+  _pressureSpawnScale() {
+    if (this.count <= ENEMY_SOFT_CAP) return 1;
+    const over = (this.count - ENEMY_SOFT_CAP) / (MAX_ENEMIES - ENEMY_SOFT_CAP);
+    return Math.max(0.12, 1 - over * 0.88);
+  }
+
   update(dt, playerPos, terrain = null) {
     this.rebuildGrid();
+    this._cullDistant(playerPos);
 
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -154,17 +286,42 @@ export class EnemyManager {
       const dx = playerPos.x - e.x;
       const dz = playerPos.z - e.z;
       const dist = Math.hypot(dx, dz);
+      const near = dist <= ENEMY_NEAR_RADIUS;
+
       if (dist > 0.1) {
-        e.x += (dx / dist) * e.speed * slowMult * dt;
-        e.z += (dz / dist) * e.speed * slowMult * dt;
+        const moveX = (dx / dist) * e.speed * slowMult * dt;
+        const moveZ = (dz / dist) * e.speed * slowMult * dt;
+        if (near) {
+          this._moveEnemyOnTerrain(e, moveX, moveZ, terrain);
+        } else {
+          e.x += moveX;
+          e.z += moveZ;
+        }
       }
 
-      if (terrain?.resolveObstacleCollision) {
-        const resolved = terrain.resolveObstacleCollision(e.x, e.z, e.scale * 0.42);
-        e.x = resolved.x;
-        e.z = resolved.z;
+      if (near && terrain?.resolveObstacleCollision) {
+        const prevX = e.x;
+        const prevZ = e.z;
+        // Always use ground-level collision for enemies so mesa side walls keep them on the plateau.
+        const resolved = terrain.resolveObstacleCollision(e.x, e.z, e.scale * 0.42, 0);
+        if (
+          !terrain.canTraverse
+          || terrain.canTraverse(prevX, prevZ, resolved.x, resolved.z)
+        ) {
+          e.x = resolved.x;
+          e.z = resolved.z;
+        }
       }
-      e.groundY = terrain?.getGroundHeight?.(e.x, e.z) ?? 0;
+
+      if (near) {
+        this._updateEnemyVertical(e, terrain, dt);
+      } else {
+        const terrainY = terrain?.getGroundHeight?.(e.x, e.z) ?? 0;
+        e.feetY = terrainY;
+        e.groundY = terrainY;
+        e.airborne = false;
+        e.verticalVel = 0;
+      }
 
       this.updateInstance(e);
     }
@@ -174,6 +331,7 @@ export class EnemyManager {
     if (!enemy.alive) return null;
     enemy.alive = false;
     this.count--;
+    this._deadSinceCompact++;
     const xp = enemy.xp;
     const pos = { x: enemy.x, z: enemy.z };
     const mesh = this._meshFor(enemy);
@@ -224,17 +382,21 @@ export class EnemyManager {
   }
 
   _getGroupSize(elapsed, isGigaspawn) {
-    const base = Math.min(10, BASE_SPAWN_GROUP_SIZE + Math.floor(elapsed / 50));
-    if (!isGigaspawn) return base;
-    const mult = 3 + Math.floor(Math.random() * 3);
-    return Math.min(45, base * mult);
+    const base = Math.min(MAX_SPAWN_GROUP_SIZE, BASE_SPAWN_GROUP_SIZE + Math.floor(elapsed / 65));
+    let size = base;
+    if (isGigaspawn) {
+      const mult = 2 + Math.floor(Math.random() * 2);
+      size = Math.min(MAX_GIGA_GROUP_SIZE, base * mult);
+    }
+    const pressure = this._pressureSpawnScale();
+    return Math.max(1, Math.floor(size * pressure));
   }
 
   _spawnCluster(anchorX, anchorZ, count, type, playerDmg, hpMult, speedMult) {
     type = this._resolveType(type);
     let spawned = 0;
     for (let i = 0; i < count; i++) {
-      if (this.count >= 790) break;
+      if (this.count >= MAX_ENEMIES) break;
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * GROUP_CLUSTER_RADIUS;
       const x = anchorX + Math.cos(angle) * r;
@@ -245,16 +407,22 @@ export class EnemyManager {
   }
 
   spawnWave(playerPos, elapsed, inRift, diffMult = 1, dt = 0, hpMultBonus = 1, playerDmg = 10, isGigaspawn = false) {
+    this._cullDistant(playerPos);
+
     const baseInterval = 3;
-    const minInterval = 0.55;
-    const ramp = 1 + elapsed * 0.015;
-    const interval = Math.max(
+    const minInterval = 0.7;
+    const ramp = 1 + elapsed * 0.012;
+    let interval = Math.max(
       minInterval,
       baseInterval / ramp / (inRift ? 1.35 : 1) / Math.sqrt(diffMult)
     );
+    if (this.count > ENEMY_SOFT_CAP) {
+      const over = (this.count - ENEMY_SOFT_CAP) / (MAX_ENEMIES - ENEMY_SOFT_CAP);
+      interval *= 1 + over * 3.5;
+    }
 
     this.spawnTimer += dt;
-    if (this.spawnTimer < interval || this.count >= 790) return { spawned: 0, isGigaspawn: false };
+    if (this.spawnTimer < interval || this.count >= MAX_ENEMIES) return { spawned: 0, isGigaspawn: false };
     this.spawnTimer -= interval;
 
     const minDist = 12;

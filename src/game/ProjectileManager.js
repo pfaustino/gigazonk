@@ -33,11 +33,11 @@ export class ProjectileManager {
     this.mesh.count = 0;
   }
 
-  fire(px, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null, isCrit = false) {
+  fire(px, py, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null, isCrit = false) {
     if (this.freeSlots.length === 0) return;
     const slot = this.freeSlots.pop();
     const p = {
-      slot, px, pz,
+      slot, px, py, pz,
       vx: Math.sin(angle) * speed,
       vz: Math.cos(angle) * speed,
       speed,
@@ -56,10 +56,10 @@ export class ProjectileManager {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
-  fireVolley(px, pz, targetEnemies, speed, damage, area, element, pierce = 0, isCrit = false) {
+  fireVolley(px, py, pz, targetEnemies, speed, damage, area, element, pierce = 0, isCrit = false) {
     for (const enemy of targetEnemies) {
       const angle = Math.atan2(enemy.x - px, enemy.z - pz);
-      this.fire(px, pz, angle, speed, damage, area, element, pierce, enemy, isCrit);
+      this.fire(px, py, pz, angle, speed, damage, area, element, pierce, enemy, isCrit);
     }
   }
 
@@ -98,7 +98,7 @@ export class ProjectileManager {
     if (!p.alive) {
       dummy.scale.set(0, 0, 0);
     } else {
-      dummy.position.set(p.px, 1.1, p.pz);
+      dummy.position.set(p.px, p.py, p.pz);
       dummy.scale.set(p.area, p.area, p.area);
       dummy.rotation.y = Math.atan2(p.vx, p.vz);
     }

@@ -4,6 +4,8 @@ import {
   ARENA_GROUND_SEGMENTS,
   ARENA_REFERENCE_SIZE,
   ARENA_ROCK_COUNT,
+  ARENA_ROCK_MAX_RADIUS,
+  ARENA_ROCK_MIN_RADIUS,
   ARENA_SPAWN_PAD_RADIUS,
   BIOMES,
   getBiomeOuterColor,
@@ -22,6 +24,16 @@ import {
 function tintTerrainMaterial(material, color) {
   material.color.setHex(color);
   if (material.emissive) material.emissive.setHex(color);
+}
+
+const _rockBox = new THREE.Box3();
+
+function placeRockOnGround(rock, x, z, mesas) {
+  rock.position.set(x, 0, z);
+  rock.updateMatrixWorld(true);
+  _rockBox.setFromObject(rock);
+  const groundY = sampleGroundHeight(x, z, mesas);
+  rock.position.y = groundY - _rockBox.min.y + 0.02;
 }
 
 export class Arena {
@@ -80,30 +92,44 @@ export class Arena {
 
     this.obstacles = [...features.obstacles];
     this.rocks = [];
+    const minR = ARENA_ROCK_MIN_RADIUS;
+    const maxR = ARENA_ROCK_MAX_RADIUS;
+    const minR2 = minR * minR;
+    const maxR2 = maxR * maxR;
     for (let i = 0; i < ARENA_ROCK_COUNT; i++) {
-      const radius = 0.5 + Math.random() * 0.8;
+      const isBoulder = Math.random() < 0.2;
+      const radius = isBoulder
+        ? 2.0 + Math.random() * 2.8
+        : 0.5 + Math.random() * 0.8;
       const rockGeo = new THREE.DodecahedronGeometry(radius, 0);
-      const rockMat = createTerrainLambertMaterial(0x5e5448);
+      const rockMat = createTerrainLambertMaterial(0x6a6054);
       const rock = new THREE.Mesh(rockGeo, rockMat);
+      const scaleXZ = 0.85 + Math.random() * 0.3;
+      const scaleY = 0.75 + Math.random() * 0.35;
+      rock.rotation.y = Math.random() * Math.PI * 2;
+      rock.rotation.x = (Math.random() - 0.5) * 0.35;
+      rock.rotation.z = (Math.random() - 0.5) * 0.35;
+      rock.scale.set(scaleXZ, scaleY, scaleXZ);
+      const collisionRadius = radius * scaleXZ;
 
-      let x;
-      let z;
-      for (let attempt = 0; attempt < 24; attempt++) {
-        x = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
-        z = (Math.random() - 0.5) * ARENA_SIZE * 0.8;
-        if (Math.hypot(x, z) > ARENA_SPAWN_PAD_RADIUS + radius + 1) break;
-      }
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.sqrt(minR2 + Math.random() * (maxR2 - minR2));
+      const x = Math.cos(angle) * dist;
+      const z = Math.sin(angle) * dist;
 
-      rock.position.set(x, radius * 0.55, z);
+      placeRockOnGround(rock, x, z, this.mesas);
       rock.castShadow = true;
+      rock.receiveShadow = true;
       this.group.add(rock);
       this.rocks.push(rock);
+      rock.updateMatrixWorld(true);
+      _rockBox.setFromObject(rock);
       this.obstacles.push({
         type: 'circle',
         x,
         z,
-        radius,
-        blockBelowY: radius * 1.1 + 0.15,
+        radius: collisionRadius,
+        blockBelowY: _rockBox.max.y,
       });
     }
 
@@ -194,6 +220,23 @@ export class Arena {
       }
     }
     return { x: px, z: pz };
+  }
+
+  isProjectileBlocked(x, z, radius, projectileY) {
+    for (const obs of this.obstacles) {
+      if (obs.type === 'circle') {
+        const blockY = obs.blockBelowY ?? obs.radius * 1.1 + 0.15;
+        if (projectileY >= blockY - 0.35) continue;
+        if (Math.hypot(x - obs.x, z - obs.z) < obs.radius + radius) return true;
+      } else if (obs.type === 'aabb' || obs.type === 'mesa_wall') {
+        const blockY = obs.blockBelowY ?? GROUND_WALL_HEIGHT;
+        if (projectileY >= blockY - 0.35) continue;
+        const cx = THREE.MathUtils.clamp(x, obs.minX, obs.maxX);
+        const cz = THREE.MathUtils.clamp(z, obs.minZ, obs.maxZ);
+        if (Math.hypot(x - cx, z - cz) < radius) return true;
+      }
+    }
+    return false;
   }
 
   getWave(elapsed) {

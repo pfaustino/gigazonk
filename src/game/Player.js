@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PLAYER_BASE, CHARACTERS, ARENA_SIZE } from './constants.js';
 import { saveData } from './SaveData.js';
+import { applySkillBonusesToPlayer } from './SkillTree.js';
 import { buildPlayerVisual } from './EntityVisuals.js';
 
 export class Player {
@@ -48,45 +49,24 @@ export class Player {
   }
 
   reset() {
-    const meta = saveData.data.meta;
     const char = CHARACTERS.find(c => c.id === this.characterId) || CHARACTERS[0];
     const m = char.mods;
 
-    this.maxHp = (PLAYER_BASE.maxHp + meta.hp) * (m.hpMult || 1);
-    this.hp = this.maxHp;
-    this.speed = PLAYER_BASE.speed * (1 + meta.speed) * (m.speedMult || 1);
-    this.damage = PLAYER_BASE.damage * (1 + meta.damage) * (m.damageMult || 1);
-    this.attackRate = PLAYER_BASE.attackRate * (m.attackRateMult || 1);
-    this.projectileCount = PLAYER_BASE.projectileCount + (m.projectileCount || 0);
-    this.projectilePierce = PLAYER_BASE.projectilePierce;
     this.projectileSpeed = PLAYER_BASE.projectileSpeed;
-    this.pickupRadius = PLAYER_BASE.pickupRadius + meta.pickup;
     this.magnetRadius = PLAYER_BASE.magnetRadius;
-    this.critChance = PLAYER_BASE.critChance + (m.critChance || 0);
-    this.critDamageMult = PLAYER_BASE.critDamageMult;
-    this.area = PLAYER_BASE.area;
-    this.lifesteal = m.lifesteal || 0;
-    this.thorns = m.thorns || 0;
     this.familiars = 0;
-    this.hpRegen = 0;
     this.runXpMult = 0;
     this.killXpMult = 0;
-    this.coinMult = 0;
-    this.evasion = 0;
-    this.armor = 0;
     this.meleeBonus = 0;
     this.airDamageMult = 0;
-    this.bossDamageMult = 0;
     this.poisonChance = 0;
     this.bonkChance = 0;
     this.explodeChance = 0;
-    this.healOnKill = 0;
     this.fireTrailLevel = 0;
     this.projectileSpeedMult = 0;
     this.jumpPeakMult = 0;
     this.baseJumpPeak = 4.8;
     this.jumpGravity = 17;
-    this.damagePerKill = 0;
     this.killDamageBonus = 0;
     this.upgradeBoost = 0;
     this.critSplash = 0;
@@ -99,7 +79,7 @@ export class Player {
     this._lastPosZ = 0;
     this.elements = new Set();
     if (char.startElement) this.elements.add(char.startElement);
-    this.comboMultBonus = m.comboMult || 1;
+    this.lightningChains = 3;
     this.attackTimer = 0;
     this.magnetCooldown = 0;
     this.magnetActive = false;
@@ -114,9 +94,7 @@ export class Player {
     this.maxAirJumps = 0;
     this.airJumpsUsed = 0;
     this.knockbackTimer = 0;
-    this.level = 1 + meta.startLevel;
     this.xp = 0;
-    this.xpToNext = this.xpForLevel(this.level);
     this.combo = 0;
     this.comboTimer = 0;
     this.kills = 0;
@@ -128,6 +106,10 @@ export class Player {
     this.position.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
     this.invincible = 0;
+    this._skillXpMult = 0;
+
+    applySkillBonusesToPlayer(this, m, saveData.data.skillLevels);
+    this.xpToNext = this.xpForLevel(this.level);
     this.setCharacter(this.characterId);
     this._captureRunBaseline();
   }
@@ -149,6 +131,11 @@ export class Player {
       familiars: this.familiars,
       maxAirJumps: this.maxAirJumps,
       fireTrailLevel: this.fireTrailLevel,
+      hpRegen: this.hpRegen,
+      evasion: this.evasion,
+      armor: this.armor,
+      bossDamageMult: this.bossDamageMult,
+      coinMult: this.coinMult,
       elements: new Set(this.elements),
     };
   }
@@ -158,7 +145,7 @@ export class Player {
   }
 
   get xpMult() {
-    return (1 + saveData.data.meta.xp) * (1 + this.runXpMult);
+    return (1 + (this._skillXpMult ?? 0)) * (1 + this.runXpMult);
   }
 
   getEffectiveSpeed() {
@@ -415,14 +402,14 @@ export class Player {
 
   addXp(amount) {
     this.xp += Math.floor(amount * this.xpMult);
-    let leveled = false;
+    let levelsGained = 0;
     while (this.xp >= this.xpToNext) {
       this.xp -= this.xpToNext;
       this.level++;
       this.xpToNext = this.xpForLevel(this.level);
-      leveled = true;
+      levelsGained++;
     }
-    return leveled;
+    return levelsGained;
   }
 
   addKill() {
@@ -497,6 +484,7 @@ export class Player {
     if (e.critChance) this.critChance = Math.min(0.75, this.critChance + mul(e.critChance));
     if (e.critDamageMult) this.critDamageMult += mul(e.critDamageMult);
     if (e.element) this.elements.add(e.element);
+    if (e.lightningChains) this.lightningChains += mul(e.lightningChains);
     if (e.familiars) this.familiars += mul(e.familiars);
     if (e.lifesteal) this.lifesteal += mul(e.lifesteal);
     if (e.thorns) this.thorns += mul(e.thorns);

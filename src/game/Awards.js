@@ -48,7 +48,7 @@ export const UPGRADE_TEMPLATES = [
   { id: 'greased_fire', name: 'Greased Fire', icon: '🛢️', baseEffect: { fireTrail: 1 }, rarities: EPIC_UP, integerEffect: true },
   { id: 'fire', name: 'Dragonfire', icon: '🔥', baseEffect: { element: 'fire' }, rarities: EPIC_UP, onceOnly: true },
   { id: 'ice', name: 'Ice Cube', icon: '❄️', baseEffect: { element: 'ice' }, rarities: EPIC_UP, onceOnly: true },
-  { id: 'lightning', name: 'Lightning Orb', icon: '⚡', baseEffect: { element: 'lightning' }, rarities: LEGENDARY_ONLY, onceOnly: true },
+  { id: 'lightning', name: 'Lightning Orb', icon: '⚡', baseEffect: { element: 'lightning', lightningChains: 2 }, rarities: LEGENDARY_ONLY, onceOnly: true },
   { id: 'proj_pierce', name: 'Pierce Zonk', icon: '🏹', baseEffect: { pierce: 1 }, rarities: LEGENDARY_ONLY, integerEffect: true, fixedEffect: true },
   { id: 'big_bonk', name: 'Big Bonk', icon: '🔨', baseEffect: { bonkChance: 0.02 }, rarities: LEGENDARY_ONLY },
   { id: 'grandmas_tonic', name: "Grandma's Tonic", icon: '🍵', baseEffect: { critSplash: 0.45 }, rarities: LEGENDARY_ONLY },
@@ -57,12 +57,12 @@ export const UPGRADE_TEMPLATES = [
   { id: 'anvil', name: 'Anvil', icon: '🔩', baseEffect: { upgradeBoost: 0.22 }, rarities: LEGENDARY_ONLY, onceOnly: true, fixedEffect: true },
 ];
 
-const FIXED_KEYS = new Set(['pierce', 'element', 'doubleJump', 'familiars', 'projectileCount']);
+const FIXED_KEYS = new Set(['pierce', 'element', 'doubleJump', 'familiars', 'projectileCount', 'lightningChains']);
 
 function scaleValue(key, value, mult, template) {
   if (template.fixedEffect && FIXED_KEYS.has(key)) return value;
   if (key === 'pierce') return 1;
-  if (key === 'element') return value;
+  if (key === 'lightningChains') return value;
   if (template.integerEffect && Number.isInteger(value)) {
     return Math.max(1, Math.ceil(value * mult));
   }
@@ -118,7 +118,7 @@ export function formatOfferDesc(template, effect) {
   if (effect.pierce) return `Projectiles penetrate +1 enemy`;
   if (effect.doubleJump) return `+${effect.doubleJump} air jump`;
   if (effect.familiars) return `+${effect.familiars} orbiting familiar`;
-  if (effect.element) return `${effect.element.charAt(0).toUpperCase() + effect.element.slice(1)} element`;
+  if (effect.element) return `${effect.element.charAt(0).toUpperCase() + effect.element.slice(1)} element${effect.lightningChains ? `, +${effect.lightningChains} chain jumps` : ''}`;
   if (effect.magnetRadius) return `+${effect.magnetRadius.toFixed(1)} magnet radius`;
   if (effect.fireTrail) return `Drop burning oil (+${effect.fireTrail} trail level)`;
   return template.name;

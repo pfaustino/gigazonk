@@ -33,7 +33,7 @@ export class ProjectileManager {
     this.mesh.count = 0;
   }
 
-  fire(px, py, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null, isCrit = false) {
+  fire(px, py, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null, isCrit = false, lightningChains = 3) {
     if (this.freeSlots.length === 0) return;
     const slot = this.freeSlots.pop();
     const p = {
@@ -43,6 +43,7 @@ export class ProjectileManager {
       speed,
       damage, area, element,
       pierce,
+      lightningChains,
       isCrit,
       hitEnemies: new Set(),
       targetEnemy,
@@ -56,10 +57,10 @@ export class ProjectileManager {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
-  fireVolley(px, py, pz, targetEnemies, speed, damage, area, element, pierce = 0, isCrit = false) {
+  fireVolley(px, py, pz, targetEnemies, speed, damage, area, element, pierce = 0, isCrit = false, lightningChains = 3) {
     for (const enemy of targetEnemies) {
       const angle = Math.atan2(enemy.x - px, enemy.z - pz);
-      this.fire(px, py, pz, angle, speed, damage, area, element, pierce, enemy, isCrit);
+      this.fire(px, py, pz, angle, speed, damage, area, element, pierce, enemy, isCrit, lightningChains);
     }
   }
 
@@ -108,7 +109,7 @@ export class ProjectileManager {
     this.mesh.setColorAt(p.slot, _color.setHex(tint));
   }
 
-  update(dt, enemyManager, onHit) {
+  update(dt, enemyManager, arena, onHit) {
     for (const p of this.projectiles) {
       if (!p.alive) continue;
       p.life -= dt;
@@ -125,17 +126,33 @@ export class ProjectileManager {
       p.px += p.vx * dt;
       p.pz += p.vz * dt;
 
+      const hitRadius = Math.max(0.12, p.area * 0.4);
+      if (arena?.isProjectileBlocked(p.px, p.pz, hitRadius, p.py)) {
+        this.remove(p);
+        continue;
+      }
+
       const nearby = this._getCollisionTargets(p, enemyManager);
       for (const { enemy } of nearby) {
         if (!enemy.alive || p.hitEnemies.has(enemy)) continue;
         if (Math.hypot(enemy.x - p.px, enemy.z - p.pz) < p.area + enemy.scale * 0.4) {
           p.hitEnemies.add(enemy);
           if (p.targetEnemy === enemy) p.targetEnemy = null;
+          const hitX = enemy.x;
+          const hitZ = enemy.z;
           const result = enemyManager.damageEnemy(enemy, p.damage, p.element);
           onHit(p.damage, result, p.element, enemy, p.isCrit);
 
-          if (p.element === 'lightning' && enemy.alive) {
-            this.chainLightning(enemy, p.damage * 0.6, enemyManager, onHit, 3, new Set([enemy]));
+          if (p.element === 'lightning') {
+            this.chainLightning(
+              hitX,
+              hitZ,
+              p.damage * 0.6,
+              enemyManager,
+              onHit,
+              p.lightningChains,
+              new Set([enemy])
+            );
           }
 
           if (p.hitEnemies.size >= p.pierce + 1) {
@@ -150,9 +167,9 @@ export class ProjectileManager {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
-  chainLightning(fromEnemy, damage, enemyManager, onHit, chainsLeft, hitSet) {
+  chainLightning(fromX, fromZ, damage, enemyManager, onHit, chainsLeft, hitSet) {
     if (chainsLeft <= 0) return;
-    const nearby = enemyManager.getNearby(fromEnemy.x, fromEnemy.z, 6);
+    const nearby = enemyManager.getNearby(fromX, fromZ, 7);
     let best = null;
     let bestDist = Infinity;
     for (const { enemy, dist } of nearby) {
@@ -163,7 +180,7 @@ export class ProjectileManager {
     hitSet.add(best);
     const result = enemyManager.damageEnemy(best, damage, 'lightning');
     onHit(damage, result, 'lightning', best);
-    this.chainLightning(best, damage * 0.7, enemyManager, onHit, chainsLeft - 1, hitSet);
+    this.chainLightning(best.x, best.z, damage * 0.7, enemyManager, onHit, chainsLeft - 1, hitSet);
   }
 
   remove(p) {

@@ -78,6 +78,7 @@ export class GemManager {
       ? player.magnetRadius * 2
       : Math.max(player.pickupRadius, player.magnetRadius * 0.55);
     let collectedXp = 0;
+    let collectedGems = 0;
 
     for (const g of this.gems) {
       if (!g.alive) continue;
@@ -95,6 +96,7 @@ export class GemManager {
 
       if (dist < 1.2) {
         collectedXp += g.value;
+        collectedGems++;
         g.alive = false;
         this.freeSlots.push(g.slot);
         dummy.scale.set(0, 0, 0);
@@ -105,6 +107,6 @@ export class GemManager {
       }
     }
     this.mesh.instanceMatrix.needsUpdate = true;
-    return collectedXp;
+    return { xp: collectedXp, gems: collectedGems };
   }
 }

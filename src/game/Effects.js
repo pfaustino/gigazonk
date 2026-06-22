@@ -239,7 +239,7 @@ export class FireTrailManager {
     const mat = new THREE.MeshBasicMaterial({
       color: 0xff6622,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.28,
       depthWrite: false,
       depthTest: true,
       side: THREE.DoubleSide,
@@ -302,7 +302,7 @@ export class FireTrailManager {
       }
 
       const fade = p.life / p.maxLife;
-      p.mesh.material.opacity = 0.3 + fade * 0.7;
+      p.mesh.material.opacity = 0.1 + fade * 0.35;
       const pulse = 0.88 + Math.sin((1 - fade) * Math.PI) * 0.18;
       p.mesh.scale.set(pulse, pulse, 1);
 

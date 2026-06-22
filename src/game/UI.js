@@ -1,5 +1,12 @@
-import { SHOP_ITEMS, SHOP_MAX_LEVEL, getShopUpgradeCost, CHARACTERS, QUESTS, SYNERGY_ELEMENTS, GAME_VERSION } from './constants.js';
+import { CHARACTERS, QUESTS, SYNERGY_ELEMENTS, GAME_VERSION } from './constants.js';
 import { saveData } from './SaveData.js';
+import {
+  SKILL_BRANCHES,
+  SKILL_MAX_LEVEL,
+  SKILL_TREE,
+  getSkillUpgradeCost,
+  isSkillUnlocked,
+} from './SkillTree.js';
 import { GameMenu } from './GameMenu.js';
 import { getUpgradePreview, getActiveBuffs, RARITIES } from './UpgradeSystem.js';
 
@@ -18,6 +25,24 @@ export class UI {
     this._rewardSeq = 0;
     this._rewardQueue = [];
     this._rewardShowcaseActive = false;
+    this.levelUpActive = false;
+  }
+
+  isLevelUpOpen() {
+    return this.levelUpActive || !!document.getElementById('levelup-overlay');
+  }
+
+  dismissRewardFlyers() {
+    this.layer?.querySelectorAll('.reward-flyer').forEach((el) => el.remove());
+    this._rewardShowcaseActive = false;
+  }
+
+  dismissLevelUp() {
+    this.levelUpActive = false;
+    this._navCleanup?.();
+    this._navCleanup = null;
+    document.getElementById('levelup-overlay')?.remove();
+    this.layer?.querySelectorAll('.levelup-screen').forEach((s) => s.remove());
   }
 
   clear() {
@@ -174,7 +199,7 @@ export class UI {
       <h2 style="color:#b8a8ff">📜 Elder Zonka's Quest Board</h2>
       <p style="color:#888;margin:8px 0">${completed}/${QUESTS.length} quests completed</p>
       <div class="quest-board">${active}</div>
-      ${available.length ? `<p style="color:#666;font-size:12px;margin-top:12px">${available.length} more quests available — they'll be assigned automatically</p>` : ''}
+      ${available.length ? `<p style="color:#666;font-size:12px;margin-top:12px">${available.length} more quests available</p>` : ''}
       <p class="menu-hint" style="margin-top:16px">${CONFIRM_HINT} | Esc back</p>
       <button class="btn btn-secondary" id="btn-close" style="margin-top:12px">Close</button>
     `;
@@ -554,7 +579,15 @@ export class UI {
   }
 
   showLevelUp(choices, player, onPick) {
-    const screen = this._screen();
+    if (!choices?.length) return false;
+
+    this.dismissLevelUp();
+    this.dismissRewardFlyers();
+
+    const container = document.getElementById('game-container') || this.layer;
+    const screen = document.createElement('div');
+    screen.id = 'levelup-overlay';
+    screen.className = 'screen levelup-screen';
     screen.innerHTML = `
       <h2 style="font-size:36px;color:#f7c948">LEVEL UP!</h2>
       <p style="color:#888;margin-bottom:8px">Choose your Zonk upgrade</p>
@@ -589,9 +622,7 @@ export class UI {
     });
 
     const confirm = (upgrade) => {
-      this._navCleanup?.();
-      this._navCleanup = null;
-      screen.remove();
+      this.dismissLevelUp();
       onPick(upgrade);
     };
 
@@ -599,13 +630,20 @@ export class UI {
       card.onclick = () => confirm(choices[i]);
     });
 
-    this._navCleanup?.();
-    this._navCleanup = this._bindGridNavigation({
-      cards,
-      columns: 3,
-      focusClass: 'focused',
-      onConfirm: (idx) => confirm(choices[idx]),
-    });
+    container.appendChild(screen);
+    try {
+      this.levelUpActive = true;
+      this._navCleanup = this._bindGridNavigation({
+        cards,
+        columns: Math.min(3, cards.length),
+        focusClass: 'focused',
+        onConfirm: (idx) => confirm(choices[idx]),
+      });
+      return true;
+    } catch (err) {
+      this.dismissLevelUp();
+      throw err;
+    }
   }
 
   showGameOver(stats, onAction) {
@@ -650,42 +688,68 @@ export class UI {
     this._navCleanup = this._bindMenuList([resume, newRun, cancel]);
   }
 
-  showShop(onClose) {
+  showSkillTree(onClose) {
     this._navCleanup?.();
     this._navCleanup = null;
     const screen = this._screen();
-    const items = SHOP_ITEMS.map(item => {
-      const level = saveData.getShopLevel(item.id);
-      const maxed = level >= SHOP_MAX_LEVEL;
-      const cost = getShopUpgradeCost(item, level);
+    const levels = saveData.data.skillLevels;
+
+    const branchCols = SKILL_BRANCHES.map((branch) => {
+      const skills = SKILL_TREE.filter((s) => s.branch === branch.id)
+        .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+      const maxTier = Math.max(...skills.map((s) => s.tier));
+
+      const nodes = skills.map((skill) => {
+        const lv = levels[skill.id] ?? 0;
+        const maxed = lv >= SKILL_MAX_LEVEL;
+        const unlocked = isSkillUnlocked(skill, levels);
+        const cost = getSkillUpgradeCost(skill, lv);
+        const state = maxed ? 'maxed' : unlocked ? 'available' : 'locked';
+        const reqText = !unlocked && skill.requires?.length
+          ? `Requires: ${skill.requires.map((id) => SKILL_TREE.find((s) => s.id === id)?.name ?? id).join(', ')}`
+          : '';
+        return `
+          <div class="skill-node skill-node--${state}" data-id="${skill.id}" data-tier="${skill.tier}"
+               style="--branch-color:${branch.color}" title="${skill.desc}${reqText ? ` — ${reqText}` : ''}">
+            <div class="skill-node-icon">${skill.icon}</div>
+            <div class="skill-node-name">${skill.name}</div>
+            <div class="skill-node-level">${lv}/${SKILL_MAX_LEVEL}</div>
+            <div class="skill-node-cost">${maxed ? 'MAX' : unlocked ? `${cost} 🪙` : '🔒'}</div>
+          </div>
+        `;
+      }).join('');
+
       return `
-        <div class="shop-item ${maxed ? 'maxed' : ''}" data-id="${item.id}">
-          <h4>${item.name}</h4>
-          <p>${item.desc}</p>
-          <div class="shop-level">Level ${level}/${SHOP_MAX_LEVEL}</div>
-          <div class="cost">${maxed ? 'MAX' : `${cost} coins`}</div>
+        <div class="skill-branch" data-branch="${branch.id}" style="--branch-color:${branch.color}">
+          <div class="skill-branch-header">
+            <span class="skill-branch-icon">${branch.icon}</span>
+            <span class="skill-branch-name">${branch.name}</span>
+          </div>
+          <div class="skill-branch-tree" style="--max-tier:${maxTier}">
+            ${nodes}
+          </div>
         </div>
       `;
     }).join('');
 
     screen.innerHTML = `
-      <h2 style="color:#f7c948">Merchant Bonk's Shop</h2>
+      <h2 style="color:#f7c948">Coach Zonk's Skill Tree</h2>
       <div class="currency-display">🪙 ${saveData.data.zonkCoins} Zonk Coins</div>
-      <p class="menu-hint" style="margin:12px 0">↑ ↓ or W S to navigate | ${CONFIRM_HINT} | Esc leave</p>
-      <div class="shop-grid">${items}</div>
-      <button class="btn btn-secondary" id="btn-close">Leave Shop</button>
+      <p class="menu-hint" style="margin:12px 0">↑ ↓ or W S to navigate | ${CONFIRM_HINT} upgrade | Esc leave</p>
+      <div class="skill-tree">${branchCols}</div>
+      <button class="btn btn-secondary" id="btn-close">Leave Trainer</button>
     `;
 
-    const purchasable = [...screen.querySelectorAll('.shop-item:not(.maxed)')];
-    purchasable.forEach((el) => {
+    const upgradeable = [...screen.querySelectorAll('.skill-node--available')];
+    upgradeable.forEach((el) => {
       el.onclick = () => {
-        const item = SHOP_ITEMS.find(i => i.id === el.dataset.id);
-        if (!item) return;
-        if (saveData.applyShopUpgrade(item)) {
-          this.toast(`Upgraded ${item.name}!`);
-          this.showShop(onClose);
+        const skill = SKILL_TREE.find((s) => s.id === el.dataset.id);
+        if (!skill) return;
+        if (saveData.applySkillUpgrade(skill.id)) {
+          this.toast(`Upgraded ${skill.name}!`);
+          this.showSkillTree(onClose);
         } else {
-          this.toast('Not enough coins!');
+          this.toast('Not enough coins or skill maxed!');
         }
       };
     });
@@ -699,7 +763,7 @@ export class UI {
     };
     closeBtn.onclick = leave;
 
-    const navItems = [...purchasable, closeBtn];
+    const navItems = [...upgradeable, closeBtn];
     this._navCleanup = this._bindMenuList(navItems, leave);
   }
 
@@ -961,6 +1025,7 @@ export class UI {
   }
 
   removeScreens() {
+    this.dismissLevelUp();
     this._navCleanup?.();
     this._navCleanup = null;
     if (this.gameMenu.isOpen()) {

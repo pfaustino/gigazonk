@@ -12,6 +12,8 @@ export class QuestSystem {
       kills: 0,
       chests: 0,
       pots: 0,
+      gems: 0,
+      guardians: 0,
       time: 0,
       level: 1,
       bosses: 0,
@@ -31,27 +33,40 @@ export class QuestSystem {
   }
 
   checkCompletions() {
-    for (const questId of saveData.data.activeQuests) {
-      const quest = QUESTS.find(q => q.id === questId);
-      if (!quest) continue;
-      const current = this.progress[quest.type] || 0;
-      if (current >= quest.target) {
-        saveData.addCoins(quest.reward);
-        saveData.completeQuest(questId);
-        saveData.addReputation(5);
-        return { completed: quest, reward: quest.reward };
+    let lastCompleted = null;
+    for (;;) {
+      let completed = null;
+      for (const questId of saveData.data.activeQuests) {
+        const quest = QUESTS.find(q => q.id === questId);
+        if (!quest) continue;
+        const current = this.progress[quest.type] || 0;
+        if (current >= quest.target) {
+          saveData.addCoins(quest.reward);
+          saveData.completeQuest(questId);
+          saveData.addReputation(5);
+          completed = { completed: quest, reward: quest.reward };
+          break;
+        }
       }
+      if (!completed) break;
+      lastCompleted = completed;
+      this.assignNewQuests();
     }
-    return null;
+    return lastCompleted;
   }
 
   getActiveQuests() {
+    this.assignNewQuests();
     return saveData.data.activeQuests.map(id => {
       const quest = QUESTS.find(q => q.id === id);
       if (!quest) return null;
+      const raw = this.progress[quest.type] || 0;
+      const current = quest.type === 'time'
+        ? Math.min(Math.floor(raw), quest.target)
+        : Math.min(raw, quest.target);
       return {
         ...quest,
-        current: Math.min(this.progress[quest.type] || 0, quest.target),
+        current,
       };
     }).filter(Boolean);
   }
@@ -61,10 +76,12 @@ export class QuestSystem {
       !saveData.data.completedQuests.includes(q.id) &&
       !saveData.data.activeQuests.includes(q.id)
     );
+    let added = false;
     while (saveData.data.activeQuests.length < 3 && available.length > 0) {
       const pick = available.splice(Math.floor(Math.random() * available.length), 1)[0];
       saveData.data.activeQuests.push(pick.id);
+      added = true;
     }
-    saveData.save();
+    if (added) saveData.save();
   }
 }

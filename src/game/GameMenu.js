@@ -80,7 +80,7 @@ export class GameMenu {
       items.push({
         id: 'village',
         label: '🏘️ Return to Village',
-        desc: 'Bank coins & visit the shop',
+        desc: 'Bank coins & visit the Trainer',
         action: () => h.onReturnToVillage?.(),
       });
     }

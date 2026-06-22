@@ -1,32 +1,22 @@
 import { DEFAULT_SETTINGS } from './settings.js';
-import { SHOP_ITEMS, SHOP_MAX_LEVEL, getShopUpgradeCost } from './constants.js';
+import { QUESTS } from './constants.js';
+import {
+  SKILL_MAX_LEVEL,
+  SKILL_TREE,
+  getSkillById,
+  getSkillUpgradeCost,
+  migrateSkillLevels,
+} from './SkillTree.js';
 
 const SAVE_KEY = 'gigazonk_save';
-
-function migrateShopLevels(parsed) {
-  if (parsed.shopLevels) return parsed.shopLevels;
-  const levels = {};
-  for (const id of parsed.purchasedShop || []) {
-    levels[id] = 1;
-  }
-  return levels;
-}
 
 const DEFAULT_SAVE = {
   zonkCoins: 0,
   reputation: 0,
-  shopLevels: {},
+  skillLevels: {},
   totalKills: 0,
   totalRuns: 0,
   bestTime: 0,
-  meta: {
-    damage: 0,
-    hp: 0,
-    speed: 0,
-    xp: 0,
-    pickup: 0,
-    startLevel: 0,
-  },
   activeQuests: ['kill_50', 'chests_3', 'survive_5'],
   completedQuests: [],
   selectedCharacter: 'fox',
@@ -49,9 +39,10 @@ export class SaveData {
         return {
           ...DEFAULT_SAVE,
           ...parsed,
-          meta: { ...DEFAULT_SAVE.meta, ...parsed.meta },
           settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
-          shopLevels: migrateShopLevels(parsed),
+          skillLevels: migrateSkillLevels(parsed),
+          activeQuests: (parsed.activeQuests ?? DEFAULT_SAVE.activeQuests)
+            .filter((id) => QUESTS.some((q) => q.id === id)),
           unlockedCharacters: parsed.unlockedCharacters || DEFAULT_SAVE.unlockedCharacters,
           selectedCharacter: parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter,
           runSnapshot: parsed.runSnapshot ?? null,
@@ -84,26 +75,21 @@ export class SaveData {
     return true;
   }
 
-  getShopLevel(id) {
-    return this.data.shopLevels[id] ?? 0;
+  getSkillLevel(id) {
+    return this.data.skillLevels[id] ?? 0;
   }
 
-  applyShopUpgrade(item) {
-    const level = this.getShopLevel(item.id);
-    if (level >= SHOP_MAX_LEVEL) return false;
+  applySkillUpgrade(skillId) {
+    const skill = getSkillById(skillId);
+    if (!skill) return false;
 
-    const cost = getShopUpgradeCost(item, level);
+    const level = this.getSkillLevel(skillId);
+    if (level >= SKILL_MAX_LEVEL) return false;
+
+    const cost = getSkillUpgradeCost(skill, level);
     if (cost == null || !this.spendCoins(cost)) return false;
 
-    this.data.shopLevels[item.id] = level + 1;
-    const meta = this.data.meta;
-    const e = item.effect;
-    if (e.metaDamage) meta.damage += e.metaDamage;
-    if (e.metaHp) meta.hp += e.metaHp;
-    if (e.metaSpeed) meta.speed += e.metaSpeed;
-    if (e.metaXp) meta.xp += e.metaXp;
-    if (e.metaPickup) meta.pickup += e.metaPickup;
-    if (e.startLevel) meta.startLevel += e.startLevel;
+    this.data.skillLevels[skillId] = level + 1;
     this.save();
     return true;
   }

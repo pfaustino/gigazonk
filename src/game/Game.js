@@ -27,6 +27,7 @@ export class Game {
     this.audio = new Audio();
     this.ui.setAudio(this.audio);
     this.quests = new QuestSystem();
+    this.quests.assignNewQuests();
     this.upgrades = new UpgradeSystem();
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -81,6 +82,7 @@ export class Game {
     this.coinsAlreadyBanked = 0;
     this.currentBiome = null;
     this.pendingAction = null;
+    this.pendingLevelUps = 0;
 
     canvas.addEventListener('click', () => this.audio.resume());
 
@@ -188,6 +190,7 @@ export class Game {
     this.arena.setVisible(true);
     this.applyArenaScene();
     this.resetRun();
+    this.quests.assignNewQuests();
     this.ui.clear();
     this.ui.buildHUD();
     this.currentBiome = this.arena.pickRandomBiome();
@@ -232,6 +235,8 @@ export class Game {
     this.gigaSpawnSurvivalTimer = 0;
     this.runCoins = 0;
     this.coinsAlreadyBanked = 0;
+    this.pendingLevelUps = 0;
+    this.ui.dismissLevelUp();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
     this.enemies.reset();
@@ -265,6 +270,33 @@ export class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  queueLevelUp(count = 1) {
+    if (count > 0) this.pendingLevelUps += count;
+  }
+
+  recoverStuckModalPause() {
+    if (this.ui.isLevelUpOpen()) {
+      if (!this.modalPause || !this.paused) {
+        this.modalPause = true;
+        this.paused = true;
+      }
+      return;
+    }
+    if (!this.modalPause && !this.paused) return;
+    if (this.ui.gameMenu.isOpen()) return;
+
+    this.modalPause = false;
+    this.paused = false;
+    this.ui.dismissLevelUp();
+    this.ui._navCleanup?.();
+    this.ui._navCleanup = null;
+  }
+
+  flushPendingLevelUp() {
+    if (this.pendingLevelUps <= 0 || this.modalPause || this.ui.isLevelUpOpen()) return;
+    this.onLevelUp();
   }
 
   openGameMenu() {
@@ -364,6 +396,7 @@ export class Game {
     this.particles.reset();
     this.ui.clear();
     this.ui.buildHUD();
+    this.quests.assignNewQuests();
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
     this.interactables.spawnVillagePortal(0, 0);
     this.player.mesh.visible = true;
@@ -462,6 +495,7 @@ export class Game {
         evasion: p.evasion,
         fireTrailLevel: p.fireTrailLevel,
         elements: [...p.elements],
+        lightningChains: p.lightningChains ?? 3,
         x: p.position.x,
         z: p.position.z,
       },
@@ -496,6 +530,7 @@ export class Game {
     this.arena.setVisible(true);
     this.applyArenaScene();
     this.resetRun();
+    this.quests.assignNewQuests();
     this.ui.clear();
     this.ui.buildHUD();
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
@@ -540,6 +575,7 @@ export class Game {
     this.player.fireTrailLevel = p.fireTrailLevel ?? 0;
     this.player.airJumpsUsed = 0;
     this.player.elements = new Set(p.elements);
+    this.player.lightningChains = p.lightningChains ?? 3;
     this.player.position.set(p.x, 0, p.z);
   }
 
@@ -589,7 +625,10 @@ export class Game {
         killResult.pos.x, killResult.pos.z, xpValue,
         this.player.position.x, this.player.position.z
       );
-      if (overflow > 0 && this.player.addXp(overflow)) this.onLevelUp();
+      if (overflow > 0) {
+        const levels = this.player.addXp(overflow);
+        if (levels > 0) this.queueLevelUp(levels);
+      }
       if (this.player.coinMult > 0) {
         this.runCoins += Math.max(1, Math.floor(this.player.coinMult * 10));
       }
@@ -597,6 +636,7 @@ export class Game {
       if (killResult.isBoss) {
         this.quests.track('bosses');
         if (enemy?.isMesaGuardian) {
+          this.quests.track('guardians');
           this.interactables.removeMesaBeaconForGuardian(enemy);
         }
         this.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
@@ -670,6 +710,8 @@ export class Game {
     if (!this.modalPause && !this.ui.gameMenu.isOpen() && this.input.wasPressed('Escape')) {
       this.openGameMenu();
     }
+
+    this.recoverStuckModalPause();
 
     this.updateCameraInput();
     this.updateCamera();
@@ -761,21 +803,23 @@ export class Game {
           projSpeed, finalDmg,
           this.player.area, element,
           this.player.projectilePierce,
-          isCrit
+          isCrit,
+          this.player.lightningChains
         );
         this.player.resetAttackTimer();
         this.audio.shoot();
       }
     }
 
-    this.projectiles.update(dt, this.enemies, (dmg, result, el, enemy, isCrit) =>
+    this.projectiles.update(dt, this.enemies, this.arena, (dmg, result, el, enemy, isCrit) =>
       this.handleCombatHit(dmg, result, el, enemy, { isCrit })
     );
 
-    const xp = this.gems.update(dt, this.player);
+    const { xp, gems } = this.gems.update(dt, this.player);
+    if (gems > 0) this.quests.track('gems', gems);
     if (xp > 0) {
-      const leveled = this.player.addXp(xp);
-      if (leveled) this.onLevelUp();
+      const levels = this.player.addXp(xp);
+      if (levels > 0) this.queueLevelUp(levels);
     }
 
     if (this.player.thorns > 0) {
@@ -815,7 +859,7 @@ export class Game {
 
     this.interactables.update(dt, this.player.position.x, this.player.position.z);
     const nearItem = this.interactables.getNearest(this.player.position.x, this.player.position.z);
-    if (nearItem) {
+    if (!this.paused && nearItem) {
       const label = nearItem.type === 'chest' ? '[F] Open Chest' :
         nearItem.type === 'pot' ? '[F] Break Pot' :
         nearItem.type === 'mesa_cache' ? '[F] Claim Mesa Treasure' :
@@ -836,13 +880,16 @@ export class Game {
           onToast: (msg) => this.ui.toast(msg),
         });
         if (result?.loot || result?.preview) {
-          this.ui.pushReward({
-            icon: result.icon || '🎁',
-            name: result.name || result.loot?.label || 'Reward',
-            stats: result.preview || [],
-          });
+          if (!result?.levelsGained) {
+            this.ui.pushReward({
+              icon: result.icon || '🎁',
+              name: result.name || result.loot?.label || 'Reward',
+              stats: result.preview || [],
+            });
+          }
         }
         if (result?.label) this.ui.toast(result.label);
+        if (result?.levelsGained) this.queueLevelUp(result.levelsGained);
         }
       }
     } else {
@@ -911,8 +958,8 @@ export class Game {
         if (npc.id === 'questgiver') {
           this.quests.assignNewQuests();
           this.ui.showQuestBoard(this.quests.getActiveQuests(), () => {});
-        } else if (npc.id === 'merchant') {
-          this.ui.showShop(() => {
+        } else if (npc.id === 'trainer') {
+          this.ui.showSkillTree(() => {
             this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
           });
         } else if (npc.id === 'portal') {
@@ -955,34 +1002,60 @@ export class Game {
   }
 
   onLevelUp() {
-    this.modalPause = true;
-    this.paused = true;
+    if (this.pendingLevelUps <= 0 || this.ui.isLevelUpOpen()) return;
+
     this.input.releaseCameraLook();
-    this.audio.levelUp();
-    const choices = this.upgrades.getRandomChoices(3, this.player);
+    let choices;
+    try {
+      choices = this.upgrades.getRandomChoices(3, this.player);
+    } catch (err) {
+      console.error('Failed to roll level-up choices', err);
+      this.pendingLevelUps = Math.max(0, this.pendingLevelUps - 1);
+      this.player.heal(this.player.maxHp * 0.25);
+      this.flushPendingLevelUp();
+      return;
+    }
+
     if (choices.length === 0) {
       this.player.heal(this.player.maxHp * 0.25);
       this.ui.toast('Power surge! +25% HP — all upgrades capped', 'synergy');
-      this.modalPause = false;
-      this.paused = false;
+      this.pendingLevelUps = Math.max(0, this.pendingLevelUps - 1);
+      this.flushPendingLevelUp();
       return;
     }
-    this.ui.showLevelUp(choices, this.player, (upgrade) => {
-      const preview = getUpgradePreview(this.player, upgrade);
-      this.upgrades.apply(upgrade, this.player);
-      this.ui.renderBuffBar(this.player);
-      this.ui.pushReward({
-        icon: upgrade.icon,
-        name: upgrade.name,
-        stats: preview,
-        rarity: upgrade.rarity,
+
+    try {
+      const shown = this.ui.showLevelUp(choices, this.player, (upgrade) => {
+        try {
+          const preview = getUpgradePreview(this.player, upgrade);
+          this.upgrades.apply(upgrade, this.player);
+          this.ui.renderBuffBar(this.player);
+          this.ui.pushReward({
+            icon: upgrade.icon,
+            name: upgrade.name,
+            stats: preview,
+            rarity: upgrade.rarity,
+          });
+          if (this.upgrades.checkSynergy(this.player)) {
+            this.ui.toast(`🔥 Synergy unlocked: ${SYNERGY_NAME}!`, 'synergy');
+          }
+        } finally {
+          this.modalPause = false;
+          this.paused = false;
+          this.pendingLevelUps = Math.max(0, this.pendingLevelUps - 1);
+          this.flushPendingLevelUp();
+        }
       });
-      if (this.upgrades.checkSynergy(this.player)) {
-        this.ui.toast(`🔥 Synergy unlocked: ${SYNERGY_NAME}!`, 'synergy');
-      }
+      if (!shown) return;
+      this.audio.levelUp();
+      this.modalPause = true;
+      this.paused = true;
+    } catch (err) {
+      console.error('Level up UI failed', err);
+      this.ui.dismissLevelUp();
       this.modalPause = false;
       this.paused = false;
-    });
+    }
   }
 
   gameOver() {
@@ -1019,8 +1092,13 @@ export class Game {
     this.timer.update(timestamp);
     const dt = Math.min(this.timer.getDelta(), 0.05);
 
-    if (this.state === 'arena') this.updateArena(dt);
-    else if (this.state === 'village') this.updateVillage(dt);
+    if (this.state === 'arena') {
+      this.updateArena(dt);
+      this.recoverStuckModalPause();
+      this.flushPendingLevelUp();
+    } else if (this.state === 'village') {
+      this.updateVillage(dt);
+    }
 
     this.input.endFrame();
     this.renderer.render(this.scene, this.camera);

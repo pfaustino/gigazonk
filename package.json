@@ -1,11 +1,12 @@
 {
   "name": "gigazonk",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:itch": "vite build --base=./",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"
   },

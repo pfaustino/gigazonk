@@ -81,10 +81,19 @@ html, body {
 #ui-layer button,
 #ui-layer .btn,
 #ui-layer .char-card,
-#ui-layer .shop-item,
+#ui-layer .skill-node,
 #ui-layer .upgrade-card,
 #ui-layer .paypal-donate-slot {
   pointer-events: auto;
+}
+
+#levelup-overlay,
+#levelup-overlay .upgrade-card {
+  pointer-events: auto;
+}
+
+#levelup-overlay {
+  z-index: 1000;
 }
 
 /* HUD */
@@ -435,7 +444,7 @@ html, body {
   box-shadow: none;
 }
 
-#ui-layer.keyboard-nav-active .shop-item:hover:not(.focused) {
+#ui-layer.keyboard-nav-active .skill-node:hover:not(.focused) {
   border-color: #4a3a8a;
 }
 
@@ -516,7 +525,110 @@ html, body {
   color: #6ee86e;
 }
 
-/* Shop */
+/* Skill tree */
+.skill-tree {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 960px;
+  margin: 16px 0;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.skill-branch {
+  background: rgba(12, 10, 28, 0.85);
+  border: 2px solid color-mix(in srgb, var(--branch-color) 40%, #4a3a8a);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.skill-branch-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--branch-color) 30%, transparent);
+}
+
+.skill-branch-icon { font-size: 20px; }
+.skill-branch-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--branch-color);
+}
+
+.skill-branch-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-node {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  align-items: center;
+  background: rgba(20, 15, 40, 0.9);
+  border: 2px solid #4a3a8a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: default;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.skill-node--available {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--branch-color) 55%, #4a3a8a);
+}
+
+.skill-node--available:hover:not(.focused),
+.skill-node--available.focused {
+  border-color: var(--branch-color);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--branch-color) 35%, transparent);
+}
+
+.skill-node--maxed {
+  opacity: 0.6;
+  border-color: #3a5a3a;
+}
+
+.skill-node--locked {
+  opacity: 0.45;
+}
+
+.skill-node-icon {
+  grid-row: 1 / 3;
+  font-size: 22px;
+  text-align: center;
+}
+
+.skill-node-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f0e6d3;
+}
+
+.skill-node-level {
+  font-size: 10px;
+  color: #aaa;
+}
+
+.skill-node-cost {
+  grid-row: 1 / 3;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4ade80;
+  text-align: right;
+  min-width: 48px;
+}
+
+.skill-node--locked .skill-node-cost { color: #888; }
+.skill-node--maxed .skill-node-cost { color: #888; }
+
+/* Shop (legacy) */
 .shop-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

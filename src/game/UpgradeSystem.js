@@ -1,5 +1,4 @@
-import { SYNERGY_ELEMENTS, SYNERGY_NAME, SHOP_ITEMS, SHOP_MAX_LEVEL } from './constants.js';
-import { saveData } from './SaveData.js';
+import { SYNERGY_ELEMENTS, SYNERGY_NAME } from './constants.js';
 import {
   RARITIES,
   UPGRADE_TEMPLATES,
@@ -22,7 +21,7 @@ function fmtElements(elements) {
 }
 
 export function getUpgradePreview(player, upgrade) {
-  const e = upgrade.effect;
+  const e = upgrade?.effect ?? {};
   const lines = [];
 
   const add = (label, before, after, format = fmtNum) => {
@@ -65,6 +64,9 @@ export function getUpgradePreview(player, upgrade) {
     const after = new Set(player.elements);
     after.add(e.element);
     add('Elements', fmtElements(player.elements), fmtElements(after), v => v);
+  }
+  if (e.lightningChains) {
+    add('Lightning chains', player.lightningChains, player.lightningChains + e.lightningChains);
   }
   if (e.familiars) {
     add('Familiars', player.familiars, player.familiars + e.familiars);
@@ -248,43 +250,9 @@ const ELEMENT_ICONS = {
   lightning: '⚡',
 };
 
-const SHOP_BUFF_ICONS = {
-  meta_damage: '⚔️',
-  meta_hp: '❤️',
-  meta_speed: '👢',
-  meta_xp: '📚',
-  meta_start_level: '🎯',
-  meta_magnet: '🧲',
-};
-
-function shopBuffAmount(item) {
-  const meta = saveData.data.meta;
-  const e = item.effect;
-  if (e.metaDamage) return `+${Math.round(meta.damage * 100)}%`;
-  if (e.metaHp) return `+${meta.hp}`;
-  if (e.metaSpeed) return `+${Math.round(meta.speed * 100)}%`;
-  if (e.metaXp) return `+${Math.round(meta.xp * 100)}%`;
-  if (e.startLevel) return `L${1 + meta.startLevel}`;
-  if (e.metaPickup) return `+${meta.pickup}`;
-  return '✓';
-}
-
-/** Permanent village shop upgrades — shown in the buff bar when leveled. */
-export function getMetaBuffs() {
-  return SHOP_ITEMS
-    .filter((item) => saveData.getShopLevel(item.id) > 0)
-    .map((item) => ({
-      icon: SHOP_BUFF_ICONS[item.id] || '🏪',
-      amount: shopBuffAmount(item),
-      title: `${item.name} — ${item.desc} (Lv ${saveData.getShopLevel(item.id)}/${SHOP_MAX_LEVEL})`,
-      meta: true,
-    }));
-}
-
 export function getActiveBuffs(player) {
-  const metaBuffs = getMetaBuffs();
   const base = player.runBaseline;
-  if (!base) return metaBuffs;
+  if (!base) return [];
 
   const buffs = [];
   const add = (icon, amount, title) => buffs.push({ icon, amount, title });
@@ -336,16 +304,19 @@ export function getActiveBuffs(player) {
       add(ELEMENT_ICONS[el] || '✨', 'ON', `${el} element`);
     }
   }
+  if (player.lightningChains > 3) {
+    add('⚡', `×${player.lightningChains}`, 'Lightning chains');
+  }
 
   if (player.magnetActive) add('🧲', 'ON', 'Magnet pulse');
 
-  if (player.hpRegen > 0) add('🩹', fmtNum(player.hpRegen, 1), 'HP regen');
+  if (player.hpRegen > (base.hpRegen ?? 0)) add('🩹', fmtNum(player.hpRegen - (base.hpRegen ?? 0), 1), 'HP regen');
   if (player.runXpMult > 0) add('⌚', fmtPct(player.runXpMult), 'XP gain');
-  if (player.evasion > 0) add('💍', fmtPct(player.evasion), 'Evasion');
-  if (player.armor > 0) add('🛡️', fmtPct(player.armor), 'Armor');
+  if (player.evasion > (base.evasion ?? 0)) add('💍', fmtPct(player.evasion - (base.evasion ?? 0)), 'Evasion');
+  if (player.armor > (base.armor ?? 0)) add('🛡️', fmtPct(player.armor - (base.armor ?? 0)), 'Armor');
   if (player.meleeBonus > 0) add('👊', fmtPct(player.meleeBonus), 'Melee');
   if (player.airDamageMult > 0) add('🧣', fmtPct(player.airDamageMult), 'Air dmg');
-  if (player.bossDamageMult > 0) add('💀', fmtPct(player.bossDamageMult), 'Boss dmg');
+  if (player.bossDamageMult > (base.bossDamageMult ?? 0)) add('💀', fmtPct(player.bossDamageMult - (base.bossDamageMult ?? 0)), 'Boss dmg');
   if (player.poisonChance > 0) add('🧀', fmtPct(player.poisonChance), 'Poison');
   if (player.bonkChance > 0) add('🔨', fmtPct(player.bonkChance), 'Bonk');
   if (player.explodeChance > 0) add('🧆', fmtPct(player.explodeChance), 'Explode');
@@ -355,9 +326,9 @@ export function getActiveBuffs(player) {
   const trailLevel = player.fireTrailLevel ?? 0;
   const baseTrail = base.fireTrailLevel ?? 0;
   if (trailLevel > baseTrail) add('🛢️', `L${trailLevel}`, 'Greased Fire');
-  if (player.coinMult > 0) add('🧤', fmtPct(player.coinMult), 'Coins');
+  if (player.coinMult > (base.coinMult ?? 0)) add('🧤', fmtPct(player.coinMult - (base.coinMult ?? 0)), 'Coins');
 
-  return [...metaBuffs, ...buffs];
+  return buffs;
 }
 
 export class UpgradeSystem {
@@ -391,10 +362,7 @@ export class UpgradeSystem {
 
   _isTemplateAvailable(template, player) {
     const id = template.id;
-    if (template.baseEffect.element && this.hasElement(template.baseEffect.element)) return false;
-    if (id === 'fire' && this.hasElement('fire')) return false;
-    if (id === 'ice' && this.hasElement('ice')) return false;
-    if (id === 'lightning' && this.hasElement('lightning')) return false;
+    if (template.baseEffect.element && player?.elements?.has(template.baseEffect.element)) return false;
     if (this._isCapped(id, player)) return false;
     if (template.onceOnly && this.taken.has(id)) return false;
     return true;

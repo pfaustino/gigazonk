@@ -302,12 +302,13 @@ export class Interactables {
       this.removeMesh(item);
       const loot = pickLoot();
       const preview = getLootPreview(player, loot);
-      this.applyLoot(loot, player, callbacks);
+      const levelsGained = this.applyLoot(loot, player, callbacks);
       callbacks.onChest?.();
       return {
         type: 'chest',
         loot,
         preview,
+        levelsGained,
         icon: LOOT_REWARD_ICONS[loot.type] || '🎁',
         name: loot.label,
       };
@@ -318,12 +319,13 @@ export class Interactables {
       this.removeMesh(item);
       const loot = pickLoot();
       const preview = getLootPreview(player, loot);
-      this.applyLoot(loot, player, callbacks);
+      const levelsGained = this.applyLoot(loot, player, callbacks);
       callbacks.onPot?.();
       return {
         type: 'pot',
         loot,
         preview,
+        levelsGained,
         icon: LOOT_REWARD_ICONS[loot.type] || '🏺',
         name: loot.label,
       };
@@ -352,12 +354,13 @@ export class Interactables {
       this._disposeItemMeshes(item);
       const loot = pickLoot(MESA_LOOT_TABLE);
       const preview = getLootPreview(player, loot);
-      this.applyLoot(loot, player, callbacks);
+      const levelsGained = this.applyLoot(loot, player, callbacks);
       callbacks.onMesaCache?.();
       return {
         type: 'mesa_cache',
         loot,
         preview,
+        levelsGained,
         icon: LOOT_REWARD_ICONS[loot.type] || '🏔️',
         name: loot.label,
       };
@@ -372,8 +375,11 @@ export class Interactables {
   }
 
   applyLoot(loot, player, callbacks) {
+    let levelsGained = 0;
     switch (loot.type) {
-      case 'xp': player.addXp(loot.value); break;
+      case 'xp':
+        levelsGained = player.addXp(loot.value);
+        break;
       case 'heal': player.heal(loot.value); break;
       case 'damage': player.damage *= (1 + loot.value); break;
       case 'speed': player.speed *= (1 + loot.value); break;
@@ -411,6 +417,7 @@ export class Interactables {
         player.runXpMult += loot.value;
         break;
     }
+    return levelsGained;
   }
 
   removeMesh(item) {

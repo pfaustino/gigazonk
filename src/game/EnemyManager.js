@@ -359,6 +359,7 @@ export class EnemyManager {
     enemy.hp -= amount;
     if (element === 'fire') enemy.burnTimer = 3;
     if (element === 'ice') enemy.slowTimer = 2;
+    if (element === 'lightning') enemy.slowTimer = Math.max(enemy.slowTimer, 0.45);
     if (enemy.hp <= 0) return this.killEnemy(enemy);
     return null;
   }

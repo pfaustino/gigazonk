@@ -1,14 +1,17 @@
 export const ARENA_SIZE = 1200;
 
 /** Bump this on each release. */
-export const GAME_VERSION = '0.1.6';
+export const GAME_VERSION = '0.1.7';
 
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;
 export const ARENA_SPAWN_PAD_RADIUS = 30;
 export const VILLAGE_SKY = 0x7ab4d4;
 export const TITLE_SKY = 0x80b8d8;
-export const ARENA_ROCK_COUNT = 150;
+export const ARENA_ROCK_COUNT = 300;
+/** Scatter rocks in the combat band (not the full 1200-unit arena plane). */
+export const ARENA_ROCK_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
+export const ARENA_ROCK_MAX_RADIUS = 260;
 export const ARENA_LOOT_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_LOOT_MAX_RADIUS = ARENA_SIZE * 0.5 - 24;
 export const ARENA_LOOT_RING_AREA =
@@ -78,22 +81,11 @@ export const ZONK_DOME_FOLLOWUP_COUNT = 4;
 export const ZONK_DOME_FOLLOWUP_DELAY = 0.45;
 export const ZONK_DOME_FOLLOWUP_DAMAGE_MULT = 0.65;
 
-export const SHOP_MAX_LEVEL = 10;
-
-export const SHOP_ITEMS = [
-  { id: 'meta_damage', name: 'Sharpened Blades', desc: '+5% base damage per level', baseCost: 50, costStep: 25, effect: { metaDamage: 0.05 } },
-  { id: 'meta_hp', name: 'Iron Constitution', desc: '+10 base HP per level', baseCost: 40, costStep: 20, effect: { metaHp: 10 } },
-  { id: 'meta_speed', name: 'Light Boots', desc: '+5% base speed per level', baseCost: 45, costStep: 22, effect: { metaSpeed: 0.05 } },
-  { id: 'meta_xp', name: 'Scholar Tome', desc: '+10% XP gain per level', baseCost: 60, costStep: 30, effect: { metaXp: 0.1 } },
-  { id: 'meta_start_level', name: 'Head Start', desc: '+1 starting level per upgrade', baseCost: 100, costStep: 50, effect: { startLevel: 1 } },
-  { id: 'meta_magnet', name: 'Silver Magnet', desc: '+2 pickup radius per level', baseCost: 35, costStep: 18, effect: { metaPickup: 2 } },
+export const VILLAGE_NPCS = [
+  { id: 'questgiver', name: 'Elder Zonka', role: 'Quests', pos: [-15, 0, -10], color: 0x6b4fd4 },
+  { id: 'trainer', name: 'Coach Zonk', role: 'Skill Tree', pos: [15, 0, -10], color: 0xf7c948 },
+  { id: 'portal', name: 'Arena Portal', role: 'Enter Arena', pos: [0, 0, 20], color: 0xff6b35 },
 ];
-
-/** Cost for the next upgrade at `currentLevel` (0 = never bought). */
-export function getShopUpgradeCost(item, currentLevel) {
-  if (currentLevel >= SHOP_MAX_LEVEL) return null;
-  return item.baseCost + item.costStep * currentLevel;
-}
 
 export const QUESTS = [
   { id: 'kill_50', desc: 'Slay 50 monsters', target: 50, type: 'kills', reward: 30 },
@@ -102,7 +94,11 @@ export const QUESTS = [
   { id: 'kill_500', desc: 'Slay 500 monsters', target: 500, type: 'kills', reward: 150 },
   { id: 'kill_1000', desc: 'Slay 1000 monsters', target: 1000, type: 'kills', reward: 300 },
   { id: 'chests_3', desc: 'Open 3 chests', target: 3, type: 'chests', reward: 25 },
+  { id: 'chests_20', desc: 'Pick up 20 chests', target: 20, type: 'chests', reward: 65 },
   { id: 'pots_10', desc: 'Break 10 pots', target: 10, type: 'pots', reward: 20 },
+  { id: 'pots_59', desc: 'Pick up 59 pots', target: 59, type: 'pots', reward: 55 },
+  { id: 'gems_100', desc: 'Pick up 100 gems', target: 100, type: 'gems', reward: 40 },
+  { id: 'guardians_10', desc: 'Slay 10 guardians', target: 10, type: 'guardians', reward: 55 },
   { id: 'survive_5', desc: 'Survive 5 minutes', target: 300, type: 'time', reward: 50 },
   { id: 'survive_10', desc: 'Survive 10 minutes', target: 600, type: 'time', reward: 90 },
   { id: 'level_10', desc: 'Reach level 10', target: 10, type: 'level', reward: 60 },
@@ -115,12 +111,6 @@ export const QUESTS = [
 
 export const SYNERGY_ELEMENTS = ['fire', 'ice', 'lightning'];
 export const SYNERGY_NAME = 'Tri-Zonk Nova';
-
-export const VILLAGE_NPCS = [
-  { id: 'questgiver', name: 'Elder Zonka', role: 'Quests', pos: [-15, 0, -10], color: 0x6b4fd4 },
-  { id: 'merchant', name: 'Merchant Bonk', role: 'Shop', pos: [15, 0, -10], color: 0xf7c948 },
-  { id: 'portal', name: 'Arena Portal', role: 'Enter Arena', pos: [0, 0, 20], color: 0xff6b35 },
-];
 
 export const CHARACTERS = [
   {

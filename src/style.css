@@ -20,6 +20,41 @@ html, body {
   height: 100%;
 }
 
+.paypal-donate-slot {
+  display: block;
+  width: 100%;
+  min-width: 300px;
+  min-height: 110px;
+  margin: 16px 0 8px;
+  pointer-events: auto;
+  overflow: visible;
+}
+
+.paypal-donate-slot > div {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+.paypal-donate-slot iframe {
+  width: 100% !important;
+  min-width: 300px;
+  max-width: 100%;
+}
+
+.paypal-donate-slot.paypal-donate-loading,
+.paypal-donate-slot.paypal-donate-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 13px;
+  color: #999;
+  text-align: center;
+}
+
+.paypal-donate-slot.paypal-donate-error {
+  color: #f87171;
+}
+
 #game-canvas {
   display: block;
   width: 100%;
@@ -47,7 +82,8 @@ html, body {
 #ui-layer .btn,
 #ui-layer .char-card,
 #ui-layer .shop-item,
-#ui-layer .upgrade-card {
+#ui-layer .upgrade-card,
+#ui-layer .paypal-donate-slot {
   pointer-events: auto;
 }
 
@@ -791,10 +827,23 @@ html, body {
   width: 92%;
   max-height: 90vh;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .menu-panel-wide {
   max-width: 520px;
+}
+
+.menu-panel-donate {
+  width: min(92vw, 400px);
+  min-width: 320px;
+  overflow: visible;
+  max-height: none;
+  padding: 16px 24px 20px;
+}
+
+.menu-panel-donate .paypal-donate-slot {
+  margin: 0 0 10px;
 }
 
 .menu-title {

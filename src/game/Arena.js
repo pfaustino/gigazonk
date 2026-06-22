@@ -6,20 +6,23 @@ import {
   ARENA_ROCK_COUNT,
   ARENA_SPAWN_PAD_RADIUS,
   BIOMES,
+  getBiomeOuterColor,
+  getBiomeRockColor,
 } from './constants.js';
-import {
-  createGroundMaterial,
-  createSpawnPad,
-  paintBiomeGround,
-  terrainTexScale,
-} from './TerrainVisuals.js';
+import { createTerrainLambertMaterial, terrainTexScale } from './TerrainVisuals.js';
 import {
   buildFeatureMeshes,
   generateArenaFeatures,
+  GROUND_WALL_HEIGHT,
   resolveCircleAabb,
   sampleGroundHeight,
   tintFeatureMeshes,
 } from './TerrainFeatures.js';
+
+function tintTerrainMaterial(material, color) {
+  material.color.setHex(color);
+  if (material.emissive) material.emissive.setHex(color);
+}
 
 export class Arena {
   constructor(scene) {
@@ -31,32 +34,45 @@ export class Arena {
     this.dayNight = 0;
     this.maxClimb = 0.9;
     this.build();
+    this._applyTerrainColors(this.biome);
+  }
+
+  _applyTerrainColors(biome) {
+    const rock = getBiomeRockColor(biome);
+    const outer = getBiomeOuterColor(biome);
+    tintTerrainMaterial(this.ground.material, outer);
+    tintTerrainMaterial(this.spawnPad.material, rock);
   }
 
   build() {
-    const hillFreq = 0.1 * (ARENA_REFERENCE_SIZE / ARENA_SIZE);
     this.groundGeo = new THREE.PlaneGeometry(
       ARENA_SIZE,
       ARENA_SIZE,
       ARENA_GROUND_SEGMENTS,
       ARENA_GROUND_SEGMENTS
     );
-    const verts = this.groundGeo.attributes.position;
-    for (let i = 0; i < verts.count; i++) {
-      const x = verts.getX(i);
-      const z = verts.getZ(i);
-      verts.setY(i, Math.sin(x * hillFreq) * Math.cos(z * hillFreq) * 0.5);
+    if (this.groundGeo.getAttribute('color')) {
+      this.groundGeo.deleteAttribute('color');
     }
-    this.groundGeo.computeVertexNormals();
-    this.texScale = terrainTexScale();
-    paintBiomeGround(this.groundGeo, this.biome, this.texScale);
-    this.ground = new THREE.Mesh(this.groundGeo, createGroundMaterial());
+
+    this.groundMat = createTerrainLambertMaterial(0x384858);
+    this.ground = new THREE.Mesh(this.groundGeo, this.groundMat);
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.group.add(this.ground);
 
-    this.spawnPad = createSpawnPad(ARENA_SPAWN_PAD_RADIUS, this.texScale);
+    const padGeo = new THREE.CircleGeometry(ARENA_SPAWN_PAD_RADIUS, 32);
+    if (padGeo.getAttribute('color')) {
+      padGeo.deleteAttribute('color');
+    }
+    this.spawnPadMat = createTerrainLambertMaterial(0x5e5448);
+    this.spawnPad = new THREE.Mesh(padGeo, this.spawnPadMat);
+    this.spawnPad.rotation.x = -Math.PI / 2;
+    this.spawnPad.position.y = 0.04;
+    this.spawnPad.receiveShadow = true;
     this.group.add(this.spawnPad);
+
+    this.texScale = terrainTexScale();
 
     const features = generateArenaFeatures();
     this.mesas = features.mesas;
@@ -67,7 +83,7 @@ export class Arena {
     for (let i = 0; i < ARENA_ROCK_COUNT; i++) {
       const radius = 0.5 + Math.random() * 0.8;
       const rockGeo = new THREE.DodecahedronGeometry(radius, 0);
-      const rockMat = new THREE.MeshLambertMaterial({ color: 0x666666 });
+      const rockMat = createTerrainLambertMaterial(0x5e5448);
       const rock = new THREE.Mesh(rockGeo, rockMat);
 
       let x;
@@ -82,7 +98,13 @@ export class Arena {
       rock.castShadow = true;
       this.group.add(rock);
       this.rocks.push(rock);
-      this.obstacles.push({ type: 'circle', x, z, radius });
+      this.obstacles.push({
+        type: 'circle',
+        x,
+        z,
+        radius,
+        blockBelowY: radius * 1.1 + 0.15,
+      });
     }
 
     const borderGeo = new THREE.RingGeometry(this.halfSize - 1, this.halfSize, 64);
@@ -95,13 +117,12 @@ export class Arena {
 
   setBiome(biome) {
     this.biome = biome;
-    paintBiomeGround(this.groundGeo, biome, this.texScale);
-    this.groundGeo.attributes.color.needsUpdate = true;
-    const rockColor = biome.id === 'frost' ? 0x99aabb : biome.id === 'volcanic' ? 0x443322 : 0x666666;
+    const rockColor = getBiomeRockColor(biome);
     for (const rock of this.rocks) {
-      rock.material.color.setHex(rockColor);
+      tintTerrainMaterial(rock.material, rockColor);
     }
     tintFeatureMeshes(this.featureMeshes, rockColor);
+    this._applyTerrainColors(biome);
   }
 
   pickRandomBiome() {
@@ -112,10 +133,6 @@ export class Arena {
 
   update(dt, elapsed) {
     this.dayNight = (Math.sin(elapsed * 0.05) + 1) / 2;
-    const nightFactor = (1 - this.dayNight) * 0.45;
-    const tint = new THREE.Color(0xffffff).lerp(new THREE.Color(this.biome.fog), nightFactor);
-    this.ground.material.color.copy(tint);
-    this.spawnPad.material.color.copy(tint);
   }
 
   getNightFactor() {
@@ -149,6 +166,8 @@ export class Arena {
     for (let pass = 0; pass < 4; pass++) {
       for (const obs of this.obstacles) {
         if (obs.type === 'circle') {
+          const blockY = obs.blockBelowY ?? obs.radius * 1.1 + 0.15;
+          if (entityY >= blockY - 0.35) continue;
           const dx = px - obs.x;
           const dz = pz - obs.z;
           const dist = Math.hypot(dx, dz);
@@ -162,6 +181,7 @@ export class Arena {
             px += minDist;
           }
         } else if (obs.type === 'aabb') {
+          if (entityY >= (obs.blockBelowY ?? GROUND_WALL_HEIGHT) - 0.35) continue;
           const resolved = resolveCircleAabb(px, pz, radius, obs);
           px = resolved.x;
           pz = resolved.z;

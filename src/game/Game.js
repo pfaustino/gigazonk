@@ -10,11 +10,11 @@ import { UpgradeSystem, SYNERGY_NAME, getUpgradePreview } from './UpgradeSystem.
 import { UI } from './UI.js';
 import { Village } from './Village.js';
 import { Arena } from './Arena.js';
-import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager } from './Effects.js';
+import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeManager } from './Effects.js';
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, ARENA_FOG_NEAR, ARENA_FOG_FAR, VILLAGE_FOG_NEAR, VILLAGE_FOG_FAR, PLAYER_BASE } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, PLAYER_BASE, ZONK_DOME_FOLLOWUP_DAMAGE_MULT } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 
@@ -34,10 +34,11 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.92;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1030);
-    this.scene.fog = new THREE.Fog(0x1a1030, VILLAGE_FOG_NEAR, VILLAGE_FOG_FAR);
+    this.scene.background = new THREE.Color(TITLE_SKY);
 
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2500);
     this.camera.position.set(0, 25, 20);
@@ -52,6 +53,7 @@ export class Game {
     this.interactables = new Interactables(this.scene);
     this.familiars = new FamiliarManager(this.scene);
     this.fireTrail = new FireTrailManager(this.scene);
+    this.zonkDomes = new ZonkDomeManager(this.scene);
     this.rifts = new RiftManager(this.scene);
     this.synergy = new SynergyNova(this.scene);
     this.particles = new ParticleSystem(this.scene);
@@ -88,6 +90,9 @@ export class Game {
     this.timer.connect(document);
     this.audio.applySettings(saveData.data.settings);
     this.cameraController.applySettings(saveData.data.settings);
+    this.audio.loadMusicManifest().then(() => {
+      if (this.state === 'title') this.audio.playMusic('title');
+    });
     this.animate();
   }
 
@@ -101,23 +106,34 @@ export class Game {
     cam.updateProjectionMatrix();
   }
 
-  applyArenaFog() {
-    this.scene.fog.near = ARENA_FOG_NEAR;
-    this.scene.fog.far = ARENA_FOG_FAR;
-    this.setShadowFrustum(ARENA_SIZE * 0.55);
+  setSkyColor(hex) {
+    this.scene.background.setHex(hex);
   }
 
-  applyVillageFog() {
-    this.scene.fog.near = VILLAGE_FOG_NEAR;
-    this.scene.fog.far = VILLAGE_FOG_FAR;
+  applyArenaScene() {
+    this.setShadowFrustum(ARENA_SIZE * 0.55);
+    this.applyDaylight();
+  }
+
+  applyDaylight() {
+    this.hemiLight.intensity = 0.44;
+    this.ambientLight.intensity = 0.28;
+    this.sunLight.intensity = 0.82;
+  }
+
+  applyVillageScene() {
+    this.setSkyColor(VILLAGE_SKY);
+    this.applyDaylight();
     this.setShadowFrustum(120);
   }
 
   setupLights() {
-    this.ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+    this.hemiLight = new THREE.HemisphereLight(0x9ec8e8, 0xc8b898, 0.44);
+    this.scene.add(this.hemiLight);
+    this.ambientLight = new THREE.AmbientLight(0xe8e4dc, 0.28);
     this.scene.add(this.ambientLight);
-    this.sunLight = new THREE.DirectionalLight(0xffeedd, 1);
-    this.sunLight.position.set(20, 40, 20);
+    this.sunLight = new THREE.DirectionalLight(0xffe8c8, 0.82);
+    this.sunLight.position.set(30, 55, 18);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
     this.sunLight.shadow.camera.near = 1;
@@ -152,7 +168,7 @@ export class Game {
     this.state = 'village';
     this.village.setVisible(true);
     this.arena.setVisible(false);
-    this.applyVillageFog();
+    this.applyVillageScene();
     this.hideCombat();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
@@ -162,6 +178,7 @@ export class Game {
     this.cameraController.apply(this.camera, this.player.position, this.player.getViewY());
     this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
     this.quests.assignNewQuests();
+    this.audio.playMusic('village');
   }
 
   startArena() {
@@ -169,21 +186,37 @@ export class Game {
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
-    this.applyArenaFog();
+    this.applyArenaScene();
     this.resetRun();
     this.ui.clear();
     this.ui.buildHUD();
     this.currentBiome = this.arena.pickRandomBiome();
-    this.scene.fog.color.setHex(this.currentBiome.fog);
-    this.scene.background.setHex(this.currentBiome.fog);
+    this.setSkyColor(this.currentBiome.sky);
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
     this.interactables.spawnVillagePortal(0, 0);
+    this.populateMesaEncounters(true);
     this.player.position.set(0, 0, 0);
     this.player.mesh.visible = true;
     this.cameraController.reset();
     saveData.data.totalRuns++;
     saveData.save();
     this.ui.toast(`Entering ${this.currentBiome.name}`, 'synergy');
+    this.audio.playMusic('arena');
+  }
+
+  populateMesaEncounters(showToast = false) {
+    const roll = this.interactables.populateMesas(
+      this.arena.mesas,
+      this.enemies,
+      this.player.damage
+    );
+    if (showToast && roll) {
+      this.ui.toast(
+        `🏔️ ${roll.caches} mesa treasures & ${roll.guardians} guardians await!`,
+        'synergy'
+      );
+    }
+    return roll;
   }
 
   resetRun() {
@@ -207,6 +240,7 @@ export class Game {
     this.interactables.reset();
     this.familiars.reset();
     this.fireTrail.reset();
+    this.zonkDomes.reset();
     this.rifts.reset();
     this.synergy.reset();
     this.particles.reset();
@@ -221,6 +255,7 @@ export class Game {
     this.interactables.reset();
     this.familiars.reset();
     this.fireTrail.reset();
+    this.zonkDomes.reset();
     this.rifts.reset();
     this.synergy.reset();
     this.particles.reset();
@@ -287,7 +322,7 @@ export class Game {
     this.state = 'village';
     this.village.setVisible(true);
     this.arena.setVisible(false);
-    this.applyVillageFog();
+    this.applyVillageScene();
     this.hideCombat();
     this.player.position.set(0, 0, 5);
     this.player.mesh.visible = true;
@@ -316,13 +351,14 @@ export class Game {
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
-    this.applyArenaFog();
+    this.applyArenaScene();
     this.enemies.reset();
     this.projectiles.reset();
     this.gems.reset();
     this.interactables.reset();
     this.familiars.reset();
     this.fireTrail.reset();
+    this.zonkDomes.reset();
     this.rifts.reset();
     this.synergy.reset();
     this.particles.reset();
@@ -338,12 +374,12 @@ export class Game {
       if (biome) {
         this.currentBiome = biome;
         this.arena.setBiome(biome);
-        this.scene.fog.color.setHex(biome.fog);
-        this.scene.background.setHex(biome.fog);
+        this.setSkyColor(biome.sky);
       }
     }
 
     this.restoreArenaFromSnapshot(snap);
+    this.populateMesaEncounters();
     snap.pausedInVillage = false;
     saveData.data.runSnapshot = snap;
     saveData.save();
@@ -449,8 +485,7 @@ export class Game {
       if (biome) {
         this.currentBiome = biome;
         this.arena.setBiome(biome);
-        this.scene.fog.color.setHex(biome.fog);
-        this.scene.background.setHex(biome.fog);
+        this.setSkyColor(biome.sky);
       }
     }
   }
@@ -459,7 +494,7 @@ export class Game {
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
-    this.applyArenaFog();
+    this.applyArenaScene();
     this.resetRun();
     this.ui.clear();
     this.ui.buildHUD();
@@ -468,6 +503,8 @@ export class Game {
     this.player.mesh.visible = true;
     this.cameraController.reset();
     this.restoreArenaFromSnapshot(snap);
+    this.populateMesaEncounters();
+    this.audio.playMusic('arena');
   }
 
   applyPlayerSnapshot(snap) {
@@ -521,7 +558,10 @@ export class Game {
     this.arena.setVisible(false);
     this.hideCombat();
     this.player.mesh.visible = false;
+    this.setSkyColor(TITLE_SKY);
+    this.applyDaylight();
     this.ui.showTitle((action) => this.handleTitleAction(action));
+    this.audio.playMusic('title');
   }
 
   exitGame() {
@@ -556,7 +596,10 @@ export class Game {
       this.quests.track('kills');
       if (killResult.isBoss) {
         this.quests.track('bosses');
-        this.interactables.spawnChest(killResult.pos.x, killResult.pos.z);
+        if (enemy?.isMesaGuardian) {
+          this.interactables.removeMesaBeaconForGuardian(enemy);
+        }
+        this.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
       }
       const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0x44ff88;
       this.particles.burst(killResult.pos.x, killResult.pos.z, color);
@@ -640,8 +683,15 @@ export class Game {
     const diffSetting = getDifficultyFromId(saveData.data.settings.difficulty);
     const diffMult = (1 + nightFactor * 0.5 + (this.inRift ? 1 : 0)) * diffSetting.spawnMult;
 
-    this.ambientLight.intensity = 0.3 + (1 - nightFactor) * 0.4;
-    this.sunLight.intensity = 0.4 + (1 - nightFactor) * 0.6;
+    this.hemiLight.intensity = 0.36 + (1 - nightFactor) * 0.16;
+    this.ambientLight.intensity = 0.24 + (1 - nightFactor) * 0.14;
+    this.sunLight.intensity = 0.55 + (1 - nightFactor) * 0.35;
+
+    if (this.currentBiome?.sky) {
+      const daySky = new THREE.Color(this.currentBiome.sky);
+      const nightSky = daySky.clone().multiplyScalar(0.3);
+      this.scene.background.copy(daySky).lerp(nightSky, nightFactor);
+    }
 
     this.arena.update(dt, this.elapsed);
     this.player.update(dt, this.input, this.arena, this.cameraController.yaw);
@@ -768,6 +818,7 @@ export class Game {
     if (nearItem) {
       const label = nearItem.type === 'chest' ? '[F] Open Chest' :
         nearItem.type === 'pot' ? '[F] Break Pot' :
+        nearItem.type === 'mesa_cache' ? '[F] Claim Mesa Treasure' :
         nearItem.type === 'village_portal' ? '[F] Return to Village (bank coins)' :
         '[F] Ascension Shrine';
       this.ui.showInteractPrompt(true, label);
@@ -779,6 +830,7 @@ export class Game {
         const result = this.interactables.interact(nearItem, this.player, {
           onChest: () => { this.quests.track('chests'); this.audio.chest(); },
           onPot: () => { this.quests.track('pots'); this.audio.chest(); },
+          onMesaCache: () => { this.quests.track('chests'); this.audio.chest(); },
           onShrine: () => this.ui.toast('Power surges through you!'),
           onCoins: (v) => { this.runCoins += v; },
           onToast: (msg) => this.ui.toast(msg),
@@ -804,6 +856,27 @@ export class Game {
     }
 
     this.particles.update(dt, this.camera, this.renderer, this.enemies.enemies);
+
+    this.zonkDomes.update(dt, this.player, this.arena, this.elapsed, {
+      onWarn: () => {
+        this.audio.zonkDomeWarn();
+        this.ui.toast('⚠️ Zonk Dome incoming — leave the zone!', 'synergy');
+      },
+      onFollowupWarn: () => {
+        this.audio.zonkDomeWarn();
+      },
+      onPop: (dome) => {
+        this.audio.zonkDomePop();
+        const isFollowup = dome.isFollowup;
+        const kb = isFollowup ? 18 : 22;
+        const dmgMult = isFollowup ? ZONK_DOME_FOLLOWUP_DAMAGE_MULT : 1;
+        this.player.applyKnockback(dome.cx, dome.cz, kb);
+        const dmg = Math.max(8, Math.floor(this.player.maxHp * 0.18 * dmgMult));
+        const dead = this.player.takeDamage(dmg, { forced: true });
+        this.particles.burst(this.player.position.x, this.player.position.z, isFollowup ? 0xcc66ff : 0xff44ff);
+        if (dead) { this.gameOver(); return; }
+      },
+    });
 
     this.ui.updateHUD(
       this.player, this.quests.getActiveQuests(), this.elapsed,

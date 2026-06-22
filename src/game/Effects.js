@@ -1,4 +1,14 @@
 import * as THREE from 'three';
+import { isOnAnyMesaPlateau } from './TerrainFeatures.js';
+import {
+  ZONK_DOME_CAMP_RADIUS,
+  ZONK_DOME_CAMP_TIME,
+  ZONK_DOME_STILL_SPEED,
+  ZONK_DOME_GROW_TIME,
+  ZONK_DOME_HURT_RADIUS,
+  ZONK_DOME_FOLLOWUP_COUNT,
+  ZONK_DOME_FOLLOWUP_DELAY,
+} from './constants.js';
 
 export class FamiliarManager {
   constructor(scene) {
@@ -307,6 +317,203 @@ export class FireTrailManager {
           if (result) onHit(p.damage, result, 'fire');
         }
       }
+    }
+  }
+}
+
+/** Punishes sustained orbit-kiting in the open arena (Megabonk-style Zonk Dome). */
+export class ZonkDomeManager {
+  constructor(scene) {
+    this.scene = scene;
+    this.group = new THREE.Group();
+    scene.add(this.group);
+    this.moveHistory = [];
+    this.campTime = 0;
+    this.activeDomes = [];
+    this.chainRemaining = 0;
+    this.chainTimer = 0;
+  }
+
+  reset() {
+    this._clearAllDomes();
+    this.moveHistory = [];
+    this.campTime = 0;
+    this.chainRemaining = 0;
+    this.chainTimer = 0;
+  }
+
+  _centroid(points) {
+    let sx = 0;
+    let sz = 0;
+    for (const p of points) {
+      sx += p.x;
+      sz += p.z;
+    }
+    const n = points.length;
+    return { x: sx / n, z: sz / n };
+  }
+
+  _maxDist(points, cx, cz) {
+    let max = 0;
+    for (const p of points) {
+      max = Math.max(max, Math.hypot(p.x - cx, p.z - cz));
+    }
+    return max;
+  }
+
+  _clearAllDomes() {
+    for (const d of this.activeDomes) {
+      this._disposeDomeMesh(d);
+    }
+    this.activeDomes = [];
+  }
+
+  _disposeDomeMesh(d) {
+    const { mesh, ring } = d;
+    this.group.remove(mesh);
+    mesh.geometry?.dispose();
+    mesh.material?.dispose();
+    if (ring) {
+      this.group.remove(ring);
+      ring.geometry?.dispose();
+      ring.material?.dispose();
+    }
+  }
+
+  _spawnDome(x, z, arena, { isFollowup = false, onWarn } = {}) {
+    const surfaceY = arena?.getGroundHeight?.(x, z) ?? 0;
+
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 24, 16),
+      new THREE.MeshBasicMaterial({
+        color: isFollowup ? 0xc77dff : 0x9b59f5,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.position.set(x, surfaceY + 0.5, z);
+    this.group.add(mesh);
+
+    const dome = {
+      cx: x,
+      cz: z,
+      surfaceY,
+      mesh,
+      ring: null,
+      grow: 0,
+      hurtRadius: ZONK_DOME_HURT_RADIUS,
+      playerWasInside: false,
+      isFollowup,
+    };
+    this.activeDomes.push(dome);
+    onWarn?.(dome);
+    return dome;
+  }
+
+  _updateDome(d, dt, player, onPop) {
+    d.grow += dt / ZONK_DOME_GROW_TIME;
+    const t = Math.min(1, d.grow);
+    const currentRadius = t * d.hurtRadius;
+    d.mesh.scale.set(currentRadius, currentRadius * 0.82, currentRadius);
+    d.mesh.position.y = d.surfaceY + currentRadius * 0.45;
+    d.mesh.material.opacity = 0.18 + t * 0.5;
+    if (d.ring) d.ring.material.opacity = 0.22 * (1 - t * 0.65);
+
+    const dist = Math.hypot(player.position.x - d.cx, player.position.z - d.cz);
+    if (dist < currentRadius + 0.6) {
+      d.playerWasInside = true;
+    }
+
+    if (t >= 1) {
+      if (d.playerWasInside) {
+        onPop?.(d);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  _tickFollowupChain(dt, player, arena, callbacks) {
+    if (this.chainRemaining <= 0) return;
+
+    this.chainTimer -= dt;
+    if (this.chainTimer > 0) return;
+
+    const px = player.position.x;
+    const pz = player.position.z;
+    const mesas = arena?.mesas ?? [];
+    if (!isOnAnyMesaPlateau(px, pz, mesas)) {
+      this._spawnDome(px, pz, arena, {
+        isFollowup: true,
+        onWarn: callbacks.onFollowupWarn,
+      });
+    }
+    this.chainRemaining -= 1;
+    this.chainTimer = ZONK_DOME_FOLLOWUP_DELAY;
+  }
+
+  _startFollowupChain() {
+    this.chainRemaining = ZONK_DOME_FOLLOWUP_COUNT;
+    this.chainTimer = ZONK_DOME_FOLLOWUP_DELAY;
+  }
+
+  update(dt, player, arena, elapsed, callbacks = {}) {
+    for (let i = this.activeDomes.length - 1; i >= 0; i--) {
+      const done = this._updateDome(this.activeDomes[i], dt, player, callbacks.onPop);
+      if (done) {
+        this._disposeDomeMesh(this.activeDomes[i]);
+        this.activeDomes.splice(i, 1);
+      }
+    }
+
+    this._tickFollowupChain(dt, player, arena, callbacks);
+
+    if (this.activeDomes.length > 0 || this.chainRemaining > 0) {
+      return;
+    }
+
+    const px = player.position.x;
+    const pz = player.position.z;
+    const speed = Math.hypot(player.velocity.x, player.velocity.z);
+    const mesas = arena?.mesas ?? [];
+
+    if (isOnAnyMesaPlateau(px, pz, mesas)) {
+      this.campTime = 0;
+      this.moveHistory = [];
+      return;
+    }
+
+    if (speed < ZONK_DOME_STILL_SPEED) {
+      return;
+    }
+
+    this.moveHistory.push({ x: px, z: pz, t: elapsed });
+    const cutoff = elapsed - ZONK_DOME_CAMP_TIME;
+    this.moveHistory = this.moveHistory.filter(p => p.t >= cutoff);
+
+    if (this.moveHistory.length < 2) {
+      this.campTime = 0;
+      return;
+    }
+
+    const { x: cx, z: cz } = this._centroid(this.moveHistory);
+    const spread = this._maxDist(this.moveHistory, cx, cz);
+
+    if (spread > ZONK_DOME_CAMP_RADIUS) {
+      this.campTime = 0;
+      this.moveHistory = [{ x: px, z: pz, t: elapsed }];
+      return;
+    }
+
+    this.campTime += dt;
+    if (this.campTime >= ZONK_DOME_CAMP_TIME) {
+      this._spawnDome(px, pz, arena, { onWarn: callbacks.onWarn });
+      this._startFollowupChain();
+      this.campTime = 0;
+      this.moveHistory = [];
     }
   }
 }

@@ -85,6 +85,7 @@ export class Player {
     this.projectileSpeedMult = 0;
     this.jumpPeakMult = 0;
     this.baseJumpPeak = 4.8;
+    this.jumpGravity = 17;
     this.damagePerKill = 0;
     this.killDamageBonus = 0;
     this.upgradeBoost = 0;
@@ -108,10 +109,11 @@ export class Player {
     this.dodgeDir = { x: 0, z: 0 };
     this.jumping = false;
     this.jumpTimer = 0;
-    this.jumpDuration = 0.45;
+    this.jumpDuration = 0.72;
     this.jumpPeak = 4.8;
     this.maxAirJumps = 0;
     this.airJumpsUsed = 0;
+    this.knockbackTimer = 0;
     this.level = 1 + meta.startLevel;
     this.xp = 0;
     this.xpToNext = this.xpForLevel(this.level);
@@ -230,12 +232,17 @@ export class Player {
         this._onDodge?.();
       }
 
-      const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
-      const speedMult = sprint ? 1.4 : 1;
-      if (hasInput) {
-        this.velocity.set(move.x * effSpeed * speedMult, 0, move.z * effSpeed * speedMult);
+      if (this.knockbackTimer > 0) {
+        this.knockbackTimer -= dt;
+        this._decelerate(dt, friction * 0.25);
       } else {
-        this._decelerate(dt, friction);
+        const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
+        const speedMult = sprint ? 1.4 : 1;
+        if (hasInput) {
+          this.velocity.set(move.x * effSpeed * speedMult, 0, move.z * effSpeed * speedMult);
+        } else {
+          this._decelerate(dt, friction);
+        }
       }
       this.position.addScaledVector(this.velocity, dt);
     }
@@ -340,7 +347,7 @@ export class Player {
     }
 
     if (this.airborne) {
-      this.verticalVel -= 28 * dt;
+      this.verticalVel -= this.jumpGravity * dt;
       this.worldY += this.verticalVel * dt;
       if (this.worldY <= this.groundY + 0.05) {
         this.worldY = this.groundY;
@@ -372,9 +379,11 @@ export class Player {
     return this.mesh.position.y + 0.9;
   }
 
-  takeDamage(amount) {
-    if (this.invincible > 0) return false;
-    if (this.evasion > 0 && Math.random() < this.evasion) return false;
+  takeDamage(amount, opts = {}) {
+    if (!opts.forced) {
+      if (this.invincible > 0) return false;
+      if (this.evasion > 0 && Math.random() < this.evasion) return false;
+    }
     const reduced = amount * (1 - Math.min(0.5, this.armor));
     this.hp -= reduced;
     this.invincible = 0.5;
@@ -382,6 +391,22 @@ export class Player {
     if (this.hurtSpeedBurst > 0) this.hurtSpeedTimer = 2;
     this._onHurt?.();
     return this.hp <= 0;
+  }
+
+  applyKnockback(fromX, fromZ, force = 18) {
+    let dx = this.position.x - fromX;
+    let dz = this.position.z - fromZ;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.15) {
+      dx = Math.sin(this.facing);
+      dz = Math.cos(this.facing);
+    } else {
+      dx /= dist;
+      dz /= dist;
+    }
+    this.velocity.x = dx * force;
+    this.velocity.z = dz * force;
+    this.knockbackTimer = Math.max(this.knockbackTimer ?? 0, 0.4);
   }
 
   heal(amount) {

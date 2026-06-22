@@ -1,15 +1,13 @@
 export const ARENA_SIZE = 1200;
 
 /** Bump this on each release. */
-export const GAME_VERSION = '0.1.5';
+export const GAME_VERSION = '0.1.6';
 
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;
 export const ARENA_SPAWN_PAD_RADIUS = 30;
-export const ARENA_FOG_NEAR = 80;
-export const ARENA_FOG_FAR = ARENA_SIZE * 0.92;
-export const VILLAGE_FOG_NEAR = 80;
-export const VILLAGE_FOG_FAR = 320;
+export const VILLAGE_SKY = 0x7ab4d4;
+export const TITLE_SKY = 0x80b8d8;
 export const ARENA_ROCK_COUNT = 150;
 export const ARENA_LOOT_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_LOOT_MAX_RADIUS = ARENA_SIZE * 0.5 - 24;
@@ -67,6 +65,18 @@ export const MAX_SPAWN_GROUP_SIZE = 7;
 export const MAX_GIGA_GROUP_SIZE = 28;
 
 // Level-up awards live in Awards.js (UPGRADE_TEMPLATES + rarity tiers).
+
+export const ZONK_DOME_CAMP_RADIUS = 20;
+export const ZONK_DOME_CAMP_TIME = 15;
+export const ZONK_DOME_STILL_SPEED = 0.35;
+/** Seconds for dome to expand to full hurt radius.
+ *  Escape math (R=8m, ~0.3s reaction): walk 5.5 m/s needs T > 8/5.5+0.3 ≈ 1.75s;
+ *  sprint 7.7 m/s needs T > 1.34s. 2.0s lets walkers outrun it; campers who hesitate get popped. */
+export const ZONK_DOME_GROW_TIME = 2;
+export const ZONK_DOME_HURT_RADIUS = 8;
+export const ZONK_DOME_FOLLOWUP_COUNT = 4;
+export const ZONK_DOME_FOLLOWUP_DELAY = 0.45;
+export const ZONK_DOME_FOLLOWUP_DAMAGE_MULT = 0.65;
 
 export const SHOP_MAX_LEVEL = 10;
 
@@ -155,9 +165,29 @@ export const CHARACTERS = [
   },
 ];
 
+/** Rock / mesa color per biome — terrain uses the same palette. */
+export function getBiomeRockColor(biome) {
+  switch (biome?.id) {
+    case 'frost': return 0x5a6878;
+    case 'volcanic': return 0x6a5848;
+    case 'waste': return 0x6a6050;
+    default: return 0x5e5448;
+  }
+}
+
+/** Outer arena ring — slightly darker than pad/mesas but still readable. */
+export function getBiomeOuterColor(biome) {
+  switch (biome?.id) {
+    case 'frost': return 0x384858;
+    case 'volcanic': return 0x403028;
+    case 'waste': return 0x403830;
+    default: return 0x384858;
+  }
+}
+
 export const BIOMES = [
-  { id: 'grass', name: 'Zonk Meadows', ground: 0x4a8a48, fog: 0x1a3020, accent: 0x3a6b35, friction: 26 },
-  { id: 'waste', name: 'Bonk Wastes', ground: 0xb89a72, fog: 0x2a2018, accent: 0xa08060, friction: 24 },
-  { id: 'frost', name: 'Frost Zonk', ground: 0xd8eeff, fog: 0x1a2838, accent: 0x88bbdd, friction: 7 },
-  { id: 'volcanic', name: 'Magma Pits', ground: 0x3a2018, fog: 0x2a1008, accent: 0x883311, friction: 14 },
+  { id: 'grass', name: 'Zonk Meadows', ground: 0x4a9050, sky: 0x72b8d8, accent: 0x2d6030, friction: 26 },
+  { id: 'waste', name: 'Bonk Wastes', ground: 0xa08060, sky: 0xc8a878, accent: 0x6a5040, friction: 24 },
+  { id: 'frost', name: 'Frost Zonk', ground: 0x5a7080, sky: 0x6a9cb8, accent: 0x3a5870, friction: 7 },
+  { id: 'volcanic', name: 'Magma Pits', ground: 0x5a3828, sky: 0xc89878, accent: 0x2a1408, friction: 14 },
 ];

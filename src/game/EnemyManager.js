@@ -17,6 +17,7 @@ import {
   buildEnemyGeometry,
   createEnemyMaterial,
 } from './EntityVisuals.js';
+import { isOnMesaPlateau } from './TerrainFeatures.js';
 
 const dummy = new THREE.Object3D();
 const _color = new THREE.Color();
@@ -288,7 +289,14 @@ export class EnemyManager {
       const dist = Math.hypot(dx, dz);
       const near = dist <= ENEMY_NEAR_RADIUS;
 
-      if (dist > 0.1) {
+      if (e.isMesaGuardian && e.mesa) {
+        if (!e.mesaAwake) {
+          e.mesaAwake = isOnMesaPlateau(playerPos.x, playerPos.z, e.mesa);
+        }
+      }
+      const mesaGuardianIdle = e.isMesaGuardian && e.mesa && !e.mesaAwake;
+
+      if (!mesaGuardianIdle && dist > 0.1) {
         const moveX = (dx / dist) * e.speed * slowMult * dt;
         const moveZ = (dz / dist) * e.speed * slowMult * dt;
         if (near) {
@@ -333,7 +341,7 @@ export class EnemyManager {
     this.count--;
     this._deadSinceCompact++;
     const xp = enemy.xp;
-    const pos = { x: enemy.x, z: enemy.z };
+    const pos = { x: enemy.x, z: enemy.z, y: enemy.groundY ?? enemy.feetY ?? 0 };
     const mesh = this._meshFor(enemy);
     dummy.position.set(0, 0, 0);
     dummy.rotation.set(0, 0, 0);
@@ -464,6 +472,29 @@ export class EnemyManager {
       this.updateInstance(boss);
     }
     return boss;
+  }
+
+  spawnMesaGuardian(x, z, playerDmg = 10, mesa) {
+    const guardian = this.spawn('grunt', x, z, playerDmg, 1.05, 0.72);
+    if (!guardian) return null;
+
+    const topY = mesa?.topY ?? 0;
+    const hits = 14;
+    guardian.hp = playerDmg * hits;
+    guardian.maxHp = guardian.hp;
+    guardian.damage = 18;
+    guardian.xp = 45;
+    guardian.scale = 2;
+    guardian.color = 0xb56cff;
+    guardian.isBoss = true;
+    guardian.isMesaGuardian = true;
+    guardian.mesa = mesa;
+    guardian.mesaAwake = false;
+    guardian.feetY = topY;
+    guardian.groundY = topY;
+    guardian.hpBarVisible = false;
+    this.updateInstance(guardian);
+    return guardian;
   }
 
   get aliveCount() {

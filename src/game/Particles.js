@@ -99,7 +99,8 @@ export class ParticleSystem {
       bar.root.classList.toggle('boss', !!e.isBoss);
 
       const barWidth = e.isBoss ? 56 : 36;
-      const height = (e.isBoss ? 3.2 : 1.1) * e.scale + 0.5;
+      const surfaceY = e.groundY ?? e.feetY ?? 0;
+      const height = surfaceY + (e.isBoss ? 3.2 : 1.1) * e.scale + 0.5;
       vec.set(e.x, height, e.z);
       vec.project(camera);
 

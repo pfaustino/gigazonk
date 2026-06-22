@@ -1,6 +1,7 @@
 import { saveData } from './SaveData.js';
 import { DIFFICULTIES, LANGUAGES } from './settings.js';
 import { GAME_VERSION } from './constants.js';
+import { renderHostedDonateButton, clearDonateButton } from './PayPalDonate.js';
 
 const MENU_HINT = '↑ ↓ or W S to navigate | Enter, Space, or F to select | Esc back';
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
@@ -92,7 +93,7 @@ export class GameMenu {
       { id: 'controls', label: '🎮 Controls', action: () => this.renderControls() },
       { id: 'mainmenu', label: '🏠 Main Menu', action: () => h.onMainMenu?.() },
       { id: 'about', label: 'ℹ️ About', action: () => this.renderAbout() },
-      { id: 'donation', label: '❤️ Support / Donate', action: () => this.renderDonation() },
+      { id: 'donation', label: '❤️ Donate', action: () => this.renderDonation() },
       { id: 'exit', label: '🚪 Exit Game', action: () => h.onExit?.() },
     );
 
@@ -321,7 +322,7 @@ export class GameMenu {
         <p class="menu-hint">${MENU_HINT}</p>
         <div class="menu-about">
           <p><strong>GigaZonk</strong> v${GAME_VERSION}</p>
-          <p>A 3D survival roguelike inspired by Megabonk. Survive endless waves,
+          <p>Survive endless waves,
           level up with wild upgrades, explore Zonka Village, and become the ultimate Zonker.</p>
           <p>Built with Three.js. Made with love for Zonk enthusiasts everywhere.</p>
         </div>
@@ -339,29 +340,29 @@ export class GameMenu {
   renderDonation() {
     this.ui._navCleanup?.();
     this.screen.innerHTML = `
-      <div class="menu-panel menu-panel-wide">
-        <h2 class="menu-title">Support GigaZonk</h2>
-        <p class="menu-hint">${MENU_HINT}</p>
-        <div class="menu-about">
-          <p>If you're enjoying GigaZonk, consider supporting development!</p>
-          <p>Your support helps fund art, new biomes, characters, and more Zonk content.</p>
-          <p style="margin-top:16px;color:#f7c948">Add your Ko-fi / PayPal / itch link here when ready.</p>
-        </div>
-        <button class="btn btn-primary" id="btn-donate-link">Open Support Page</button>
+      <div class="menu-panel menu-panel-wide menu-panel-donate">
+        <div id="paypal-donate-slot" class="paypal-donate-slot paypal-donate-loading">Loading PayPal…</div>
         <button class="btn btn-secondary menu-back" id="menu-back">Back</button>
       </div>
     `;
-    const donateBtn = this.screen.querySelector('#btn-donate-link');
+    const slot = this.screen.querySelector('#paypal-donate-slot');
     const backBtn = this.screen.querySelector('#menu-back');
-    donateBtn.onclick = () => {
-      window.open('https://github.com/', '_blank', 'noopener');
-      this.flash('Thanks for your support!');
-    };
+
+    renderHostedDonateButton(slot)
+      .then(() => slot?.classList.remove('paypal-donate-loading'))
+      .catch(() => {
+        if (!slot) return;
+        slot.classList.remove('paypal-donate-loading');
+        slot.classList.add('paypal-donate-error');
+        slot.textContent = 'Could not load PayPal. Check your connection and try again.';
+      });
+
     backBtn.onclick = () => {
+      clearDonateButton(slot);
       this.ui._audio?.ui();
       this.renderMain();
     };
-    this._bindPanelNav([donateBtn, backBtn]);
+    this._bindPanelNav([backBtn]);
   }
 
   flash(msg) {

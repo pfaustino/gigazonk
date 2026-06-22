@@ -26,15 +26,31 @@ const LOOT_TABLE = [
   { weight: 2, type: 'xp_boost', value: 0.05, label: '+5% XP Gain' },
 ];
 
-function pickLoot() {
-  const total = LOOT_TABLE.reduce((s, l) => s + l.weight, 0);
+function pickLoot(table = LOOT_TABLE) {
+  const total = table.reduce((s, l) => s + l.weight, 0);
   let roll = Math.random() * total;
-  for (const l of LOOT_TABLE) {
+  for (const l of table) {
     roll -= l.weight;
     if (roll <= 0) return l;
   }
-  return LOOT_TABLE[0];
+  return table[0];
 }
+
+const MESA_LOOT_TABLE = [
+  { weight: 16, type: 'xp', value: 45, label: '+45 XP' },
+  { weight: 12, type: 'heal', value: 55, label: 'Heal +55' },
+  { weight: 12, type: 'damage', value: 0.15, label: '+15% Damage' },
+  { weight: 10, type: 'speed', value: 0.12, label: '+12% Speed' },
+  { weight: 10, type: 'coins', value: 18, label: '+18 Zonk Coins' },
+  { weight: 8, type: 'maxhp', value: 30, label: '+30 Max HP' },
+  { weight: 7, type: 'crit', value: 0.08, label: '+8% Crit' },
+  { weight: 6, type: 'area', value: 0.15, label: '+15% Area' },
+  { weight: 5, type: 'proj', value: 1, label: '+1 Projectile' },
+  { weight: 5, type: 'regen', value: 0.45, label: '+0.45 HP/s' },
+  { weight: 4, type: 'lifesteal', value: 0.04, label: '+4% Lifesteal' },
+  { weight: 3, type: 'xp_boost', value: 0.12, label: '+12% XP Gain' },
+  { weight: 2, type: 'magnet', value: 1, label: 'Instant Magnet!' },
+];
 
 export class Interactables {
   constructor(scene) {
@@ -46,21 +62,30 @@ export class Interactables {
 
   reset() {
     for (const item of this.items) {
-      this.group.remove(item.mesh);
-      item.mesh.geometry?.dispose();
-      item.mesh.material?.dispose();
+      this._disposeItemMeshes(item);
     }
     this.items = [];
   }
 
-  spawnChest(x, z) {
+  _disposeItemMeshes(item) {
+    for (const key of ['mesh', 'ringMesh', 'baseMesh']) {
+      const m = item[key];
+      if (!m) continue;
+      this.group.remove(m);
+      m.geometry?.dispose();
+      m.material?.dispose();
+      item[key] = null;
+    }
+  }
+
+  spawnChest(x, z, surfaceY = 0) {
     const geo = new THREE.BoxGeometry(1, 0.8, 0.8);
     const mat = new THREE.MeshLambertMaterial({ color: 0xf7c948 });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, 0.4, z);
+    mesh.position.set(x, surfaceY + 0.4, z);
     mesh.castShadow = true;
     this.group.add(mesh);
-    this.items.push({ type: 'chest', mesh, x, z, opened: false, radius: 2 });
+    this.items.push({ type: 'chest', mesh, x, z, surfaceY, opened: false, radius: 2 });
   }
 
   spawnPot(x, z) {
@@ -80,6 +105,101 @@ export class Interactables {
     mesh.position.set(x, 0.75, z);
     this.group.add(mesh);
     this.items.push({ type: 'shrine', mesh, x, z, used: false, radius: 2.5 });
+  }
+
+  spawnMesaBeacon(x, z, surfaceY) {
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.5, 0.35, 6),
+      new THREE.MeshLambertMaterial({ color: 0x553366 })
+    );
+    base.position.set(x, surfaceY + 0.18, z);
+    base.castShadow = true;
+    this.group.add(base);
+
+    const crystal = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.55, 0),
+      new THREE.MeshLambertMaterial({ color: 0xb56cff, emissive: 0x4a2080 })
+    );
+    crystal.position.set(x, surfaceY + 1.05, z);
+    this.group.add(crystal);
+
+    const item = {
+      type: 'mesa_beacon',
+      mesh: crystal,
+      baseMesh: base,
+      x,
+      z,
+      surfaceY,
+      radius: 2.5,
+      guardian: null,
+    };
+    this.items.push(item);
+    return item;
+  }
+
+  spawnMesaCache(x, z, surfaceY) {
+    const geo = new THREE.BoxGeometry(1.15, 0.95, 0.95);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x664400 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, surfaceY + 0.48, z);
+    mesh.castShadow = true;
+    this.group.add(mesh);
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.85, 0.08, 6, 20),
+      new THREE.MeshBasicMaterial({ color: 0xffee88 })
+    );
+    ring.position.set(x, surfaceY + 0.12, z);
+    ring.rotation.x = Math.PI / 2;
+    this.group.add(ring);
+
+    this.items.push({
+      type: 'mesa_cache',
+      mesh,
+      ringMesh: ring,
+      x,
+      z,
+      surfaceY,
+      opened: false,
+      radius: 2.4,
+    });
+  }
+
+  _mesaSpot(mesa) {
+    const inset = 0.38;
+    const maxDx = mesa.w * 0.5 * inset;
+    const maxDz = mesa.d * 0.5 * inset;
+    return {
+      x: mesa.cx + (Math.random() - 0.5) * maxDx * 2,
+      z: mesa.cz + (Math.random() - 0.5) * maxDz * 2,
+      y: mesa.topY,
+    };
+  }
+
+  populateMesas(mesas, enemyManager = null, playerDmg = 10) {
+    if (!mesas?.length) return;
+    let caches = 0;
+    let guardians = 0;
+
+    for (const mesa of mesas) {
+      const spot = this._mesaSpot(mesa);
+      const guardianRoll = Math.random() < 0.55;
+
+      if (guardianRoll && enemyManager) {
+        const guardian = enemyManager.spawnMesaGuardian(spot.x, spot.z, playerDmg, mesa);
+        if (guardian) {
+          const beacon = this.spawnMesaBeacon(spot.x, spot.z, mesa.topY);
+          beacon.guardian = guardian;
+          guardians++;
+          continue;
+        }
+      }
+
+      this.spawnMesaCache(spot.x, spot.z, mesa.topY);
+      caches++;
+    }
+
+    return { caches, guardians };
   }
 
   spawnVillagePortal(x = 0, z = 0) {
@@ -149,11 +269,22 @@ export class Interactables {
     }
   }
 
+  removeMesaBeaconForGuardian(guardian) {
+    const idx = this.items.findIndex(i => i.type === 'mesa_beacon' && i.guardian === guardian);
+    if (idx === -1) return;
+    this._disposeItemMeshes(this.items[idx]);
+    this.items.splice(idx, 1);
+  }
+
   getNearest(px, pz) {
     let nearest = null;
     let minDist = Infinity;
     for (const item of this.items) {
-      if ((item.type === 'chest' && item.opened) || (item.type === 'pot' && item.broken) || (item.type === 'shrine' && item.used)) continue;
+      if (item.type === 'mesa_beacon') continue;
+      if ((item.type === 'chest' && item.opened)
+        || (item.type === 'pot' && item.broken)
+        || (item.type === 'shrine' && item.used)
+        || (item.type === 'mesa_cache' && item.opened)) continue;
       const dist = Math.hypot(item.x - px, item.z - pz);
       if (dist < item.radius && dist < minDist) {
         minDist = dist;
@@ -216,6 +347,22 @@ export class Interactables {
       };
     }
 
+    if (item.type === 'mesa_cache' && !item.opened) {
+      item.opened = true;
+      this._disposeItemMeshes(item);
+      const loot = pickLoot(MESA_LOOT_TABLE);
+      const preview = getLootPreview(player, loot);
+      this.applyLoot(loot, player, callbacks);
+      callbacks.onMesaCache?.();
+      return {
+        type: 'mesa_cache',
+        loot,
+        preview,
+        icon: LOOT_REWARD_ICONS[loot.type] || '🏔️',
+        name: loot.label,
+      };
+    }
+
     if (item.type === 'village_portal') {
       callbacks.onVillagePortal?.();
       return { type: 'village_portal' };
@@ -267,11 +414,7 @@ export class Interactables {
   }
 
   removeMesh(item) {
-    if (!item.mesh) return;
-    this.group.remove(item.mesh);
-    item.mesh.geometry?.dispose();
-    item.mesh.material?.dispose();
-    item.mesh = null;
+    this._disposeItemMeshes(item);
   }
 
   update(dt, px, pz) {
@@ -280,8 +423,15 @@ export class Interactables {
       if (!item.mesh) continue;
       const used = (item.type === 'chest' && item.opened)
         || (item.type === 'pot' && item.broken)
-        || (item.type === 'shrine' && item.used);
+        || (item.type === 'shrine' && item.used)
+        || (item.type === 'mesa_cache' && item.opened);
       const inRange = !used && Math.hypot(item.x - px, item.z - pz) < item.radius;
+
+      if (item.type === 'mesa_beacon') {
+        item.mesh.rotation.y += dt * 1.6;
+        item.mesh.position.y = item.surfaceY + 1.05 + Math.sin(time + item.x) * 0.12;
+        continue;
+      }
 
       if (inRange) {
         item.mesh.rotation.x = Math.sin(time + item.x) * 0.45;

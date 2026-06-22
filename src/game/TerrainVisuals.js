@@ -47,54 +47,25 @@ export function paintGrassGround(geometry, texScale = 1) {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
-/** Arena biome surfaces — color matches slipperiness feel. */
-export function paintBiomeGround(geometry, biome, texScale = 1) {
-  const count = geometry.attributes.position.count;
-  const colors = new Float32Array(count * 3);
-
-  for (let i = 0; i < count; i++) {
-    const x = geometry.attributes.position.getX(i) * texScale;
-    const z = geometry.attributes.position.getZ(i) * texScale;
-    const n = Math.sin(x * 0.14) * Math.cos(z * 0.11) + Math.sin(x * 0.38 + z * 0.29) * 0.45;
-
-    switch (biome.id) {
-      case 'frost': {
-        const ice = (n + 1) * 0.5;
-        lerpColors(colors, i, 0x4a6a88, 0xd8eeff, ice * 0.75);
-        break;
-      }
-      case 'waste': {
-        const sand = (n + 1) * 0.5;
-        lerpColors(colors, i, 0x7a6348, 0xb89a72, sand * 0.55);
-        break;
-      }
-      case 'volcanic': {
-        const crack = Math.max(0, Math.sin(x * 0.09) * Math.sin(z * 0.09));
-        lerpColors(colors, i, 0x2a1810, 0x6a2810, crack * 0.65 + (n + 1) * 0.1);
-        break;
-      }
-      default: {
-        const lush = (n + 1) * 0.5;
-        lerpColors(colors, i, 0x3a5c32, 0x5a8a48, lush * 0.5);
-        break;
-      }
-    }
-  }
-
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
-
 export function createGroundMaterial() {
   return new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
 }
 
-export function createSpawnPad(radius, texScale = 1) {
-  const geo = new THREE.CircleGeometry(radius, 64);
-  paintPackedGround(geo, texScale);
+/** Lambert terrain with a touch of emissive so ground/mesas stay readable in shade. */
+export function createTerrainLambertMaterial(color) {
+  return new THREE.MeshLambertMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.14,
+  });
+}
+
+/** @deprecated arena uses Lambert materials in Arena.js */
+export function createSpawnPad(radius) {
+  const geo = new THREE.CircleGeometry(radius, 32);
   const mesh = new THREE.Mesh(geo, createGroundMaterial());
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.04;
-  mesh.receiveShadow = true;
   return mesh;
 }
 

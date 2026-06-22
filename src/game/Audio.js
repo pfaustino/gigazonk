@@ -3,6 +3,20 @@ export class Audio {
     this.ctx = null;
     this.enabled = true;
     this.masterGain = null;
+    this.musicTracks = {};
+    this._musicAudio = null;
+    this.musicTrackId = null;
+    this._musicSrc = null;
+    this.musicBase = import.meta.env.BASE_URL;
+  }
+
+  _getMusicEl() {
+    if (!this._musicAudio) {
+      this._musicAudio = new window.Audio();
+      this._musicAudio.loop = true;
+      this._musicAudio.preload = 'auto';
+    }
+    return this._musicAudio;
   }
 
   init() {
@@ -15,14 +29,73 @@ export class Audio {
     } catch { this.enabled = false; }
   }
 
+  async loadMusicManifest() {
+    try {
+      const res = await fetch(`${this.musicBase}music/manifest.json`);
+      if (!res.ok) return;
+      const data = await res.json();
+      this.musicTracks = data.tracks ?? {};
+    } catch { /* no manifest or music files yet */ }
+  }
+
+  playMusic(trackId) {
+    const file = this.musicTracks[trackId];
+    if (!file) return;
+
+    const src = `${this.musicBase}music/${file}`;
+    const el = this._getMusicEl();
+
+    if (this._musicSrc === src && !el.paused) {
+      this.musicTrackId = trackId;
+      return;
+    }
+
+    el.pause();
+    el.src = src;
+    this._musicSrc = src;
+    this.musicTrackId = trackId;
+    el.volume = this._musicVolume();
+    el.onerror = () => {
+      if (this._musicSrc === src) {
+        this._musicSrc = null;
+        this.musicTrackId = null;
+      }
+    };
+    el.play().catch(() => {});
+  }
+
+  stopMusic() {
+    const el = this._musicAudio;
+    if (!el) return;
+    el.pause();
+    el.removeAttribute('src');
+    el.load();
+    this._musicSrc = null;
+    this.musicTrackId = null;
+  }
+
+  _musicVolume() {
+    if (!this.enabled) return 0;
+    return Math.min(1, (this.masterGain?.gain.value ?? 0.3) * 0.85);
+  }
+
   resume() {
     this.init();
     if (this.ctx?.state === 'suspended') this.ctx.resume();
+    const el = this._musicAudio;
+    if (el?.paused && this.enabled && this._musicSrc) {
+      el.volume = this._musicVolume();
+      el.play().catch(() => {});
+    }
   }
 
   applySettings(settings) {
     this.enabled = settings.sfxEnabled !== false;
     if (this.masterGain) this.masterGain.gain.value = settings.masterVolume ?? 0.3;
+    const el = this._musicAudio;
+    if (el) el.volume = this._musicVolume();
+    if (!this.enabled) el?.pause();
+    else if (el?.paused && this.musicTrackId) el.play().catch(() => {});
   }
 
   tone(freq, duration, type = 'square', volume = 0.15, decay = true) {
@@ -72,5 +145,7 @@ export class Audio {
   nova() { this.noise(0.3, 0.12); this.tone(150, 0.5, 'sawtooth', 0.1); }
   ui() { this.tone(500, 0.05, 'sine', 0.08); }
   hurt() { this.tone(120, 0.15, 'sawtooth', 0.12); }
+  zonkDomeWarn() { this.tone(90, 0.35, 'sine', 0.1); this.tone(130, 0.5, 'triangle', 0.08); }
+  zonkDomePop() { this.noise(0.2, 0.14); this.tone(80, 0.25, 'sawtooth', 0.14); }
   quest() { this.tone(700, 0.12, 'sine', 0.1); this.tone(900, 0.15, 'sine', 0.08); }
 }

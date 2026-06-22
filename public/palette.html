@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GigaZonk — Color Palette Picker</title>
+  <style>
+    :root {
+      --bg: #1a1428;
+      --panel: #241c36;
+      --text: #f0e8ff;
+      --muted: #a898c8;
+      --accent: #f7c948;
+      --border: #3d3058;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      padding: 28px 32px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0 0 6px;
+      font-size: 1.6rem;
+      color: var(--accent);
+    }
+    header p { margin: 0; color: var(--muted); max-width: 720px; }
+    main { padding: 24px 32px 48px; max-width: 1100px; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 22px 24px;
+      margin-bottom: 22px;
+    }
+    section h2 {
+      margin: 0 0 4px;
+      font-size: 1.15rem;
+    }
+    section .hint {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .swatch {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #120e1c;
+    }
+    .swatch-color {
+      height: 88px;
+      position: relative;
+    }
+    .swatch-color.pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .swatch-color.pair > div { height: 88px; }
+    .callout {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .swatch-body { padding: 12px 14px 14px; }
+    .swatch-id {
+      font-family: Consolas, "Courier New", monospace;
+      color: var(--accent);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .swatch-hex { font-family: Consolas, monospace; font-size: 0.85rem; color: var(--muted); }
+    .swatch-rgb { font-size: 0.8rem; color: #8a7aaa; margin-top: 2px; }
+    .swatch-note { font-size: 0.82rem; margin-top: 6px; color: #c8b8e8; }
+    .combo {
+      display: flex;
+      gap: 0;
+      height: 88px;
+      border-radius: 0;
+    }
+    .combo > div { flex: 1; position: relative; }
+    .tag-current {
+      display: inline-block;
+      background: #3a2858;
+      color: #d8b8ff;
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    footer {
+      padding: 0 32px 32px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    code { color: #ffd878; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GigaZonk Color Palette</h1>
+    <p>
+      Each swatch has an <strong>ID</strong> in the gold label. Tell me which IDs you like —
+      e.g. <code>sky-frost-b</code> + <code>outer-frost-2</code> + <code>pad-cobble</code>.
+      Outer-ring options keep every RGB channel &lt; 33 unless marked otherwise.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Sky / background</h2>
+      <p class="hint">Scene background behind terrain. Whimsical but not blown-out white.</p>
+      <div class="grid" id="sky-grid"></div>
+    </section>
+
+    <section>
+      <h2>Outer arena ring</h2>
+      <p class="hint">Ground outside the 30m spawn pad. Dark options (RGB &lt; 33) are marked <em>dark-safe</em>.</p>
+      <div class="grid" id="outer-grid"></div>
+    </section>
+
+    <section>
+      <h2>Spawn pad (center circle)</h2>
+      <p class="hint">Cobblestone under the player at arena start.</p>
+      <div class="grid" id="pad-grid"></div>
+    </section>
+
+    <section>
+      <h2>Biome combos — sky + outer + pad</h2>
+      <p class="hint">Preview how a full set might look together. Pick a row ID or mix individual swatches above.</p>
+      <div class="grid" id="combo-grid"></div>
+    </section>
+  </main>
+
+  <footer>
+    Open via <code>npm run dev</code> → <code>http://localhost:5173/palette.html</code>
+  </footer>
+
+  <script>
+    const swatches = {
+      sky: [
+        { id: 'sky-title-a', hex: 0x80b8d8, note: 'Current title', current: true },
+        { id: 'sky-title-b', hex: 0x6aaccc, note: 'Deeper whimsical blue' },
+        { id: 'sky-title-c', hex: 0x94c8e0, note: 'Softer pastel' },
+        { id: 'sky-frost-a', hex: 0x6a9cb8, note: 'Current Frost sky', current: true },
+        { id: 'sky-frost-b', hex: 0x5a8cad, note: 'Cooler, more saturated' },
+        { id: 'sky-frost-c', hex: 0x78a8c8, note: 'Lighter frost haze' },
+        { id: 'sky-grass-a', hex: 0x72b8d8, note: 'Current Meadows sky', current: true },
+        { id: 'sky-grass-b', hex: 0x68b0a0, note: 'Green-teal sky' },
+        { id: 'sky-waste-a', hex: 0xc8a878, note: 'Current Wastes sky', current: true },
+        { id: 'sky-volc-a', hex: 0xc89878, note: 'Current Magma sky', current: true },
+      ],
+      outer: [
+        { id: 'outer-frost-1', hex: 0x181e20, note: 'Current Frost outer', dark: true, current: true },
+        { id: 'outer-frost-2', hex: 0x141a1c, note: 'Darker frost slate', dark: true },
+        { id: 'outer-frost-3', hex: 0x1a2028, note: 'Slight blue in dark', dark: true },
+        { id: 'outer-grass-1', hex: 0x182018, note: 'Current Meadows outer', dark: true, current: true },
+        { id: 'outer-grass-2', hex: 0x142014, note: 'Forest floor dark', dark: true },
+        { id: 'outer-grass-3', hex: 0x1a2818, note: 'Green-tinted dark', dark: true },
+        { id: 'outer-waste-1', hex: 0x201810, note: 'Current Wastes outer', dark: true, current: true },
+        { id: 'outer-waste-2', hex: 0x1a1408, note: 'Deeper sand shadow', dark: true },
+        { id: 'outer-volc-1', hex: 0x201008, note: 'Current Magma outer', dark: true, current: true },
+        { id: 'outer-volc-2', hex: 0x180c06, note: 'Charred basalt', dark: true },
+        { id: 'outer-mid-a', hex: 0x283848, note: 'NOT dark-safe — mid slate (previous)', dark: false },
+        { id: 'outer-mid-b', hex: 0x5a7080, note: 'NOT dark-safe — too bright', dark: false },
+      ],
+      pad: [
+        { id: 'pad-cobble', hex: 0x5e5448, alt: 0x4a4238, note: 'Current cobble pair', current: true },
+        { id: 'pad-warm', hex: 0x6a5a48, alt: 0x524838, note: 'Warmer stone' },
+        { id: 'pad-cool', hex: 0x4a5a5a, alt: 0x3a4848, note: 'Cool grey stone (frost-friendly)' },
+        { id: 'pad-frost', hex: 0x4a5860, alt: 0x384448, note: 'Blue-grey cobble' },
+        { id: 'pad-green', hex: 0x4a5c42, alt: 0x384830, note: 'Mossy packed earth' },
+      ],
+      combos: [
+        { id: 'combo-frost-current', sky: 0x6a9cb8, outer: 0x181e20, pad: 0x5e5448, note: 'Current in-game Frost set', current: true },
+        { id: 'combo-frost-cool', sky: 0x5a8cad, outer: 0x141a1c, pad: 0x4a5860, note: 'Cooler frost — dark outer + blue pad' },
+        { id: 'combo-frost-soft', sky: 0x78a8c8, outer: 0x1a2028, pad: 0x4a5a5a, note: 'Softer sky, still dark ring' },
+        { id: 'combo-grass-current', sky: 0x72b8d8, outer: 0x182018, pad: 0x5e5448, note: 'Current Meadows set', current: true },
+        { id: 'combo-grass-bright', sky: 0x68b0a0, outer: 0x142014, pad: 0x4a5c42, note: 'Greener meadow mood' },
+        { id: 'combo-waste-current', sky: 0xc8a878, outer: 0x201810, pad: 0x5e5448, note: 'Current Wastes set', current: true },
+        { id: 'combo-volc-current', sky: 0xc89878, outer: 0x201008, pad: 0x5e5448, note: 'Current Magma set', current: true },
+      ],
+    };
+
+    function hexCss(hex) {
+      return '#' + hex.toString(16).padStart(6, '0');
+    }
+
+    function rgb(hex) {
+      const r = (hex >> 16) & 255;
+      const g = (hex >> 8) & 255;
+      const b = hex & 255;
+      return { r, g, b, label: `rgb(${r}, ${g}, ${b})` };
+    }
+
+    function darkTag(s) {
+      if (s.dark === false) return '<span class="tag-current" style="background:#5a3030;color:#ffb0b0">too bright</span>';
+      if (s.dark) return '<span class="tag-current" style="background:#1a3020;color:#90d8a0">dark-safe</span>';
+      return '';
+    }
+
+    function renderSwatch(s, colorHtml) {
+      const { label } = rgb(s.hex);
+      const current = s.current ? '<span class="tag-current">current</span>' : '';
+      const dark = darkTag(s);
+      return `
+        <div class="swatch">
+          <div class="swatch-color">${colorHtml}</div>
+          <div class="swatch-body">
+            <div class="swatch-id">${s.id}${current}${dark}</div>
+            <div class="swatch-hex">${hexCss(s.hex)}</div>
+            <div class="swatch-rgb">${label}</div>
+            ${s.note ? `<div class="swatch-note">${s.note}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    document.getElementById('sky-grid').innerHTML = swatches.sky.map(s =>
+      renderSwatch(s, `<div style="background:${hexCss(s.hex)};height:100%"><span class="callout">${s.id}</span></div>`)
+    ).join('');
+
+    document.getElementById('outer-grid').innerHTML = swatches.outer.map(s =>
+      renderSwatch(s, `<div style="background:${hexCss(s.hex)};height:100%"><span class="callout">${s.id}</span></div>`)
+    ).join('');
+
+    document.getElementById('pad-grid').innerHTML = swatches.pad.map(s =>
+      renderSwatch(s, `
+        <div class="swatch-color pair">
+          <div style="background:${hexCss(s.hex)}"><span class="callout">${s.id}</span></div>
+          <div style="background:${hexCss(s.alt)}"></div>
+        </div>`)
+    ).join('');
+
+    document.getElementById('combo-grid').innerHTML = swatches.combos.map(s => {
+      const current = s.current ? '<span class="tag-current">current</span>' : '';
+      return `
+        <div class="swatch">
+          <div class="combo">
+            <div style="background:${hexCss(s.sky)}"><span class="callout">sky</span></div>
+            <div style="background:${hexCss(s.outer)}"><span class="callout">outer</span></div>
+            <div style="background:${hexCss(s.pad)}"><span class="callout">pad</span></div>
+          </div>
+          <div class="swatch-body">
+            <div class="swatch-id">${s.id}${current}</div>
+            <div class="swatch-hex">sky ${hexCss(s.sky)} · outer ${hexCss(s.outer)} · pad ${hexCss(s.pad)}</div>
+            <div class="swatch-note">${s.note}</div>
+          </div>
+        </div>`;
+    }).join('');
+  </script>
+</body>
+</html>

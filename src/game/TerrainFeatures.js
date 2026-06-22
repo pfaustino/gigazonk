@@ -4,8 +4,10 @@ import {
   ARENA_SIZE,
   ARENA_SPAWN_PAD_RADIUS,
 } from './constants.js';
+import { createTerrainLambertMaterial } from './TerrainVisuals.js';
 
-const WALL_HEIGHT = 2.8;
+export const GROUND_WALL_HEIGHT = 2.8;
+const WALL_HEIGHT = GROUND_WALL_HEIGHT;
 const WALL_THICK = 1.35;
 const MESA_BASE_TOP_Y = 3.6;
 const MESA_MAX_HEIGHT_MULT = 5;
@@ -27,6 +29,34 @@ const WALL_SEEDS = [
   { x: -18, z: 42, w: WALL_THICK, d: 14 },
   { x: 0, z: 48, w: 18, d: WALL_THICK },
   { x: 48, z: 0, w: WALL_THICK, d: 18 },
+  { x: 0, z: 58, w: 16, d: WALL_THICK },
+  { x: 0, z: -58, w: 16, d: WALL_THICK },
+  { x: 58, z: 0, w: WALL_THICK, d: 16 },
+  { x: -58, z: 0, w: WALL_THICK, d: 16 },
+  { x: 32, z: 12, w: 12, d: WALL_THICK },
+  { x: -32, z: -12, w: WALL_THICK, d: 12 },
+  { x: 12, z: -32, w: 12, d: WALL_THICK },
+  { x: -12, z: 32, w: WALL_THICK, d: 12 },
+  { x: 0, z: 26, w: 16, d: WALL_THICK },
+  { x: 0, z: -26, w: 16, d: WALL_THICK },
+  { x: 26, z: 0, w: WALL_THICK, d: 16 },
+  { x: -26, z: 0, w: WALL_THICK, d: 16 },
+  { x: 36, z: 36, w: 12, d: WALL_THICK },
+  { x: -36, z: 36, w: WALL_THICK, d: 12 },
+  { x: 36, z: -36, w: WALL_THICK, d: 12 },
+  { x: -36, z: -36, w: 12, d: WALL_THICK },
+  { x: 52, z: 28, w: 14, d: WALL_THICK },
+  { x: -52, z: 28, w: WALL_THICK, d: 14 },
+  { x: 28, z: -52, w: 14, d: WALL_THICK },
+  { x: -28, z: 52, w: WALL_THICK, d: 14 },
+  { x: 64, z: 0, w: 14, d: WALL_THICK },
+  { x: -64, z: 0, w: WALL_THICK, d: 14 },
+  { x: 0, z: 64, w: 14, d: WALL_THICK },
+  { x: 0, z: -64, w: WALL_THICK, d: 14 },
+  { x: 44, z: -12, w: 12, d: WALL_THICK },
+  { x: -44, z: 12, w: WALL_THICK, d: 12 },
+  { x: 12, z: 44, w: WALL_THICK, d: 12 },
+  { x: -12, z: -44, w: 12, d: WALL_THICK },
 ];
 
 const MESA_SEEDS = [
@@ -43,6 +73,37 @@ function wallClearOfSpawn(wall) {
   const nearX = Math.max(wall.x - halfW, Math.min(0, wall.x + halfW));
   const nearZ = Math.max(wall.z - halfD, Math.min(0, wall.z + halfD));
   return Math.hypot(nearX, nearZ) >= ARENA_SPAWN_PAD_RADIUS;
+}
+
+function wallOverlapsMesa(wall, mesa) {
+  const halfW = wall.w / 2;
+  const halfD = wall.d / 2;
+  const wMinX = wall.x - halfW;
+  const wMaxX = wall.x + halfW;
+  const wMinZ = wall.z - halfD;
+  const wMaxZ = wall.z + halfD;
+
+  const { cx, cz, w, d, rampSide, rampLen } = mesa;
+  const hw = w / 2;
+  const hd = d / 2;
+  let mMinX = cx - hw;
+  let mMaxX = cx + hw;
+  let mMinZ = cz - hd;
+  let mMaxZ = cz + hd;
+
+  if (rampSide === 'south') mMinZ -= rampLen;
+  else if (rampSide === 'north') mMaxZ += rampLen;
+  else if (rampSide === 'west') mMinX -= rampLen;
+  else if (rampSide === 'east') mMaxX += rampLen;
+
+  return wMinX < mMaxX && wMaxX > mMinX && wMinZ < mMaxZ && wMaxZ > mMinZ;
+}
+
+function wallClearOfMesas(wall, mesas) {
+  for (const mesa of mesas) {
+    if (wallOverlapsMesa(wall, mesa)) return false;
+  }
+  return true;
 }
 
 function mesaOverlaps(cx, cz, w, d, mesas, pad = 8) {
@@ -78,9 +139,9 @@ function generateProceduralWalls() {
   const half = ARENA_SIZE * 0.5 - 28;
 
   for (let r = 52; r < half; r += 34) {
-    const segments = Math.max(10, Math.round(5 + r / 18));
+    const segments = Math.max(14, Math.round(10 + r / 9));
     for (let i = 0; i < segments; i++) {
-      if (Math.random() > 0.78) continue;
+      if (Math.random() > 0.93) continue;
       const angle = (i / segments) * Math.PI * 2 + (Math.random() - 0.5) * 0.55;
       const x = Math.cos(angle) * (r + (Math.random() - 0.5) * 16);
       const z = Math.sin(angle) * (r + (Math.random() - 0.5) * 16);
@@ -95,7 +156,7 @@ function generateProceduralWalls() {
   }
 
   for (let r = 68; r < half; r += 52) {
-    if (Math.random() > 0.82) continue;
+    if (Math.random() > 0.94) continue;
     const span = 14 + Math.random() * 18;
     walls.push({ x: 0, z: r, w: span, d: WALL_THICK });
     walls.push({ x: 0, z: -r, w: span, d: WALL_THICK });
@@ -103,10 +164,10 @@ function generateProceduralWalls() {
     walls.push({ x: -r, z: 0, w: WALL_THICK, d: span });
   }
 
-  const gridStep = 88;
+  const gridStep = 62;
   for (let gx = -half; gx <= half; gx += gridStep) {
     for (let gz = -half; gz <= half; gz += gridStep) {
-      if (Math.random() > 0.68) continue;
+      if (Math.random() > 0.86) continue;
       const x = gx + (Math.random() - 0.5) * gridStep * 0.65;
       const z = gz + (Math.random() - 0.5) * gridStep * 0.65;
       if (Math.hypot(x, z) < ARENA_SPAWN_PAD_RADIUS + 14) continue;
@@ -118,6 +179,22 @@ function generateProceduralWalls() {
       if (!wallClearOfSpawn(wall)) continue;
       walls.push(wall);
     }
+  }
+
+  // Extra clutter in the mid arena where most combat happens.
+  for (let i = 0; i < 72; i++) {
+    if (Math.random() > 0.90) continue;
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 38 + Math.random() * 95;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const alongX = Math.random() < 0.5;
+    const len = 9 + Math.random() * 14;
+    const wall = alongX
+      ? { x, z, w: len, d: WALL_THICK }
+      : { x, z, w: WALL_THICK, d: len };
+    if (!wallClearOfSpawn(wall)) continue;
+    walls.push(wall);
   }
 
   return walls;
@@ -344,6 +421,7 @@ export function generateArenaFeatures() {
 
   for (const wall of wallBlueprints) {
     if (!wallClearOfSpawn(wall)) continue;
+    if (!wallClearOfMesas(wall, mesas)) continue;
     const halfW = wall.w / 2;
     const halfD = wall.d / 2;
     obstacles.push({
@@ -352,6 +430,7 @@ export function generateArenaFeatures() {
       maxX: wall.x + halfW,
       minZ: wall.z - halfD,
       maxZ: wall.z + halfD,
+      blockBelowY: WALL_HEIGHT,
     });
     featureMeshes.push({ kind: 'wall', x: wall.x, z: wall.z, w: wall.w, d: wall.d });
   }
@@ -410,6 +489,23 @@ function sampleMesaHeight(x, z, mesa) {
   return 0;
 }
 
+/** True when (x, z) is on the flat mesa plateau (not the ramp or ground). */
+export function isOnMesaPlateau(x, z, mesa) {
+  if (!mesa) return false;
+  const { cx, cz, w, d } = mesa;
+  const hw = w / 2;
+  const hd = d / 2;
+  return x >= cx - hw && x <= cx + hw && z >= cz - hd && z <= cz + hd;
+}
+
+export function isOnAnyMesaPlateau(x, z, mesas) {
+  if (!mesas?.length) return false;
+  for (const mesa of mesas) {
+    if (isOnMesaPlateau(x, z, mesa)) return true;
+  }
+  return false;
+}
+
 export function resolveCircleAabb(px, pz, radius, box) {
   const cx = THREE.MathUtils.clamp(px, box.minX, box.maxX);
   const cz = THREE.MathUtils.clamp(pz, box.minZ, box.maxZ);
@@ -437,9 +533,9 @@ export function resolveCircleAabb(px, pz, radius, box) {
 }
 
 export function buildFeatureMeshes(group, featureMeshes, rockColor) {
-  const wallMat = new THREE.MeshLambertMaterial({ color: rockColor });
-  const mesaMat = new THREE.MeshLambertMaterial({ color: rockColor });
-  const rampMat = new THREE.MeshLambertMaterial({ color: rockColor });
+  const wallMat = createTerrainLambertMaterial(rockColor);
+  const mesaMat = createTerrainLambertMaterial(rockColor);
+  const rampMat = createTerrainLambertMaterial(rockColor);
   const meshes = [];
 
   for (const f of featureMeshes) {
@@ -476,6 +572,7 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
 export function tintFeatureMeshes(meshes, rockColor) {
   for (const mesh of meshes) {
     mesh.material.color.setHex(rockColor);
+    if (mesh.material.emissive) mesh.material.emissive.setHex(rockColor);
   }
 }
 

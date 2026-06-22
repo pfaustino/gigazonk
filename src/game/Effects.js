@@ -264,12 +264,12 @@ export class FireTrailManager {
 
     const px = player.position.x;
     const pz = player.position.z;
-    const move = Math.hypot(px - (player._lastPosX ?? px), pz - (player._lastPosZ ?? pz));
     const speed = Math.hypot(player.velocity.x, player.velocity.z);
     const spawnGap = Math.max(0.45, 1.2 - level * 0.1);
 
-    if (speed > 0.12 && move > 0.015) {
-      this._spawnDistAcc += move;
+    // Use velocity × dt — player._lastPosX is already synced before this runs.
+    if (speed > 0.12) {
+      this._spawnDistAcc += speed * dt;
       if (this._spawnDistAcc >= spawnGap) {
         this._spawnDistAcc = 0;
         const backX = px - Math.sin(player.facing) * 0.75;

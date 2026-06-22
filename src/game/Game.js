@@ -897,6 +897,7 @@ export class Game {
     this.ui.showLevelUp(choices, this.player, (upgrade) => {
       const preview = getUpgradePreview(this.player, upgrade);
       this.upgrades.apply(upgrade, this.player);
+      this.ui.renderBuffBar(this.player);
       this.ui.pushReward({
         icon: upgrade.icon,
         name: upgrade.name,

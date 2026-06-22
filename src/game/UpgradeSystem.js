@@ -353,7 +353,9 @@ export function getActiveBuffs(player) {
   if (player.killDamageBonus > 0) add('👿', fmtPct(player.killDamageBonus), 'Kill dmg');
   if (player.projectileSpeedMult > 0) add('💨', fmtPct(player.projectileSpeedMult), 'Proj speed');
   if (player.jumpPeakMult > 0) add('🪶', fmtPct(player.jumpPeakMult), 'Jump');
-  if (player.fireTrailLevel > 0) add('🛢️', `L${player.fireTrailLevel}`, 'Greased Fire');
+  const trailLevel = player.fireTrailLevel ?? 0;
+  const baseTrail = base.fireTrailLevel ?? 0;
+  if (trailLevel > baseTrail) add('🛢️', `L${trailLevel}`, 'Greased Fire');
   if (player.coinMult > 0) add('🧤', fmtPct(player.coinMult), 'Coins');
 
   return [...metaBuffs, ...buffs];

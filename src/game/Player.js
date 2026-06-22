@@ -146,6 +146,7 @@ export class Player {
       thorns: this.thorns,
       familiars: this.familiars,
       maxAirJumps: this.maxAirJumps,
+      fireTrailLevel: this.fireTrailLevel,
       elements: new Set(this.elements),
     };
   }

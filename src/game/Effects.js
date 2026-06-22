@@ -188,12 +188,12 @@ export class SynergyNova {
 }
 
 const FIRE_PATCH_CAP = 52;
-const FIRE_PATCH_GEO = new THREE.CircleGeometry(1, 12);
 
 export class FireTrailManager {
   constructor(scene) {
     this.scene = scene;
     this.group = new THREE.Group();
+    this.group.renderOrder = 12;
     scene.add(this.group);
     this.patches = [];
     this._spawnDistAcc = 0;
@@ -202,38 +202,54 @@ export class FireTrailManager {
   reset() {
     for (const p of this.patches) {
       this.group.remove(p.mesh);
+      p.mesh.geometry?.dispose();
       p.mesh.material?.dispose();
     }
     this.patches = [];
     this._spawnDistAcc = 0;
   }
 
-  _spawnPatch(x, z, level, playerDamage) {
+  _surfaceY(x, z, player, terrain) {
+    const sampled = terrain?.getGroundHeight?.(x, z);
+    if (sampled != null && sampled > 0.02) return sampled;
+    if (player.groundY != null && player.groundY > 0.02) return player.groundY;
+    return player.feetY ?? player.groundY ?? 0;
+  }
+
+  _spawnPatch(x, z, level, playerDamage, player, terrain) {
     while (this.patches.length >= FIRE_PATCH_CAP) {
       const old = this.patches.shift();
       this.group.remove(old.mesh);
+      old.mesh.geometry?.dispose();
       old.mesh.material?.dispose();
     }
 
+    const radius = 1.55 + level * 0.28;
+    const geo = new THREE.RingGeometry(radius * 0.35, radius, 16);
     const mat = new THREE.MeshBasicMaterial({
       color: 0xff6622,
       transparent: true,
-      opacity: 0.82,
+      opacity: 0.88,
       depthWrite: false,
+      depthTest: true,
+      side: THREE.DoubleSide,
+      fog: false,
+      toneMapped: false,
     });
-    const mesh = new THREE.Mesh(FIRE_PATCH_GEO, mat);
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.08, z);
+    mesh.renderOrder = 12;
+    const y = this._surfaceY(x, z, player, terrain) + 0.2;
+    mesh.position.set(x, y, z);
     this.group.add(mesh);
 
-    const radius = 1.55 + level * 0.28;
     const life = 0.95 + level * 0.18;
-    mesh.scale.set(radius, radius, 1);
 
     this.patches.push({
       mesh,
       x,
       z,
+      y,
       life,
       maxLife: life,
       radius,
@@ -242,7 +258,7 @@ export class FireTrailManager {
     });
   }
 
-  update(dt, player, enemyManager, onHit) {
+  update(dt, player, enemyManager, terrain, onHit) {
     const level = player.fireTrailLevel;
     if (level <= 0) return;
 
@@ -250,15 +266,15 @@ export class FireTrailManager {
     const pz = player.position.z;
     const move = Math.hypot(px - (player._lastPosX ?? px), pz - (player._lastPosZ ?? pz));
     const speed = Math.hypot(player.velocity.x, player.velocity.z);
-    const spawnGap = Math.max(0.55, 1.35 - level * 0.12);
+    const spawnGap = Math.max(0.45, 1.2 - level * 0.1);
 
-    if (speed > 0.35 && move > 0.02) {
+    if (speed > 0.12 && move > 0.015) {
       this._spawnDistAcc += move;
       if (this._spawnDistAcc >= spawnGap) {
         this._spawnDistAcc = 0;
-        const backX = px - Math.sin(player.facing) * 0.65;
-        const backZ = pz - Math.cos(player.facing) * 0.65;
-        this._spawnPatch(backX, backZ, level, player.getEffectiveDamage());
+        const backX = px - Math.sin(player.facing) * 0.75;
+        const backZ = pz - Math.cos(player.facing) * 0.75;
+        this._spawnPatch(backX, backZ, level, player.getEffectiveDamage(), player, terrain);
       }
     } else {
       this._spawnDistAcc = 0;
@@ -269,14 +285,16 @@ export class FireTrailManager {
       p.life -= dt;
       if (p.life <= 0) {
         this.group.remove(p.mesh);
+        p.mesh.geometry?.dispose();
         p.mesh.material?.dispose();
         this.patches.splice(i, 1);
         continue;
       }
 
       const fade = p.life / p.maxLife;
-      p.mesh.material.opacity = 0.25 + fade * 0.65;
-      p.mesh.scale.set(p.radius * (0.75 + fade * 0.35), p.radius * (0.75 + fade * 0.35), 1);
+      p.mesh.material.opacity = 0.3 + fade * 0.7;
+      const pulse = 0.88 + Math.sin((1 - fade) * Math.PI) * 0.18;
+      p.mesh.scale.set(pulse, pulse, 1);
 
       p.tick -= dt;
       if (p.tick <= 0) {

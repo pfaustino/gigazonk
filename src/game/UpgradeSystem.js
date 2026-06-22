@@ -1,4 +1,5 @@
-import { SYNERGY_ELEMENTS, SYNERGY_NAME } from './constants.js';
+import { SYNERGY_ELEMENTS, SYNERGY_NAME, SHOP_ITEMS } from './constants.js';
+import { saveData } from './SaveData.js';
 import {
   RARITIES,
   UPGRADE_TEMPLATES,
@@ -247,9 +248,44 @@ const ELEMENT_ICONS = {
   lightning: '⚡',
 };
 
+const SHOP_BUFF_ICONS = {
+  meta_damage: '⚔️',
+  meta_hp: '❤️',
+  meta_speed: '👢',
+  meta_xp: '📚',
+  meta_start_level: '🎯',
+  meta_magnet: '🧲',
+};
+
+function shopBuffAmount(item) {
+  const meta = saveData.data.meta;
+  const e = item.effect;
+  if (e.metaDamage) return `+${Math.round(meta.damage * 100)}%`;
+  if (e.metaHp) return `+${meta.hp}`;
+  if (e.metaSpeed) return `+${Math.round(meta.speed * 100)}%`;
+  if (e.metaXp) return `+${Math.round(meta.xp * 100)}%`;
+  if (e.startLevel) return `L${1 + meta.startLevel}`;
+  if (e.metaPickup) return `+${meta.pickup}`;
+  return '✓';
+}
+
+/** Permanent village shop upgrades — always shown in the buff bar when owned. */
+export function getMetaBuffs() {
+  const purchased = new Set(saveData.data.purchasedShop);
+  return SHOP_ITEMS
+    .filter((item) => purchased.has(item.id))
+    .map((item) => ({
+      icon: SHOP_BUFF_ICONS[item.id] || '🏪',
+      amount: shopBuffAmount(item),
+      title: `${item.name} — ${item.desc}`,
+      meta: true,
+    }));
+}
+
 export function getActiveBuffs(player) {
+  const metaBuffs = getMetaBuffs();
   const base = player.runBaseline;
-  if (!base) return [];
+  if (!base) return metaBuffs;
 
   const buffs = [];
   const add = (icon, amount, title) => buffs.push({ icon, amount, title });
@@ -317,9 +353,10 @@ export function getActiveBuffs(player) {
   if (player.killDamageBonus > 0) add('👿', fmtPct(player.killDamageBonus), 'Kill dmg');
   if (player.projectileSpeedMult > 0) add('💨', fmtPct(player.projectileSpeedMult), 'Proj speed');
   if (player.jumpPeakMult > 0) add('🪶', fmtPct(player.jumpPeakMult), 'Jump');
+  if (player.fireTrailLevel > 0) add('🛢️', `L${player.fireTrailLevel}`, 'Greased Fire');
   if (player.coinMult > 0) add('🧤', fmtPct(player.coinMult), 'Coins');
 
-  return buffs;
+  return [...metaBuffs, ...buffs];
 }
 
 export class UpgradeSystem {

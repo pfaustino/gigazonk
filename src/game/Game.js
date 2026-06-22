@@ -741,7 +741,7 @@ export class Game {
       this.handleCombatHit(dmg, result, null, null)
     );
 
-    this.fireTrail.update(dt, this.player, this.enemies, (dmg, result, el) =>
+    this.fireTrail.update(dt, this.player, this.enemies, this.arena, (dmg, result, el) =>
       this.handleCombatHit(dmg, result, el, null)
     );
 

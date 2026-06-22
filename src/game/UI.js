@@ -529,7 +529,7 @@ export class UI {
     }
 
     track.innerHTML = buffs.map((buff) => `
-      <div class="buff-chip" title="${buff.title}">
+      <div class="buff-chip${buff.meta ? ' buff-chip-meta' : ''}" title="${buff.title}">
         <span class="buff-chip-icon">${buff.icon}</span>
         <span class="buff-chip-amount">${buff.amount}</span>
       </div>

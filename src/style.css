@@ -192,6 +192,15 @@ html, body {
   gap: 2px;
 }
 
+.buff-chip-meta {
+  border-color: #f7c948;
+  background: rgba(40, 32, 12, 0.95);
+}
+
+.buff-chip-meta .buff-chip-amount {
+  color: #f7c948;
+}
+
 .buff-chip-icon {
   font-size: 17px;
   line-height: 1;

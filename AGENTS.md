@@ -21,13 +21,14 @@ Browser horde survival roguelike: Vite + Three.js, vanilla JS.
 
 | Stage | Command |
 |-------|---------|
+| Setup | `npm run setup:extensions`, `npm run setup:mcp` |
 | 1 — Quality | `npm run check` |
 | 2 — Show e2e | `npm run test:e2e:headed` or `test:e2e:ui` |
 | 3 — CI smoke | `npm run test:e2e` |
 | 4 — Cross-browser | `npm run test:e2e:cross` |
 | Dev | `npm run dev` |
 
-Full workflow: `.cursor/rules/browser-game-testing.mdc`.
+Use Vitest + Playwright Testing sidebar when extensions installed. Full workflow: `.cursor/rules/browser-game-testing.mdc`, extensions: `DEV.md`.
 
 ## Do not
 

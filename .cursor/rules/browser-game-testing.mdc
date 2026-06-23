@@ -9,16 +9,19 @@ The user expects agents to **run automated tests and drive browsers** from this 
 
 ## Development workflow (layered gates)
 
-Match CI job order, but use **visible Playwright while iterating** and **headless before ship**:
+Match CI job order. Use **IDE test runners** while iterating, **headless before ship**:
 
 ```
 edit code
+  → Testing sidebar: Vitest / Playwright (or npm run check)
   → npm run check              (quality: lint + tsc + vitest + build)
   → npm run test:e2e:headed    (or :ui — show browser; UI / player-flow changes)
   → npm run test:e2e           (headless re-run; confirm CI e2e job)
   → npm run test:e2e:cross     (pre-PR when clicks, keyboard nav, CSS, or e2e touched)
   → PR → CI runs quality + e2e + e2e-cross
 ```
+
+Install extensions once: `npm run setup:extensions` (see `DEV.md`). Vitest + Playwright integrate with the Testing sidebar.
 
 | Stage | Command | Purpose |
 |-------|---------|---------|
@@ -42,9 +45,9 @@ After substantive changes, **run the matching stage(s) in the terminal** and fix
 
 ## What smoke e2e proves (and does not)
 
-**Covers today:** title boot, canvas, play → character select → arena HUD, dev panel, seeded URL without page errors, cross-browser error sweep.
+**Covers today:** title boot, canvas, play → arena HUD, village hub, dev level-up pick, dev panel, seeded URL without page errors, cross-browser error sweep.
 
-**Does not cover:** village, shop, skill tree, level-up picks, combat balance, horde perf, save/resume mid-run. Green e2e = **core path intact**, not full game QA.
+**Does not cover:** shop, skill tree, combat balance, horde perf, save/resume mid-run. Green e2e = **core path intact**, not full game QA.
 
 ## E2e conventions (from this repo)
 
@@ -95,17 +98,24 @@ npm run test:e2e:cross       # all browsers (stage 4)
 | Need | Tool |
 |------|------|
 | Regression / CI | Playwright headless (stage 3) |
+| Unit logic | Vitest Explorer or `npm run test` |
 | Agent session — show browser | Playwright `--headed` or `--ui` (stage 2) |
 | Firefox + Safari | `test:e2e:cross` (stage 4) |
 | Flow not in e2e yet | `npm run dev` + cursor-ide-browser MCP |
+| Agent write-then-verify | Playwright MCP (`setup:mcp`) |
+| Three.js scene asserts | `@timjen/playwright-three` + `e2e/helpers/playwrightThree.ts` |
 | Console / localStorage (dev running) | vite-mcp `http://localhost:5173/__mcp` |
 | Chrome traces / Lighthouse | chrome-devtools-mcp |
+| Library docs (agent) | context7 MCP |
 | Quick peek in editor | Simple Browser → `http://localhost:5173` |
+| Balance JSON | JSON Crack extension on `data/*.json` |
 | Structured in-game errors | `window.__gigazonkErrors.exportJson()` in dev |
 
 ### chrome-devtools-mcp vs cursor-ide-browser
 
 - **Playwright** — repeatable regression; only tool that runs Firefox + WebKit in CI.
+- **Playwright MCP** — agent-driven browser verify (`@playwright/mcp` via `npm run setup:mcp`).
+- **playwright-three** — scene/object asserts when DOM selectors are not enough (`window.PLAYWRIGHT_THREE.scene`).
 - **cursor-ide-browser** — exploratory click-through when no spec exists yet.
 - **vite-mcp** — dev server console + `localStorage` without extra browser.
 - **chrome-devtools-mcp** — network, perf traces, source-mapped stacks.

@@ -1,0 +1,299 @@
+{
+  // ── Editor (matches .editorconfig; ESLint owns JS formatting) ─────────────
+  "editor.detectIndentation": false,
+  "editor.insertSpaces": true,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": false,
+  "editor.rulers": [100],
+  "editor.bracketPairColorization.enabled": true,
+  "editor.stickyScroll.enabled": true,
+  "editor.suggest.insertMode": "replace",
+  "editor.linkedEditing": true,
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.associations": {
+    "*.mdc": "markdown"
+  },
+  "files.watcherExclude": {
+    "**/dist/**": true,
+    "**/node_modules/**": true,
+    "**/test-results/**": true,
+    "**/playwright-report/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/test-results": true,
+    "**/playwright-report/**": true
+  },
+
+  "[javascript]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": null
+  },
+  "[typescript]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": null
+  },
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.quickSuggestions": {
+      "strings": true
+    }
+  },
+  "[jsonc]": {
+    "editor.tabSize": 2
+  },
+  "[yaml]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": false
+    },
+    "files.trimTrailingWhitespace": false
+  },
+  "[powershell]": {
+    "editor.tabSize": 2,
+    "files.encoding": "utf8"
+  },
+
+  // ── ESLint (flat config; src + tests + e2e) ───────────────────────────────
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "typescript"],
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "eslint.probe": ["javascript", "typescript"],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // ── TypeScript (e2e + helpers; game logic stays JS + Vitest) ──────────────
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "javascript.suggest.paths": false,
+  "typescript.suggest.paths": false,
+
+  // ── Vitest (unit only — e2e stays in Playwright sidebar) ────────────────
+  "vitest.enable": true,
+  "vitest.shellType": "child_process",
+  "vitest.rootConfig": "vitest.config.js",
+  "vitest.commandLine": "npx vitest",
+  "vitest.exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/e2e/**",
+    "**/playwright-report/**",
+    "**/test-results/**"
+  ],
+  "vitest.showFailMessages": true,
+  "vitest.showInlineErrorMessages": true,
+  "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
+  "testing.automaticallyOpenTestResults": "openExplorerOnTestStart",
+  "testing.followRunningTest": true,
+  "testing.defaultGutterClickAction": "run",
+  "testing.openTesting": "openExplorerOnTestStart",
+
+  // ── Playwright (smoke + cross-browser specs) ──────────────────────────────
+  "playwright.reuseBrowser": false,
+  "playwright.showTrace": true,
+  "playwright.pickLocatorCopyFormat": "javascript",
+
+  // ── Error Lens + Pretty TS Errors ─────────────────────────────────────────
+  "errorLens.enabled": true,
+  "errorLens.enabledDiagnosticLevels": ["error", "warning"],
+  "errorLens.messageEnabled": true,
+  "errorLens.statusBarIconsEnabled": true,
+  "errorLens.gutterIconsEnabled": true,
+  "errorLens.excludeBySource": ["cSpell", "Code Spell Checker"],
+
+  // ── Git / PR (ship via PR; no auto PR on publish) ─────────────────────────
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "gitlens.codeLens.enabled": false,
+  "gitlens.currentLine.enabled": true,
+  "gitlens.hovers.currentLine.over": "line",
+  "gitlens.statusBar.enabled": true,
+  "gitlens.views.repositories.files.layout": "tree",
+  "githubPullRequests.createOnPublishBranch": "never",
+  "githubPullRequests.pullBranch": "never",
+  "githubPullRequests.terminalLinks": "github",
+
+  // ── GitHub Actions / YAML (CI parity with .github/workflows/) ───────────
+  "github-actions.workflows.pinned.workflows": [
+    "ci.yml",
+    "deploy-pages.yml",
+    "deploy-itch.yml",
+    "sync-wiki.yml",
+    "codeql.yml"
+  ],
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.{yml,yaml}",
+    "https://json.schemastore.org/github-action.json": ".github/actions/**/action.{yml,yaml}"
+  },
+  "yaml.format.enable": true,
+  "yaml.validate": true,
+  "yaml.customTags": ["!And", "!If", "!Not", "!Equals", "!FindInMap", "!Base64", "!Cidr", "!Ref", "!Sub", "!GetAtt", "!GetAZs", "!ImportValue", "!Select", "!Split", "!Join"],
+
+  // ── HUD / CSS (template strings in src/game/ui + UI.js) ─────────────────
+  "css.enabledLanguages": ["html", "javascript"],
+  "css.validate": true,
+  "html-css-class-completion.enableEmmetSupport": true,
+  "html-css-class-completion.includeGlobPattern": "**/src/**",
+  "html-css-class-completion.CssFilePaths": ["src/style.css"],
+  "html-css-class-completion.validateOnType": true,
+  "cssPeek.supportTags": true,
+  "cssPeek.peekFromLanguages": ["javascript", "typescript", "html"],
+  "cssPeek.peekToExclude": ["**/node_modules/**", "**/dist/**"],
+
+  // ── JSON / game data (data/*.json, export scripts) ────────────────────────
+  "json.format.enable": true,
+  "json.schemaDownload.enable": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["data/*.json"],
+      "url": "https://json.schemastore.org/json"
+    },
+    {
+      "fileMatch": ["package.json"],
+      "url": "https://json.schemastore.org/package"
+    },
+    {
+      "fileMatch": [".devcontainer/devcontainer.json"],
+      "url": "https://json.schemastore.org/devcontainer"
+    }
+  ],
+
+  // ── Markdown / wiki (ARCHITECTURE.md → wiki sync) ───────────────────────
+  "markdown.extension.toc.updateOnSave": true,
+  "markdown.extension.toc.levels": "2..4",
+  "markdown.extension.toc.slugifyMode": "github",
+  "markdown.extension.preview.autoShowPreviewToSide": false,
+  "markdownlint.config": {
+    "MD013": false,
+    "MD024": false,
+    "MD033": false,
+    "MD041": false
+  },
+
+  // ── Spell check (docs + HUD strings; not minified build output) ───────────
+  "cSpell.enabled": true,
+  "cSpell.language": "en",
+  "cSpell.allowCompoundWords": true,
+  "cSpell.ignorePaths": [
+    "node_modules/**",
+    "dist/**",
+    "package-lock.json",
+    "test-results/**",
+    "playwright-report/**",
+    "wiki/**"
+  ],
+  "cSpell.enabledFileTypes": {
+    "markdown": true,
+    "javascript": true,
+    "typescript": true,
+    "json": true,
+    "yaml": true,
+    "powershell": true
+  },
+  "cSpell.words": [
+    "Bonk",
+    "GigaZonk",
+    "Megabonk",
+    "Zonka",
+    "Zonker",
+    "biome",
+    "biomes",
+    "butler",
+    "devkit",
+    "gigazonk",
+    "gltf",
+    "gltf-transform",
+    "instanced",
+    "localStorage",
+    "playwright",
+    "pierce",
+    "roguelike",
+    "synergy",
+    "vitest",
+    "vite",
+    "webgl",
+    "xvfb",
+    "zonk",
+    "zonkCoins"
+  ],
+
+  // ── Imports / paths (src/game module tree) ────────────────────────────────
+  "path-intellisense.extensionOnImport": true,
+  "path-intellisense.autoSlash": true,
+  "path-intellisense.autoTriggerNextSuggestion": true,
+  "npm-intellisense.scanDevDependencies": true,
+  "npm-intellisense.importES6": true,
+  "npm-intellisense.importQuotes": "'",
+  "npm.enableScriptExplorer": true,
+  "importCost.smallPackageSize": 50,
+  "importCost.mediumPackageSize": 100,
+  "importCost.showCalculatingDecoration": true,
+
+  // ── Vite (manual dev server — avoids clashing with Playwright webServer) ──
+  "vite.autoStart": false,
+  "vite.port": 5173,
+
+  // ── Todo / comments (Phase markers in rules and code) ───────────────────
+  "todo-tree.general.tags": ["TODO", "FIXME", "HACK", "NOTE", "Phase"],
+  "todo-tree.filtering.excludeGlobs": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/wiki/**",
+    "**/test-results/**"
+  ],
+  "todo-tree.highlights.defaultHighlight": {
+    "icon": "alert",
+    "type": "text-and-comment"
+  },
+  "better-comments.tags": [
+    {
+      "tag": "!",
+      "color": "#FF2D00",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "?",
+      "color": "#3498DB",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "todo",
+      "color": "#FF8C00",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "Phase",
+      "color": "#C586C0",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": true,
+      "italic": false
+    }
+  ],
+  "editorconfig.generateAuto": false
+}

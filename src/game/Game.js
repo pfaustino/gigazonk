@@ -211,6 +211,73 @@ export class Game {
     this.scene.add(this.sunLight);
   }
 
+  _runManagers() {
+    return [
+      this.enemies,
+      this.projectiles,
+      this.gems,
+      this.interactables,
+      this.familiars,
+      this.fireTrail,
+      this.zonkDomes,
+      this.rifts,
+      this.synergy,
+      this.particles,
+    ];
+  }
+
+  resetRunManagers({ upgrades = false, questsRun = false } = {}) {
+    for (const mgr of this._runManagers()) mgr.reset();
+    if (upgrades) this.upgrades.reset();
+    if (questsRun) this.quests.resetRun();
+  }
+
+  _applySceneMode(mode) {
+    if (mode === 'title') {
+      this.village?.setVisible(false);
+      this.arena?.setVisible(false);
+      this.setSkyColor(TITLE_SKY);
+      this.applyDaylight();
+      return;
+    }
+    if (mode === 'village') {
+      this.village?.setVisible(true);
+      this.arena?.setVisible(false);
+      this.applyVillageScene();
+      return;
+    }
+    if (mode === 'arena') {
+      this.village?.setVisible(false);
+      this.arena?.setVisible(true);
+      this.applyArenaScene();
+    }
+  }
+
+  transitionTo(next) {
+    this.state = next;
+    this._applySceneMode(next);
+  }
+
+  _scatterArenaInteractables() {
+    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
+    this.interactables.spawnVillagePortal(0, 0);
+  }
+
+  _resolveStartBiome() {
+    if (this._devPendingBiome) {
+      const biome = BIOMES.find((b) => b.id === this._devPendingBiome);
+      this._devPendingBiome = null;
+      if (biome) return biome;
+    }
+    return this.arena.pickRandomBiome();
+  }
+
+  _applyBiome(biome) {
+    this.currentBiome = biome;
+    this.arena.setBiome(biome);
+    this.setSkyColor(biome.sky);
+  }
+
   handleTitleAction(action) {
     this.audio.resume();
     this.pendingAction = action;
@@ -233,10 +300,7 @@ export class Game {
     this._gameOverActive = false;
     saveData.data.runSnapshot = null;
     saveData.save();
-    this.state = 'village';
-    this.village.setVisible(true);
-    this.arena?.setVisible(false);
-    this.applyVillageScene();
+    this.transitionTo('village');
     this.hideCombat();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
@@ -253,29 +317,12 @@ export class Game {
   startArena() {
     this._ensureArena();
     saveData.data.runSnapshot = null;
-    this.state = 'arena';
-    this.village?.setVisible(false);
-    this.arena.setVisible(true);
-    this.applyArenaScene();
-    this.ui.clear();
-    this.ui.buildHUD();
+    this.transitionTo('arena');
     this.resetRun();
     this.quests.assignNewQuests();
-    if (this._devPendingBiome) {
-      const biome = BIOMES.find((b) => b.id === this._devPendingBiome);
-      if (biome) {
-        this.currentBiome = biome;
-        this.arena.setBiome(biome);
-        this.setSkyColor(biome.sky);
-      } else {
-        this.currentBiome = this.arena.pickRandomBiome();
-        this.setSkyColor(this.currentBiome.sky);
-      }
-      this._devPendingBiome = null;
-    } else {
-      this.currentBiome = this.arena.pickRandomBiome();
-      this.setSkyColor(this.currentBiome.sky);
-    }
+    this.ui.clear();
+    this.ui.buildHUD();
+    this._applyBiome(this._resolveStartBiome());
     this._deferArenaFieldSetup(true);
     this.player.position.set(0, 0, 0);
     this.player.mesh.visible = true;
@@ -330,18 +377,7 @@ export class Game {
     this.ui.dismissLevelUp();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
-    this.enemies.reset();
-    this.projectiles.reset();
-    this.gems.reset();
-    this.interactables.reset();
-    this.familiars.reset();
-    this.fireTrail.reset();
-    this.zonkDomes.reset();
-    this.rifts.reset();
-    this.synergy.reset();
-    this.particles.reset();
-    this.upgrades.reset();
-    this.quests.resetRun();
+    this.resetRunManagers({ upgrades: true, questsRun: true });
     this._floatHurtAcc = 0;
     this._floatHealAcc = 0;
     this._floatHurtTimer = 0;
@@ -349,16 +385,7 @@ export class Game {
   }
 
   hideCombat() {
-    this.enemies.reset();
-    this.projectiles.reset();
-    this.gems.reset();
-    this.interactables.reset();
-    this.familiars.reset();
-    this.fireTrail.reset();
-    this.zonkDomes.reset();
-    this.rifts.reset();
-    this.synergy.reset();
-    this.particles.reset();
+    this.resetRunManagers();
   }
 
   onResize() {
@@ -449,10 +476,7 @@ export class Game {
     saveData.data.runSnapshot = snap;
     saveData.save();
 
-    this.state = 'village';
-    this.village.setVisible(true);
-    this.arena?.setVisible(false);
-    this.applyVillageScene();
+    this.transitionTo('village');
     this.hideCombat();
     this.player.position.set(0, 0, 5);
     this.player.mesh.visible = true;
@@ -479,20 +503,8 @@ export class Game {
     this.paused = false;
     this.ui.removeScreens();
 
-    this.state = 'arena';
-    this.village?.setVisible(false);
-    this.arena.setVisible(true);
-    this.applyArenaScene();
-    this.enemies.reset();
-    this.projectiles.reset();
-    this.gems.reset();
-    this.interactables.reset();
-    this.familiars.reset();
-    this.fireTrail.reset();
-    this.zonkDomes.reset();
-    this.rifts.reset();
-    this.synergy.reset();
-    this.particles.reset();
+    this.transitionTo('arena');
+    this.resetRunManagers();
     this.ui.clear();
     this.ui.buildHUD();
     this.quests.assignNewQuests();
@@ -502,11 +514,7 @@ export class Game {
 
     if (snap.biomeId) {
       const biome = BIOMES.find(b => b.id === snap.biomeId);
-      if (biome) {
-        this.currentBiome = biome;
-        this.arena.setBiome(biome);
-        this.setSkyColor(biome.sky);
-      }
+      if (biome) this._applyBiome(biome);
     }
 
     this.restoreArenaFromSnapshot(snap);
@@ -559,10 +567,7 @@ export class Game {
 
   startArenaFromSnapshot(snap) {
     this._ensureArena();
-    this.state = 'arena';
-    this.village?.setVisible(false);
-    this.arena.setVisible(true);
-    this.applyArenaScene();
+    this.transitionTo('arena');
     this.resetRun();
     this.quests.assignNewQuests();
     this.ui.clear();
@@ -585,13 +590,9 @@ export class Game {
     this.modalPause = false;
     this.paused = false;
     this.ui.removeScreens();
-    this.state = 'title';
-    this.village?.setVisible(false);
-    this.arena?.setVisible(false);
+    this.transitionTo('title');
     this.hideCombat();
     this.player.mesh.visible = false;
-    this.setSkyColor(TITLE_SKY);
-    this.applyDaylight();
     this.ui.showTitle((action) => this.handleTitleAction(action));
     this.audio.playMusic('title');
   }
@@ -1132,7 +1133,8 @@ export class Game {
 
   devForceLevelUp() {
     if (this.state !== 'arena') return;
-    this.player.addXp(this.player.xpToNext);
+    const levels = this.player.addXp(this.player.xpToNext);
+    if (levels > 0) this.queueLevelUp(levels);
     this.ui.toast('Dev: forced level up', 'synergy');
   }
 

@@ -21,4 +21,12 @@ if (import.meta.env.DEV) {
     exportText: () => ErrorReporter.exportText(),
     exportJson: () => ErrorReporter.exportJson(),
   };
+  window.PLAYWRIGHT_THREE = {
+    get scene() {
+      return gameRef?.scene ?? null;
+    },
+    get state() {
+      return gameRef?.state ?? null;
+    },
+  };
 }

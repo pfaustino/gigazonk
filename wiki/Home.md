@@ -34,7 +34,7 @@ index.html → main.js
                        ├── ProjectileManager.js (pooled)
                        ├── GemManager.js (pooled)
                        ├── Interactables.js (chests, shrines, mesa loot)
-                       ├── UpgradeSystem.js + Awards.js / gameData.ts
+                       ├── UpgradeSystem.js + UpgradeOffers.js / gameData.ts
                        ├── QuestSystem.js
                        ├── Effects.js (familiars, rifts, nova, fire trail, domes)
                        ├── ParticleSystem.js
@@ -79,6 +79,8 @@ Arena combat uses seeded `runRandom()` for loot, spawns, upgrades; static visual
 | `ProjectileManager.js` | Auto-fire, pierce, elements, object pool |
 | `GemManager.js` | XP gem pool, magnet pickup |
 | `Interactables.js` | Field scatter, mesa encounters, loot tables |
+| `UpgradeOffers.js` | Rarity scaling, offer rolls (`buildUpgradeOffer`) |
+| `upgradeStatSchema.js` | Effect keys → player caps (shared by offers + UpgradeSystem) |
 | `UpgradeSystem.js` | Run upgrades, preview math, synergy nova |
 | `UI.js` | All DOM screens: title, HUD, level-up, shop, quests |
 | `GameMenu.js` | Pause / settings overlay |
@@ -102,7 +104,7 @@ Arena combat uses seeded `runRandom()` for loot, spawns, upgrades; static visual
 ```
 data/enemies.json, data/upgrades.json, data/quests.json, data/skills.json
         ↓
-gameData.ts → constants.js / Awards.js / SkillTree.js
+gameData.ts → constants.js / UpgradeOffers.js / SkillTree.js
         ↓
 EnemyManager, UpgradeSystem, Interactables
 
@@ -145,6 +147,27 @@ Progressive init keeps the title DOM responsive on slow browsers (CI Firefox):
 | `<html data-game-ready>` phases | `src/lib/gameReady.js`, title/HUD/village UI |
 
 E2e helpers wait on `data-game-ready` (`e2e/helpers/gameReady.ts`). CI cross-browser uses **Xvfb + headed Firefox/WebKit** (`.github/workflows/ci.yml`).
+
+### Phase C (polish) — in progress
+
+| Item | Status |
+|------|--------|
+| `transitionTo()` + `_applySceneMode()` scene routing | `Game.js` |
+| `resetRunManagers()` combat manager registry | `Game.js` |
+| Title **Enter Village** button (DEV smoke path) | `ui/TitleScreens.js` |
+| Village e2e (`startVillage` helper) | `e2e/` |
+| `Awards.js` → `UpgradeOffers.js` + `upgradeStatSchema.js` | done |
+
+### IDE & agent workflow
+
+| Mechanism | Location |
+|-----------|----------|
+| Extension recommendations | `.vscode/extensions.json` — `npm run setup:extensions` |
+| Workspace editor settings | `.vscode/settings.json`, `.editorconfig` |
+| Dev container extensions | `.devcontainer/devcontainer.json` |
+| MCP servers | `.cursor/mcp.json` — `npm run setup:mcp` (browser, vite-mcp, chrome-devtools, playwright, context7) |
+| Three.js e2e hook | `window.PLAYWRIGHT_THREE` in dev (`src/main.js`) |
+| Scene-aware Playwright | `@timjen/playwright-three`, `e2e/helpers/playwrightThree.ts` |
 
 ## Build & deploy
 

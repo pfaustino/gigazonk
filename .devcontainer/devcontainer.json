@@ -16,7 +16,34 @@
   "postCreateCommand": "npm ci && npx playwright install --with-deps chromium",
   "customizations": {
     "vscode": {
-      "extensions": ["dbaeumer.vscode-eslint", "ms-playwright.playwright"]
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "vitest.explorer",
+        "ms-playwright.playwright",
+        "usernamehw.errorlens",
+        "yoavbls.pretty-ts-errors",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+        "eamodio.gitlens",
+        "yzhang.markdown-all-in-one",
+        "DavidAnson.vscode-markdownlint",
+        "redhat.vscode-yaml",
+        "ecmel.vscode-html-css",
+        "pranaygp.vscode-css-peek",
+        "AykutSarac.jsoncrack-vscode",
+        "JessyLeite.super-glb-viewer",
+        "christian-kohler.path-intellisense",
+        "christian-kohler.npm-intellisense",
+        "streetsidesoftware.code-spell-checker",
+        "antfu.vite",
+        "EditorConfig.EditorConfig",
+        "Gruntfuggly.todo-tree",
+        "aaron-bond.better-comments",
+        "wix.vscode-import-cost",
+        "mechatroner.rainbow-csv",
+        "remcohaszing.schemastore",
+        "GitHub.vscode-codeql"
+      ]
     }
   },
   "remoteUser": "node"

@@ -77,6 +77,9 @@ export const MAX_PROJECTILES = 200;
 export const MAX_GEMS = 1200;
 
 export const GIGA_SPAWN_INTERVAL = 180;
+export const BOSS_SPAWN_INTERVAL = 120;
+export const BOSS_TELEGRAPH_SECONDS = 3;
+export const HIT_STOP_CRIT_SECONDS = 0.045;
 export const BASE_SPAWN_GROUP_SIZE = 3;
 export const GROUP_CLUSTER_RADIUS = 3.5;
 export const MAX_SPAWN_GROUP_SIZE = 7;
@@ -194,10 +197,10 @@ export function getBiomeOuterColor(biome) {
 }
 
 export const BIOMES = [
-  { id: 'grass', name: 'Zonk Meadows', ground: 0x4a9050, sky: 0x72b8d8, accent: 0x2d6030, friction: 26 },
-  { id: 'waste', name: 'Bonk Wastes', ground: 0xa08060, sky: 0xc8a878, accent: 0x6a5040, friction: 24 },
-  { id: 'frost', name: 'Frost Zonk', ground: 0x5a7080, sky: 0x6a9cb8, accent: 0x3a5870, friction: 7 },
-  { id: 'volcanic', name: 'Magma Pits', ground: 0x5a3828, sky: 0xc89878, accent: 0x2a1408, friction: 14 },
+  { id: 'grass', name: 'Zonk Meadows', ground: 0x4a9050, sky: 0x72b8d8, accent: 0x2d6030, friction: 28 },
+  { id: 'waste', name: 'Bonk Wastes', ground: 0xa08060, sky: 0xc8a878, accent: 0x6a5040, friction: 22 },
+  { id: 'frost', name: 'Frost Zonk', ground: 0x5a7080, sky: 0x6a9cb8, accent: 0x3a5870, friction: 5 },
+  { id: 'volcanic', name: 'Magma Pits', ground: 0x5a3828, sky: 0xc89878, accent: 0x2a1408, friction: 10 },
 ];
 
 /** Per-biome spawn weights (must sum ~1). Gates by elapsed time still apply in EnemyManager. */

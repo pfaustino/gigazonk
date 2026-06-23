@@ -189,7 +189,11 @@ export class Audio {
   hit() { this.tone(180, 0.06, 'sawtooth', 0.08); }
   kill() { this.tone(320, 0.1, 'square', 0.1); this.tone(480, 0.12, 'square', 0.06); }
   levelUp() {
-    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 0.2, 'sine', 0.12), i * 80));
+    [392, 523, 659, 784, 988, 1175].forEach((f, i) => {
+      setTimeout(() => this.tone(f, 0.22, 'sine', 0.13), i * 55);
+    });
+    setTimeout(() => this.noise(0.18, 0.09), 180);
+    setTimeout(() => this.tone(880, 0.35, 'triangle', 0.1), 320);
   }
   chest() { this.tone(600, 0.15, 'sine', 0.12); this.tone(900, 0.2, 'sine', 0.1); }
   dodge() { this.noise(0.12, 0.06); this.tone(200, 0.1, 'sine', 0.05); }

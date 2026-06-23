@@ -1,0 +1,24 @@
+{
+  "environments": {
+    "github-pages": {
+      "usedBy": [".github/workflows/deploy-pages.yml"],
+      "url": "https://pfaustino.github.io/gigazonk/",
+      "secrets": {},
+      "notes": "Uses GitHub OIDC (id-token). No BUTLER or deploy API secrets."
+    },
+    "itch": {
+      "usedBy": [".github/workflows/deploy-itch.yml"],
+      "url": "https://pfaustino.itch.io/gigazonk",
+      "butlerTarget": "pfaustino/gigazonk:html5",
+      "branchPolicy": ["main"],
+      "secrets": {
+        "BUTLER_API_KEY": {
+          "status": "required",
+          "description": "itch.io API key (User settings → API keys)",
+          "providerUrl": "https://itch.io/user/settings/api-keys",
+          "setCommand": "gh secret set BUTLER_API_KEY --env itch --repo pfaustino/gigazonk"
+        }
+      }
+    }
+  }
+}

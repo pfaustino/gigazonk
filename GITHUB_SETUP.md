@@ -95,11 +95,22 @@ Workflows use least privilege:
 
 Never store secrets in repos. Use GitHub Environments for deploy secrets if needed.
 
-### GigaZonk itch.io (one-time)
+### GigaZonk deploy environments
 
-1. Project: [pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk) (HTML5)
-2. itch.io → **API keys** → create key
-3. GitHub **gigazonk** → Settings → Environments → **itch** → secret `BUTLER_API_KEY`
-4. Merge to `main` or run workflow **Deploy to itch.io**
+Manifest: `.github/deploy-environments.json`
+
+| Environment | Workflow | Secret name | Status |
+|-------------|----------|-------------|--------|
+| `github-pages` | `deploy-pages.yml` | *(none — OIDC)* | Active |
+| `itch` | `deploy-itch.io` | **`BUTLER_API_KEY`** | **Set this** |
+
+**One-time itch setup:**
+
+1. itch.io → **API keys** → create key
+2. Paste key to agent or run:
+   ```powershell
+   gh secret set BUTLER_API_KEY --env itch --repo pfaustino/gigazonk
+   ```
+3. Merge to `main` or run **Deploy to itch.io** workflow
 
 See `docs/adr/0005-itch-io-deploy.md`.

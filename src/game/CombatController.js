@@ -16,6 +16,10 @@ export class CombatController {
     const critHit = isCrit || damage > g.player.damage * g.player.getComboMult() * (g.player.getCritMultiplier() - 0.05);
     if (enemy) {
       g.particles.damageNumber(enemy.x, enemy.z, damage, critHit);
+      if (critHit && damage >= 1) {
+        g.applyHitStop();
+        g.cameraController.addShake(0.28);
+      }
     }
     g.audio.hit();
 

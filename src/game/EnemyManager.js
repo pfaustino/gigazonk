@@ -491,7 +491,7 @@ export class EnemyManager {
 
     const baseInterval = 3;
     const minInterval = 0.7;
-    const ramp = 1 + elapsed * 0.012;
+    const ramp = 1 + Math.max(0, elapsed - 15) * 0.01;
     let interval = Math.max(
       minInterval,
       baseInterval / ramp / (inRift ? 1.35 : 1) / Math.sqrt(diffMult)
@@ -523,9 +523,9 @@ export class EnemyManager {
 
     const type = this._pickEnemyType(elapsed);
     const groupSize = this._getGroupSize(elapsed, isGigaspawn);
-    const timeHpBonus = 1 + elapsed * 0.002;
+    const timeHpBonus = 1 + Math.max(0, elapsed - 30) * 0.0018;
     const hpMult = timeHpBonus * diffMult * hpMultBonus * (isGigaspawn ? 1.1 : 1);
-    const speedMult = (1 + elapsed * 0.002) * (1 + (diffMult - 1) * 0.3);
+    const speedMult = (1 + Math.max(0, elapsed - 20) * 0.0018) * (1 + (diffMult - 1) * 0.3);
     const spawned = this._spawnCluster(anchorX, anchorZ, groupSize, type, playerDmg, hpMult, speedMult);
 
     return { spawned, isGigaspawn, groupSize, anchorX, anchorZ };

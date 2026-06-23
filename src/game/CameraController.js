@@ -15,6 +15,17 @@ export class CameraController {
     this.smooth = 0.14;
     this._targetPos = new THREE.Vector3();
     this._lookAt = new THREE.Vector3();
+    this.shakeAmount = 0;
+  }
+
+  addShake(intensity) {
+    this.shakeAmount = Math.min(2.5, this.shakeAmount + intensity);
+  }
+
+  tickShake(dt) {
+    if (this.shakeAmount <= 0) return;
+    this.shakeAmount *= Math.exp(-10 * dt);
+    if (this.shakeAmount < 0.01) this.shakeAmount = 0;
   }
 
   reset() {
@@ -54,6 +65,11 @@ export class CameraController {
 
     this._targetPos.set(x, y, z);
     camera.position.lerp(this._targetPos, this.smooth);
+    if (this.shakeAmount > 0) {
+      camera.position.x += (Math.random() - 0.5) * this.shakeAmount;
+      camera.position.y += (Math.random() - 0.5) * this.shakeAmount * 0.35;
+      camera.position.z += (Math.random() - 0.5) * this.shakeAmount;
+    }
     this._lookAt.set(playerPos.x, lookY, playerPos.z);
     camera.lookAt(this._lookAt);
   }

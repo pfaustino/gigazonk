@@ -160,7 +160,7 @@ export class Player {
   }
 
   xpForLevel(lvl) {
-    return Math.floor(20 * Math.pow(1.15, lvl - 1));
+    return Math.floor(18 * Math.pow(1.14, lvl - 1));
   }
 
   get xpMult() {

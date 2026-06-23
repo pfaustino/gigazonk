@@ -14,7 +14,7 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -126,6 +126,8 @@ export class Game {
     this._wasInRift = false;
     this._tutorialMoveDist = 0;
     this._tutorialFlags = { move: false, dodge: false, magnet: false, levelup: false, rift: false };
+    this._hitStopTimer = 0;
+    this._bossTelegraph = null;
 
     this.player._onDodge = () => {
       this.audio.dodge();
@@ -440,6 +442,8 @@ export class Game {
     this._wasInRift = false;
     this._tutorialMoveDist = 0;
     this._tutorialFlags = { move: false, dodge: false, magnet: false, levelup: false, rift: false };
+    this._hitStopTimer = 0;
+    this._bossTelegraph = null;
     this._tutorialShownStep = getCurrentTutorialStep() ? getTutorialStepIndex() : -1;
     this.initRunRng();
     this.ui.dismissLevelUp();
@@ -677,23 +681,51 @@ export class Game {
     this.combat.handleCombatHit(damage, killResult, element, enemy, opts);
   }
 
-  spawnBoss() {
-    this.bossCount++;
+  applyHitStop(duration = HIT_STOP_CRIT_SECONDS) {
+    this._hitStopTimer = Math.max(this._hitStopTimer, duration);
+  }
+
+  _pickBossSpawnPoint() {
     const angle = runRandom() * Math.PI * 2;
     const half = ARENA_SIZE / 2 - 6;
-    const bx = THREE.MathUtils.clamp(
-      this.player.position.x + Math.cos(angle) * 20,
-      -half,
-      half
+    return {
+      x: THREE.MathUtils.clamp(
+        this.player.position.x + Math.cos(angle) * 20,
+        -half,
+        half
+      ),
+      z: THREE.MathUtils.clamp(
+        this.player.position.z + Math.sin(angle) * 20,
+        -half,
+        half
+      ),
+    };
+  }
+
+  _startBossTelegraph() {
+    this.bossCount++;
+    const { x, z } = this._pickBossSpawnPoint();
+    this._bossTelegraph = { x, z, timer: BOSS_TELEGRAPH_SECONDS, pulse: 0 };
+    this.audio.zonkDomeWarn();
+    this.ui.toast(
+      `☠️ ZONK LORD #${this.bossCount} inbound — ${BOSS_TELEGRAPH_SECONDS}s!`,
+      'synergy'
     );
-    const bz = THREE.MathUtils.clamp(
-      this.player.position.z + Math.sin(angle) * 20,
-      -half,
-      half
-    );
-    this.enemies.spawnBoss(bx, bz, this.player.getEffectiveDamage());
+    this.particles.burst(x, z, 0xff2244);
+  }
+
+  _finishBossSpawn(x, z) {
+    this.enemies.spawnBoss(x, z, this.player.getEffectiveDamage());
     this.audio.boss();
+    this.cameraController.addShake(0.85);
     this.ui.toast(`⚠️ ZONK LORD #${this.bossCount} APPROACHES!`, 'synergy');
+    this.bossTimer = 0;
+  }
+
+  spawnBoss() {
+    const { x, z } = this._pickBossSpawnPoint();
+    this.bossCount++;
+    this._finishBossSpawn(x, z);
   }
 
   _checkTutorial() {
@@ -822,10 +854,23 @@ export class Game {
       this.ui.toast(`🌊 GIGASPAWN — ${spawnResult.groupSize} monsters!`, 'synergy');
     }
 
-    this.bossTimer += dt;
-    if (this.bossTimer >= 120) {
-      this.bossTimer = 0;
-      this.spawnBoss();
+    if (this._bossTelegraph) {
+      this._bossTelegraph.timer -= dt;
+      this._bossTelegraph.pulse += dt;
+      if (this._bossTelegraph.pulse >= 0.45) {
+        this._bossTelegraph.pulse = 0;
+        this.particles.burst(this._bossTelegraph.x, this._bossTelegraph.z, 0xff5533);
+      }
+      if (this._bossTelegraph.timer <= 0) {
+        const { x, z } = this._bossTelegraph;
+        this._bossTelegraph = null;
+        this._finishBossSpawn(x, z);
+      }
+    } else {
+      this.bossTimer += dt;
+      if (this.bossTimer >= BOSS_SPAWN_INTERVAL - BOSS_TELEGRAPH_SECONDS) {
+        this._startBossTelegraph();
+      }
     }
 
     this.enemies.setThreatDamage(this.player.getEffectiveDamage());
@@ -1088,6 +1133,8 @@ export class Game {
       });
       if (!shown) return;
       this.audio.levelUp();
+      this.cameraController.addShake(0.32);
+      this.applyHitStop(0.055);
       this.modalPause = true;
       this.paused = true;
     } catch (err) {
@@ -1175,7 +1222,13 @@ export class Game {
       });
     }
     this.timer.update(timestamp);
-    const dt = Math.min(this.timer.getDelta(), 0.05);
+    const rawDt = Math.min(this.timer.getDelta(), 0.05);
+    let dt = rawDt;
+    if (this._hitStopTimer > 0) {
+      dt = rawDt * 0.05;
+      this._hitStopTimer -= rawDt;
+    }
+    this.cameraController.tickShake(rawDt);
 
     const inWorld = this.state === 'arena' || this.state === 'village';
     const gameplay = inWorld

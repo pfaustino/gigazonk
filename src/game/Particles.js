@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getEnemyHpBarWorldY } from './constants.js';
 
 export class ParticleSystem {
   constructor(scene) {
@@ -9,7 +10,7 @@ export class ParticleSystem {
 
     this.dmgLayer = document.createElement('div');
     this.dmgLayer.id = 'damage-numbers';
-    this.dmgLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+    this.dmgLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:8;';
     document.getElementById('ui-layer')?.appendChild(this.dmgLayer);
     this.damageNumbers = [];
 
@@ -61,15 +62,54 @@ export class ParticleSystem {
   }
 
   damageNumber(x, z, amount, isCrit = false) {
+    this.floatingNumber(x, z, amount, isCrit ? 'crit' : 'hit');
+  }
+
+  floatingNumber(x, z, amount, kind = 'hit', y = 1.5) {
+    let n;
+    if (kind === 'hurt') {
+      if (amount < 0.15) return;
+      n = Math.max(1, Math.ceil(amount));
+    } else {
+      n = Math.round(amount);
+      if (n < 1) return;
+    }
+
+    let text;
+    let fontSize;
+    let color;
+    switch (kind) {
+      case 'hurt':
+        text = `-${n}`;
+        fontSize = 18;
+        color = '#ff5c5c';
+        break;
+      case 'heal':
+        text = `+${n}`;
+        fontSize = 18;
+        color = '#4ade80';
+        break;
+      case 'crit':
+        text = String(n);
+        fontSize = 22;
+        color = '#f7c948';
+        break;
+      default:
+        text = String(n);
+        fontSize = 16;
+        color = '#fff';
+        break;
+    }
+
     const el = document.createElement('div');
-    el.textContent = Math.round(amount);
+    el.textContent = text;
     el.style.cssText = `
-      position:absolute;font-weight:800;font-size:${isCrit ? 22 : 16}px;
-      color:${isCrit ? '#f7c948' : '#fff'};text-shadow:0 0 4px #000,1px 1px 0 #000;
+      position:absolute;font-weight:800;font-size:${fontSize}px;
+      color:${color};text-shadow:0 0 4px #000,1px 1px 0 #000;
       pointer-events:none;transition:none;
     `;
     this.dmgLayer.appendChild(el);
-    this.damageNumbers.push({ el, x, z, y: 1.5, life: 0.7, isCrit });
+    this.damageNumbers.push({ el, x, z, y, life: 0.7, isCrit: kind === 'crit' });
   }
 
   updateEnemyHpBars(enemies, camera, renderer) {
@@ -99,8 +139,7 @@ export class ParticleSystem {
       bar.root.classList.toggle('boss', !!e.isBoss);
 
       const barWidth = e.isBoss ? 56 : 36;
-      const surfaceY = e.groundY ?? e.feetY ?? 0;
-      const height = surfaceY + (e.isBoss ? 3.2 : 1.1) * e.scale + 0.5;
+      const height = getEnemyHpBarWorldY(e);
       vec.set(e.x, height, e.z);
       vec.project(camera);
 

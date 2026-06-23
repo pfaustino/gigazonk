@@ -11,6 +11,7 @@ import {
   ENEMY_NEAR_RADIUS,
   MAX_SPAWN_GROUP_SIZE,
   MAX_GIGA_GROUP_SIZE,
+  ENEMY_MESH_LIFT,
 } from './constants.js';
 import {
   ENEMY_MESH_CAPS,
@@ -114,7 +115,7 @@ export class EnemyManager {
     if (!enemy.alive) {
       dummy.scale.set(0, 0, 0);
     } else {
-      dummy.position.set(enemy.x, 0.9 * enemy.scale + (enemy.groundY || 0), enemy.z);
+      dummy.position.set(enemy.x, ENEMY_MESH_LIFT * enemy.scale + (enemy.groundY || 0), enemy.z);
       dummy.scale.set(enemy.scale, enemy.scale, enemy.scale);
       dummy.rotation.y = Date.now() * 0.003 + enemy.slot;
     }

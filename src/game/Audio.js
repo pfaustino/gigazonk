@@ -4,9 +4,12 @@ export class Audio {
     this.enabled = true;
     this.masterGain = null;
     this.musicTracks = {};
+    this.arenaPlaylist = [];
+    this._arenaIndex = -1;
     this._musicAudio = null;
     this.musicTrackId = null;
     this._musicSrc = null;
+    this._playlistMode = false;
     this.musicBase = import.meta.env.BASE_URL;
   }
 
@@ -35,22 +38,32 @@ export class Audio {
       if (!res.ok) return;
       const data = await res.json();
       this.musicTracks = data.tracks ?? {};
+      const arena = data.arena ?? data.tracks?.arena;
+      if (Array.isArray(arena)) {
+        this.arenaPlaylist = arena.filter(Boolean);
+      } else if (typeof arena === 'string') {
+        this.arenaPlaylist = [arena];
+      } else {
+        this.arenaPlaylist = [];
+      }
     } catch { /* no manifest or music files yet */ }
   }
 
-  playMusic(trackId) {
-    const file = this.musicTracks[trackId];
+  _playMusicFile(trackId, file, { loop = true, advanceArena = false } = {}) {
     if (!file) return;
 
     const src = `${this.musicBase}music/${file}`;
     const el = this._getMusicEl();
 
-    if (this._musicSrc === src && !el.paused) {
+    if (!advanceArena && this._musicSrc === src && !el.paused) {
       this.musicTrackId = trackId;
       return;
     }
 
     el.pause();
+    el.onended = null;
+    el.loop = loop;
+    this._playlistMode = !loop;
     el.src = src;
     this._musicSrc = src;
     this.musicTrackId = trackId;
@@ -59,19 +72,49 @@ export class Audio {
       if (this._musicSrc === src) {
         this._musicSrc = null;
         this.musicTrackId = null;
+        this._playlistMode = false;
       }
     };
+    if (trackId === 'arena' && this.arenaPlaylist.length > 1) {
+      el.onended = () => {
+        if (this.musicTrackId === 'arena' && this._playlistMode) {
+          this._playNextArenaTrack();
+        }
+      };
+    }
     el.play().catch(() => {});
+  }
+
+  _playNextArenaTrack() {
+    if (!this.arenaPlaylist.length) return;
+    this._arenaIndex = (this._arenaIndex + 1) % this.arenaPlaylist.length;
+    const loop = this.arenaPlaylist.length === 1;
+    this._playMusicFile('arena', this.arenaPlaylist[this._arenaIndex], {
+      loop,
+      advanceArena: true,
+    });
+  }
+
+  playMusic(trackId) {
+    if (trackId === 'arena' && this.arenaPlaylist.length > 0) {
+      this._playNextArenaTrack();
+      return;
+    }
+
+    const file = this.musicTracks[trackId];
+    this._playMusicFile(trackId, file, { loop: true });
   }
 
   stopMusic() {
     const el = this._musicAudio;
     if (!el) return;
+    el.onended = null;
     el.pause();
     el.removeAttribute('src');
     el.load();
     this._musicSrc = null;
     this.musicTrackId = null;
+    this._playlistMode = false;
   }
 
   _musicVolume() {

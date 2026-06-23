@@ -1,4 +1,4 @@
-import { SYNERGY_ELEMENTS, SYNERGY_NAME } from './constants.js';
+import { SYNERGY_ELEMENTS, SYNERGY_NAME, CRIT_CHANCE_CAP } from './constants.js';
 import {
   RARITIES,
   UPGRADE_TEMPLATES,
@@ -13,6 +13,23 @@ function fmtNum(v, decimals = 0) {
 
 function fmtPct(v) {
   return `${Math.round(v * 100)}%`;
+}
+
+/** Run bonus vs baseline — matches buff bar chips (e.g. +32%). */
+function fmtRunMultBonus(value, baselineValue) {
+  if (baselineValue == null || baselineValue === 0) return fmtNum(value);
+  const pct = Math.round((value / baselineValue - 1) * 100);
+  if (pct > 0) return `+${pct}%`;
+  if (pct < 0) return `${pct}%`;
+  return '0%';
+}
+
+function addRunMultPreview(lines, label, current, after, baselineValue) {
+  lines.push({
+    label,
+    before: fmtRunMultBonus(current, baselineValue),
+    after: fmtRunMultBonus(after, baselineValue),
+  });
 }
 
 function fmtElements(elements) {
@@ -39,26 +56,31 @@ export function getUpgradePreview(player, upgrade) {
     add('Pierce', player.projectilePierce, Math.min(5, player.projectilePierce + e.pierce));
   }
   if (e.damageMult) {
-    add('Damage', player.damage, player.damage * (1 + e.damageMult), v => fmtNum(v));
+    const base = player.runBaseline?.damage ?? player.damage;
+    addRunMultPreview(lines, 'Damage', player.damage, player.damage * (1 + e.damageMult), base);
   }
   if (e.attackRateMult) {
-    add('Attack speed', player.attackRate, player.attackRate * (1 + e.attackRateMult), v => fmtNum(v, 1));
+    const base = player.runBaseline?.attackRate ?? player.attackRate;
+    addRunMultPreview(lines, 'Attack speed', player.attackRate, player.attackRate * (1 + e.attackRateMult), base);
   }
   if (e.speedMult) {
-    add('Move speed', player.speed, player.speed * (1 + e.speedMult), v => fmtNum(v, 1));
+    const base = player.runBaseline?.speed ?? player.speed;
+    addRunMultPreview(lines, 'Move speed', player.speed, player.speed * (1 + e.speedMult), base);
   }
   if (e.maxHp) {
     add('Max HP', player.maxHp, player.maxHp + e.maxHp);
     add('HP', player.hp, player.hp + (e.heal || e.maxHp));
   }
   if (e.pickupMult) {
-    add('Pickup radius', player.pickupRadius, player.pickupRadius * (1 + e.pickupMult), v => fmtNum(v, 1));
+    const base = player.runBaseline?.pickupRadius ?? player.pickupRadius;
+    addRunMultPreview(lines, 'Pickup radius', player.pickupRadius, player.pickupRadius * (1 + e.pickupMult), base);
   }
   if (e.areaMult) {
-    add('Blast radius', player.area, player.area * (1 + e.areaMult), v => fmtNum(v, 2));
+    const base = player.runBaseline?.area ?? player.area;
+    addRunMultPreview(lines, 'Blast radius', player.area, player.area * (1 + e.areaMult), base);
   }
   if (e.critChance) {
-    add('Crit chance', player.critChance, player.critChance + e.critChance, fmtPct);
+    add('Crit chance', player.critChance, Math.min(CRIT_CHANCE_CAP, player.critChance + e.critChance), fmtPct);
   }
   if (e.element) {
     const after = new Set(player.elements);
@@ -102,7 +124,7 @@ export function getUpgradePreview(player, upgrade) {
     add('Jump height', player.jumpPeakMult, player.jumpPeakMult + e.jumpPeakMult, fmtPct);
   }
   if (e.meleeBonus) {
-    add('Melee dmg', player.meleeBonus, player.meleeBonus + e.meleeBonus, fmtPct);
+    add('Close range dmg', player.meleeBonus, player.meleeBonus + e.meleeBonus, fmtPct);
   }
   if (e.airDamageMult) {
     add('Airborne dmg', player.airDamageMult, player.airDamageMult + e.airDamageMult, fmtPct);
@@ -138,7 +160,8 @@ export function getUpgradePreview(player, upgrade) {
     add('Dmg per kill', player.killDamageBonus, Math.min(0.1, player.killDamageBonus + e.damagePerKill), fmtPct);
   }
   if (e.maxHpMult) {
-    add('Max HP', player.maxHp, player.maxHp * (1 + e.maxHpMult));
+    const base = player.runBaseline?.maxHp ?? player.maxHp;
+    addRunMultPreview(lines, 'Max HP', player.maxHp, player.maxHp * (1 + e.maxHpMult), base);
   }
   if (e.upgradeBoost) {
     add('Future upgrades', player.upgradeBoost, player.upgradeBoost + e.upgradeBoost, fmtPct);
@@ -190,12 +213,16 @@ export function getLootPreview(player, loot) {
     case 'heal':
       add('HP', player.hp, Math.min(player.maxHp, player.hp + loot.value));
       break;
-    case 'damage':
-      add('Damage', player.damage, player.damage * (1 + loot.value));
+    case 'damage': {
+      const base = player.runBaseline?.damage ?? player.damage;
+      addRunMultPreview(lines, 'Damage', player.damage, player.damage * (1 + loot.value), base);
       break;
-    case 'speed':
-      add('Speed', player.speed, player.speed * (1 + loot.value), v => fmtNum(v, 1));
+    }
+    case 'speed': {
+      const base = player.runBaseline?.speed ?? player.speed;
+      addRunMultPreview(lines, 'Speed', player.speed, player.speed * (1 + loot.value), base);
       break;
+    }
     case 'coins':
       add('Coins', 'Run', `+${loot.value}`, v => v);
       break;
@@ -203,7 +230,7 @@ export function getLootPreview(player, loot) {
       add('Magnet', 'Off', 'Pulse', v => v);
       break;
     case 'crit':
-      add('Crit chance', player.critChance, Math.min(0.75, player.critChance + loot.value), fmtPct);
+      add('Crit chance', player.critChance, Math.min(CRIT_CHANCE_CAP, player.critChance + loot.value), fmtPct);
       break;
     case 'regen':
       add('HP regen', player.hpRegen, player.hpRegen + loot.value, v => fmtNum(v, 2));
@@ -221,9 +248,11 @@ export function getLootPreview(player, loot) {
       add('Max HP', player.maxHp, player.maxHp + loot.value);
       add('HP', player.hp, player.hp + loot.value);
       break;
-    case 'area':
-      add('Blast radius', player.area, player.area * (1 + loot.value), v => fmtNum(v, 2));
+    case 'area': {
+      const base = player.runBaseline?.area ?? player.area;
+      addRunMultPreview(lines, 'Blast radius', player.area, player.area * (1 + loot.value), base);
       break;
+    }
     case 'proj':
       add('Projectiles', player.projectileCount, player.projectileCount + loot.value);
       break;
@@ -250,83 +279,291 @@ const ELEMENT_ICONS = {
   lightning: '⚡',
 };
 
+const ELEMENT_NAMES = {
+  fire: 'Fire',
+  ice: 'Ice',
+  lightning: 'Lightning',
+};
+
+export function formatBuffTooltip(buff) {
+  const title = String(buff.title ?? '').trim();
+  const amount = String(buff.amount ?? '').trim();
+  if (!title) return amount || 'Unknown buff';
+  if (!amount || amount === 'ON') return title;
+  return `${title} (${amount})`;
+}
+
+const STAT_LABEL_TO_BUFF_ID = {
+  Projectiles: 'extraProjectiles',
+  Pierce: 'pierce',
+  Damage: 'damage',
+  'Attack speed': 'attackSpeed',
+  'Move speed': 'moveSpeed',
+  'Max HP': 'maxHp',
+  'Pickup radius': 'pickupRadius',
+  'Blast radius': 'blastRadius',
+  'Crit chance': 'critChance',
+  'Crit damage': 'critDamage',
+  'Lightning chains': 'lightningChains',
+  Familiars: 'familiars',
+  Lifesteal: 'lifesteal',
+  Thorns: 'thorns',
+  'Air jumps': 'airJumps',
+  'HP regen': 'hpRegen',
+  'XP gain': 'xpGain',
+  'Coin bonus': 'coinBonus',
+  Evasion: 'evasion',
+  Armor: 'armor',
+  'Jump height': 'jumpHeight',
+  'Close range dmg': 'meleeDamage',
+  'Airborne dmg': 'airborneDamage',
+  'Boss dmg': 'bossDamage',
+  'Poison chance': 'poisonChance',
+  'Bonk chance': 'bonkChance',
+  'Explode chance': 'explodeChance',
+  'Proj speed': 'projectileSpeed',
+  'Fire trail': 'greasedFire',
+  'Dmg per kill': 'killDamageBonus',
+  'Kill XP': 'killXp',
+  'Heal on kill': 'healOnKill',
+  'Magnet radius': 'magnetRadius',
+  'Future upgrades': 'upgradeBoost',
+  'Crit splash': 'critSplash',
+  'Idle damage': 'idleDamage',
+  'Move atk spd': 'moveAtkSpeed',
+  'Hurt speed': 'hurtSpeedBurst',
+  Speed: 'moveSpeed',
+  Magnet: 'magnetPulse',
+};
+
+const ELEMENT_NAME_TO_ID = {
+  Fire: 'fire',
+  Ice: 'ice',
+  Lightning: 'lightning',
+};
+
+const BUFF_ID_DISPLAY = {
+  extraProjectiles: { icon: '🔫', title: 'Extra projectiles' },
+  pierce: { icon: '🏹', title: 'Pierce' },
+  damage: { icon: '💥', title: 'Damage' },
+  moveSpeed: { icon: '👟', title: 'Move speed' },
+  attackSpeed: { icon: '⚡', title: 'Attack speed' },
+  maxHp: { icon: '❤️', title: 'Max HP' },
+  pickupRadius: { icon: '🧲', title: 'Pickup radius' },
+  blastRadius: { icon: '💫', title: 'Blast radius' },
+  critChance: { icon: '🎯', title: 'Crit chance' },
+  critDamage: { icon: '🍴', title: 'Crit damage' },
+  lifesteal: { icon: '🩸', title: 'Lifesteal' },
+  thorns: { icon: '🌵', title: 'Thorns' },
+  familiars: { icon: '🌀', title: 'Familiars' },
+  airJumps: { icon: '🦘', title: 'Air jumps' },
+  'element-fire': { icon: '🔥', title: 'Fire element' },
+  'element-ice': { icon: '❄️', title: 'Ice element' },
+  'element-lightning': { icon: '⚡', title: 'Lightning element' },
+  lightningChains: { icon: '⚡', title: 'Lightning chains' },
+  magnetPulse: { icon: '🧲', title: 'Magnet pulse' },
+  hpRegen: { icon: '🩹', title: 'HP regen' },
+  xpGain: { icon: '⌚', title: 'XP gain' },
+  evasion: { icon: '💍', title: 'Evasion' },
+  armor: { icon: '🛡️', title: 'Armor' },
+  meleeDamage: { icon: '👊', title: 'Close range damage' },
+  airborneDamage: { icon: '🧣', title: 'Airborne damage' },
+  bossDamage: { icon: '💀', title: 'Boss damage' },
+  poisonChance: { icon: '🧀', title: 'Poison chance' },
+  bonkChance: { icon: '🔨', title: 'Bonk chance' },
+  explodeChance: { icon: '🧆', title: 'Explode chance' },
+  killDamageBonus: { icon: '👿', title: 'Kill damage bonus' },
+  projectileSpeed: { icon: '💨', title: 'Projectile speed' },
+  jumpHeight: { icon: '🪶', title: 'Jump height' },
+  greasedFire: { icon: '🛢️', title: 'Greased Fire' },
+  coinBonus: { icon: '🧤', title: 'Coin bonus' },
+  killXp: { icon: '📖', title: 'Kill XP' },
+  healOnKill: { icon: '💚', title: 'Heal on kill' },
+  magnetRadius: { icon: '🛰️', title: 'Magnet radius' },
+  upgradeBoost: { icon: '📈', title: 'Future upgrades' },
+  critSplash: { icon: '💢', title: 'Crit splash' },
+  idleDamage: { icon: '🧘', title: 'Idle damage' },
+  moveAtkSpeed: { icon: '🏃', title: 'Move attack speed' },
+  hurtSpeedBurst: { icon: '😤', title: 'Hurt speed burst' },
+};
+
+function getBuffIdsForPreviewRow(row) {
+  const ids = [];
+  const push = (id) => {
+    if (id && !ids.includes(id)) ids.push(id);
+  };
+
+  if (row.label === 'Elements') {
+    const before = new Set(
+      row.before === 'None' ? [] : String(row.before).split(', ').filter(Boolean)
+    );
+    const after = row.after === 'None' ? [] : String(row.after).split(', ').filter(Boolean);
+    for (const name of after) {
+      const el = ELEMENT_NAME_TO_ID[name];
+      if (el && !before.has(name)) push(`element-${el}`);
+    }
+    return ids;
+  }
+  if (row.label === 'HP') return ids;
+  push(STAT_LABEL_TO_BUFF_ID[row.label]);
+  return ids;
+}
+
+export function getUpgradeBuffHighlights(player, upgrade) {
+  const preview = getUpgradePreview(player, upgrade);
+  const projectedBuffs = new Map(
+    getActiveBuffs(player.previewAfterUpgrade(upgrade)).map((b) => [b.id, b])
+  );
+  const active = new Map(getActiveBuffs(player).map((b) => [b.id, b]));
+  const highlights = [];
+  const seen = new Set();
+
+  for (const row of preview) {
+    for (const id of getBuffIdsForPreviewRow(row)) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const existing = active.get(id);
+      const projected = projectedBuffs.get(id);
+      const meta = BUFF_ID_DISPLAY[id] ?? { icon: '✨', title: row.label };
+      const beforeNum = Number(row.before);
+      const afterNum = Number(row.after);
+      const isDebuff = !Number.isNaN(beforeNum) && !Number.isNaN(afterNum) && afterNum < beforeNum;
+      highlights.push({
+        id,
+        isNew: !existing && !!projected,
+        isDebuff: projected?.debuff ?? isDebuff,
+        icon: projected?.icon ?? existing?.icon ?? (isDebuff ? '💔' : meta.icon),
+        title: projected?.title ?? existing?.title ?? meta.title,
+        amount: projected?.amount ?? row.after,
+        previewAmount: projected?.amount ?? null,
+        previewLabel: row.label === 'Elements' ? null : row.after,
+        delta: `${row.before} → ${row.after}`,
+      });
+    }
+  }
+
+  return highlights;
+}
+
+export function getBuffTargetsFromStats(stats = []) {
+  const ids = [];
+  for (const row of stats) {
+    for (const id of getBuffIdsForPreviewRow(row)) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
+  return ids;
+}
+
 export function getActiveBuffs(player) {
   const base = player.runBaseline;
   if (!base) return [];
 
   const buffs = [];
-  const add = (icon, amount, title) => buffs.push({ icon, amount, title });
+  const add = (icon, amount, title, id, debuff = false) => buffs.push({ icon, amount, title, id, debuff });
 
-  const extraProj = player.projectileCount - base.projectileCount;
-  if (extraProj > 0) add('🔫', `+${extraProj}`, 'Projectiles');
+  const extraProj = Math.round(player.projectileCount) - Math.round(base.projectileCount);
+  if (extraProj > 0) add('🔫', `+${extraProj}`, 'Extra projectiles', 'extraProjectiles');
 
-  const extraPierce = player.projectilePierce - base.projectilePierce;
-  if (extraPierce > 0) add('🏹', `+${extraPierce}`, 'Pierce');
+  const extraPierce = Math.round(player.projectilePierce) - Math.round(base.projectilePierce);
+  if (extraPierce > 0) add('🏹', `+${extraPierce}`, 'Pierce', 'pierce');
 
   const dmgPct = Math.round((player.damage / base.damage - 1) * 100);
-  if (dmgPct > 0) add('💥', `+${dmgPct}%`, 'Damage');
+  if (dmgPct > 0) add('💥', `+${dmgPct}%`, 'Damage', 'damage');
 
   const spdPct = Math.round((player.speed / base.speed - 1) * 100);
-  if (spdPct > 0) add('👟', `+${spdPct}%`, 'Speed');
+  if (spdPct > 0) add('👟', `+${spdPct}%`, 'Move speed', 'moveSpeed');
 
   const atkPct = Math.round((player.attackRate / base.attackRate - 1) * 100);
-  if (atkPct > 0) add('⚡', `+${atkPct}%`, 'Attack speed');
+  if (atkPct > 0) add('⚡', `+${atkPct}%`, 'Attack speed', 'attackSpeed');
 
   const hpExtra = Math.round(player.maxHp - base.maxHp);
-  if (hpExtra > 0) add('❤️', `+${hpExtra}`, 'Max HP');
+  const hpPct = Math.round((player.maxHp / base.maxHp - 1) * 100);
+  if (hpExtra > 0) add('❤️', `+${hpExtra}`, 'Max HP', 'maxHp');
+  else if (hpExtra < 0) add('💔', `${hpPct}%`, 'Max HP', 'maxHp', true);
 
   const pickupPct = Math.round((player.pickupRadius / base.pickupRadius - 1) * 100);
-  if (pickupPct > 0) add('🧲', `+${pickupPct}%`, 'Pickup');
+  if (pickupPct > 0) add('🧲', `+${pickupPct}%`, 'Pickup radius', 'pickupRadius');
 
   const areaPct = Math.round((player.area / base.area - 1) * 100);
-  if (areaPct > 0) add('💫', `+${areaPct}%`, 'Area');
+  if (areaPct > 0) add('💫', `+${areaPct}%`, 'Blast radius', 'blastRadius');
 
   const critPct = Math.round((player.critChance - base.critChance) * 100);
-  if (critPct > 0) add('🎯', `+${critPct}%`, 'Crit');
+  if (critPct > 0) {
+    const atCap = player.critChance >= CRIT_CHANCE_CAP - 0.0001;
+    add('🎯', `+${critPct}%`, atCap ? 'Crit chance (max)' : 'Crit chance', 'critChance');
+  }
 
-  const critDmgPct = Math.round((player.critDamageMult / base.critDamageMult - 1) * 100);
-  if (critDmgPct > 0) add('🍴', `+${critDmgPct}%`, 'Crit damage');
+  const critDmgBonus = Math.round((player.critDamageMult - base.critDamageMult) * 10) / 10;
+  if (critDmgBonus > 0) {
+    add('🍴', `+${critDmgBonus.toFixed(1)}×`, 'Crit damage', 'critDamage');
+  }
 
   const lsPct = Math.round((player.lifesteal - base.lifesteal) * 100);
-  if (lsPct > 0) add('🩸', `+${lsPct}%`, 'Lifesteal');
+  if (lsPct > 0) add('🩸', `+${lsPct}%`, 'Lifesteal', 'lifesteal');
 
   const thornExtra = Math.round((player.thorns - base.thorns) * 10) / 10;
-  if (thornExtra > 0) add('🌵', `+${thornExtra}`, 'Thorns');
+  if (thornExtra > 0) add('🌵', `+${thornExtra}`, 'Thorns', 'thorns');
 
-  const famExtra = player.familiars - base.familiars;
-  if (famExtra > 0) add('🌀', `+${famExtra}`, 'Familiars');
+  const famExtra = Math.round(player.familiars) - Math.round(base.familiars);
+  if (famExtra > 0) add('🌀', `+${famExtra}`, 'Familiars', 'familiars');
 
-  const jumpExtra = player.maxAirJumps - base.maxAirJumps;
-  if (jumpExtra > 0) add('🦘', `+${jumpExtra}`, 'Air jumps');
+  const jumpExtra = Math.round(player.maxAirJumps) - Math.round(base.maxAirJumps);
+  if (jumpExtra > 0) add('🦘', `+${jumpExtra}`, 'Air jumps', 'airJumps');
 
   for (const el of player.elements) {
     if (!base.elements.has(el)) {
-      add(ELEMENT_ICONS[el] || '✨', 'ON', `${el} element`);
+      const elName = ELEMENT_NAMES[el] || (el ? el.charAt(0).toUpperCase() + el.slice(1) : 'Unknown');
+      add(ELEMENT_ICONS[el] || '✨', 'ON', `${elName} element`, `element-${el}`);
     }
   }
   if (player.lightningChains > 3) {
-    add('⚡', `×${player.lightningChains}`, 'Lightning chains');
+    add('⚡', `×${player.lightningChains}`, 'Lightning chains', 'lightningChains');
   }
 
-  if (player.magnetActive) add('🧲', 'ON', 'Magnet pulse');
+  if (player.magnetActive) add('🧲', 'ON', 'Magnet pulse', 'magnetPulse');
 
-  if (player.hpRegen > (base.hpRegen ?? 0)) add('🩹', fmtNum(player.hpRegen - (base.hpRegen ?? 0), 1), 'HP regen');
-  if (player.runXpMult > 0) add('⌚', fmtPct(player.runXpMult), 'XP gain');
-  if (player.evasion > (base.evasion ?? 0)) add('💍', fmtPct(player.evasion - (base.evasion ?? 0)), 'Evasion');
-  if (player.armor > (base.armor ?? 0)) add('🛡️', fmtPct(player.armor - (base.armor ?? 0)), 'Armor');
-  if (player.meleeBonus > 0) add('👊', fmtPct(player.meleeBonus), 'Melee');
-  if (player.airDamageMult > 0) add('🧣', fmtPct(player.airDamageMult), 'Air dmg');
-  if (player.bossDamageMult > (base.bossDamageMult ?? 0)) add('💀', fmtPct(player.bossDamageMult - (base.bossDamageMult ?? 0)), 'Boss dmg');
-  if (player.poisonChance > 0) add('🧀', fmtPct(player.poisonChance), 'Poison');
-  if (player.bonkChance > 0) add('🔨', fmtPct(player.bonkChance), 'Bonk');
-  if (player.explodeChance > 0) add('🧆', fmtPct(player.explodeChance), 'Explode');
-  if (player.killDamageBonus > 0) add('👿', fmtPct(player.killDamageBonus), 'Kill dmg');
-  if (player.projectileSpeedMult > 0) add('💨', fmtPct(player.projectileSpeedMult), 'Proj speed');
-  if (player.jumpPeakMult > 0) add('🪶', fmtPct(player.jumpPeakMult), 'Jump');
+  if (player.hpRegen > (base.hpRegen ?? 0)) add('🩹', fmtNum(player.hpRegen - (base.hpRegen ?? 0), 1), 'HP regen', 'hpRegen');
+  if (player.runXpMult > (base.runXpMult ?? 0)) add('⌚', fmtPct(player.runXpMult - (base.runXpMult ?? 0)), 'XP gain', 'xpGain');
+  if (player.evasion > (base.evasion ?? 0)) add('💍', fmtPct(player.evasion - (base.evasion ?? 0)), 'Evasion', 'evasion');
+  if (player.armor > (base.armor ?? 0)) add('🛡️', fmtPct(player.armor - (base.armor ?? 0)), 'Armor', 'armor');
+  if (player.meleeBonus > (base.meleeBonus ?? 0)) add('👊', fmtPct(player.meleeBonus - (base.meleeBonus ?? 0)), 'Close range damage', 'meleeDamage');
+  if (player.airDamageMult > (base.airDamageMult ?? 0)) add('🧣', fmtPct(player.airDamageMult - (base.airDamageMult ?? 0)), 'Airborne damage', 'airborneDamage');
+  if (player.bossDamageMult > (base.bossDamageMult ?? 0)) add('💀', fmtPct(player.bossDamageMult - (base.bossDamageMult ?? 0)), 'Boss damage', 'bossDamage');
+  if (player.poisonChance > (base.poisonChance ?? 0)) add('🧀', fmtPct(player.poisonChance - (base.poisonChance ?? 0)), 'Poison chance', 'poisonChance');
+  if (player.bonkChance > (base.bonkChance ?? 0)) add('🔨', fmtPct(player.bonkChance - (base.bonkChance ?? 0)), 'Bonk chance', 'bonkChance');
+  if (player.explodeChance > (base.explodeChance ?? 0)) add('🧆', fmtPct(player.explodeChance - (base.explodeChance ?? 0)), 'Explode chance', 'explodeChance');
+  if (player.killDamageBonus > (base.killDamageBonus ?? 0)) add('👿', fmtPct(player.killDamageBonus - (base.killDamageBonus ?? 0)), 'Kill damage bonus', 'killDamageBonus');
+  if (player.projectileSpeedMult > (base.projectileSpeedMult ?? 0)) add('💨', fmtPct(player.projectileSpeedMult - (base.projectileSpeedMult ?? 0)), 'Projectile speed', 'projectileSpeed');
+  if (player.jumpPeakMult > (base.jumpPeakMult ?? 0)) add('🪶', fmtPct(player.jumpPeakMult - (base.jumpPeakMult ?? 0)), 'Jump height', 'jumpHeight');
   const trailLevel = player.fireTrailLevel ?? 0;
   const baseTrail = base.fireTrailLevel ?? 0;
-  if (trailLevel > baseTrail) add('🛢️', `L${trailLevel}`, 'Greased Fire');
-  if (player.coinMult > (base.coinMult ?? 0)) add('🧤', fmtPct(player.coinMult - (base.coinMult ?? 0)), 'Coins');
+  if (trailLevel > baseTrail) add('🛢️', `L${trailLevel}`, 'Greased Fire', 'greasedFire');
+  if (player.coinMult > (base.coinMult ?? 0)) add('🧤', fmtPct(player.coinMult - (base.coinMult ?? 0)), 'Coin bonus', 'coinBonus');
+
+  const killXpExtra = player.killXpMult - (base.killXpMult ?? 0);
+  if (killXpExtra > 0) add('📖', fmtPct(killXpExtra), 'Kill XP', 'killXp');
+
+  const healKillExtra = player.healOnKill - (base.healOnKill ?? 0);
+  if (healKillExtra > 0) add('💚', fmtPct(healKillExtra), 'Heal on kill', 'healOnKill');
+
+  const magnetExtra = Math.round((player.magnetRadius - (base.magnetRadius ?? 0)) * 10) / 10;
+  if (magnetExtra > 0) add('🛰️', `+${magnetExtra}`, 'Magnet radius', 'magnetRadius');
+
+  const upgradeBoostExtra = player.upgradeBoost - (base.upgradeBoost ?? 0);
+  if (upgradeBoostExtra > 0) add('📈', fmtPct(upgradeBoostExtra), 'Future upgrades', 'upgradeBoost');
+
+  const critSplashExtra = player.critSplash - (base.critSplash ?? 0);
+  if (critSplashExtra > 0) add('💢', fmtPct(critSplashExtra), 'Crit splash', 'critSplash');
+
+  const idleExtra = player.idleDamageMult - (base.idleDamageMult ?? 0);
+  if (idleExtra > 0) add('🧘', fmtPct(idleExtra), 'Idle damage', 'idleDamage');
+
+  const moveAtkExtra = player.moveAtkSpeed - (base.moveAtkSpeed ?? 0);
+  if (moveAtkExtra > 0) add('🏃', fmtPct(moveAtkExtra), 'Move attack speed', 'moveAtkSpeed');
+
+  const hurtSpdExtra = player.hurtSpeedBurst - (base.hurtSpeedBurst ?? 0);
+  if (hurtSpdExtra > 0) add('😤', fmtPct(hurtSpdExtra), 'Hurt speed burst', 'hurtSpeedBurst');
 
   return buffs;
 }
@@ -353,7 +590,7 @@ export class UpgradeSystem {
     if (templateId === 'proj_pierce' && player.projectilePierce >= 5) return true;
     if (e.evasion && player.evasion >= 0.75) return true;
     if (e.armor && player.armor >= 0.5) return true;
-    if (e.critChance && player.critChance >= 0.75) return true;
+    if (e.critChance && player.critChance >= CRIT_CHANCE_CAP) return true;
     if (e.poisonChance && player.poisonChance >= 1) return true;
     if (e.explodeChance && player.explodeChance >= 1) return true;
     if (e.damagePerKill && player.killDamageBonus >= 0.1) return true;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER_BASE, CHARACTERS, ARENA_SIZE } from './constants.js';
+import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP } from './constants.js';
 import { saveData } from './SaveData.js';
 import { applySkillBonusesToPlayer } from './SkillTree.js';
 import { buildPlayerVisual } from './EntityVisuals.js';
@@ -111,6 +111,7 @@ export class Player {
     applySkillBonusesToPlayer(this, m, saveData.data.skillLevels);
     this.xpToNext = this.xpForLevel(this.level);
     this.setCharacter(this.characterId);
+    this.hp = this.maxHp;
     this._captureRunBaseline();
   }
 
@@ -136,6 +137,23 @@ export class Player {
       armor: this.armor,
       bossDamageMult: this.bossDamageMult,
       coinMult: this.coinMult,
+      killXpMult: this.killXpMult,
+      healOnKill: this.healOnKill,
+      magnetRadius: this.magnetRadius,
+      upgradeBoost: this.upgradeBoost,
+      critSplash: this.critSplash,
+      idleDamageMult: this.idleDamageMult,
+      moveAtkSpeed: this.moveAtkSpeed,
+      hurtSpeedBurst: this.hurtSpeedBurst,
+      runXpMult: this.runXpMult,
+      meleeBonus: this.meleeBonus,
+      airDamageMult: this.airDamageMult,
+      poisonChance: this.poisonChance,
+      bonkChance: this.bonkChance,
+      explodeChance: this.explodeChance,
+      killDamageBonus: this.killDamageBonus,
+      projectileSpeedMult: this.projectileSpeedMult,
+      jumpPeakMult: this.jumpPeakMult,
       elements: new Set(this.elements),
     };
   }
@@ -372,11 +390,13 @@ export class Player {
       if (this.evasion > 0 && Math.random() < this.evasion) return false;
     }
     const reduced = amount * (1 - Math.min(0.5, this.armor));
+    if (reduced <= 0) return false;
     this.hp -= reduced;
     this.invincible = 0.5;
     this.combo = 0;
     if (this.hurtSpeedBurst > 0) this.hurtSpeedTimer = 2;
     this._onHurt?.();
+    this._onDamageTaken?.(reduced);
     return this.hp <= 0;
   }
 
@@ -397,7 +417,10 @@ export class Player {
   }
 
   heal(amount) {
+    const before = this.hp;
     this.hp = Math.min(this.hp + amount, this.maxHp);
+    const healed = this.hp - before;
+    if (healed > 0) this._onHeal?.(healed);
   }
 
   addXp(amount) {
@@ -464,12 +487,21 @@ export class Player {
     this._onJump?.();
   }
 
+  previewAfterUpgrade(upgrade) {
+    const preview = Object.create(Object.getPrototypeOf(this));
+    Object.assign(preview, this);
+    preview.elements = new Set(this.elements);
+    preview.runBaseline = this.runBaseline;
+    preview.applyUpgrade(upgrade);
+    return preview;
+  }
+
   applyUpgrade(upgrade) {
     const b = 1 + this.upgradeBoost;
     const e = upgrade.effect;
     const mul = (v) => (typeof v === 'number' ? v * b : v);
 
-    if (e.projectileCount) this.projectileCount += mul(e.projectileCount);
+    if (e.projectileCount) this.projectileCount = Math.round(this.projectileCount + mul(e.projectileCount));
     if (e.pierce) this.projectilePierce = Math.min(5, this.projectilePierce + mul(e.pierce));
     if (e.damageMult) this.damage *= (1 + mul(e.damageMult));
     if (e.attackRateMult) this.attackRate *= (1 + mul(e.attackRateMult));
@@ -481,9 +513,9 @@ export class Player {
     }
     if (e.pickupMult) this.pickupRadius *= (1 + mul(e.pickupMult));
     if (e.areaMult) this.area *= (1 + mul(e.areaMult));
-    if (e.critChance) this.critChance = Math.min(0.75, this.critChance + mul(e.critChance));
+    if (e.critChance) this.critChance = Math.min(CRIT_CHANCE_CAP, this.critChance + mul(e.critChance));
     if (e.critDamageMult) this.critDamageMult += mul(e.critDamageMult);
-    if (e.element) this.elements.add(e.element);
+    if (e.element && typeof e.element === 'string') this.elements.add(e.element);
     if (e.lightningChains) this.lightningChains += mul(e.lightningChains);
     if (e.familiars) this.familiars += mul(e.familiars);
     if (e.lifesteal) this.lifesteal += mul(e.lifesteal);

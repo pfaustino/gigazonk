@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { VILLAGE_SIZE, VILLAGE_NPCS } from './constants.js';
 import { saveData } from './SaveData.js';
 import { createGrassField, createPathStrip } from './TerrainVisuals.js';
+import { GROUND_WALL_HEIGHT, resolveCircleAabb } from './TerrainFeatures.js';
 
 export class Village {
   constructor(scene) {
     this.scene = scene;
     this.halfSize = VILLAGE_SIZE / 2;
     this.npcs = [];
+    this.obstacles = [];
     this.group = new THREE.Group();
     scene.add(this.group);
     this.build();
@@ -56,6 +58,16 @@ export class Village {
     roof.position.set(x, h + 0.75, z);
     roof.rotation.y = Math.PI / 4;
     this.group.add(roof);
+
+    const half = w / 2 + 0.2;
+    this.obstacles.push({
+      type: 'aabb',
+      minX: x - half,
+      maxX: x + half,
+      minZ: z - half,
+      maxZ: z + half,
+      blockBelowY: h + 1.6,
+    });
   }
 
   addNPC(npcDef) {
@@ -91,6 +103,14 @@ export class Village {
       const leaves = new THREE.Mesh(leafGeo, leafMat);
       leaves.position.set(x, 2.2, z);
       this.group.add(leaves);
+
+      this.obstacles.push({
+        type: 'circle',
+        x,
+        z,
+        radius: 0.5,
+        blockBelowY: 2.5,
+      });
     }
 
     const portalGeo = new THREE.TorusGeometry(2, 0.2, 8, 24);
@@ -142,6 +162,41 @@ export class Village {
   getFriction(x) {
     // Village spawn hub — compacted path and settled grass.
     return Math.abs(x) < 3 ? 36 : 32;
+  }
+
+  getGroundHeight() {
+    return 0;
+  }
+
+  resolveObstacleCollision(x, z, radius = 0.5, entityY = 0) {
+    let px = x;
+    let pz = z;
+    for (let pass = 0; pass < 4; pass++) {
+      for (const obs of this.obstacles) {
+        if (obs.type === 'circle') {
+          const blockY = obs.blockBelowY ?? obs.radius * 1.1 + 0.15;
+          if (entityY >= blockY - 0.35) continue;
+          const dx = px - obs.x;
+          const dz = pz - obs.z;
+          const dist = Math.hypot(dx, dz);
+          const minDist = obs.radius + radius;
+          if (dist >= minDist) continue;
+          if (dist > 0.001) {
+            const push = (minDist - dist) / dist;
+            px += dx * push;
+            pz += dz * push;
+          } else {
+            px += minDist;
+          }
+        } else if (obs.type === 'aabb') {
+          if (entityY >= (obs.blockBelowY ?? GROUND_WALL_HEIGHT) - 0.35) continue;
+          const resolved = resolveCircleAabb(px, pz, radius, obs);
+          px = resolved.x;
+          pz = resolved.z;
+        }
+      }
+    }
+    return { x: px, z: pz };
   }
 
   setVisible(v) {

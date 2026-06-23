@@ -235,6 +235,28 @@ html, body {
   border: 1px solid #6b4fd4;
   border-radius: 8px;
   gap: 2px;
+  pointer-events: auto;
+  cursor: help;
+}
+
+.buff-tooltip {
+  position: fixed;
+  z-index: 1200;
+  max-width: 240px;
+  padding: 8px 10px;
+  background: rgba(12, 8, 28, 0.96);
+  border: 1px solid #6b4fd4;
+  border-radius: 8px;
+  color: #e8e0ff;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.buff-tooltip.hidden {
+  display: none;
 }
 
 .buff-chip-meta {
@@ -257,6 +279,26 @@ html, body {
   color: #6ee86e;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+}
+
+.buff-chip-debuff {
+  border-color: #e74c3c;
+  background: rgba(40, 12, 12, 0.95);
+}
+
+.buff-chip-debuff .buff-chip-amount {
+  color: #ff6b6b;
+}
+
+.buff-chip-highlight {
+  border-color: #6ee86e;
+  box-shadow: 0 0 14px rgba(110, 232, 110, 0.55);
+  animation: buff-chip-pulse 0.45s ease;
+}
+
+@keyframes buff-chip-pulse {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.18); }
 }
 
 .quest-panel {
@@ -325,15 +367,74 @@ html, body {
 }
 
 .screen .title-version {
-  position: absolute;
-  bottom: 14px;
-  left: 0;
-  right: 0;
-  margin: 0;
+  position: static;
+  margin-top: 20px;
   text-align: center;
   font-size: 11px;
-  color: #555;
+  color: #888;
   letter-spacing: 0.06em;
+}
+
+.title-screen {
+  justify-content: flex-end;
+  padding: 0 0 40px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.title-hero {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.title-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+}
+
+.title-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(5, 3, 15, 0.2) 0%,
+    rgba(5, 3, 15, 0.45) 38%,
+    rgba(5, 3, 15, 0.88) 72%,
+    rgba(5, 3, 15, 0.96) 100%
+  );
+}
+
+.title-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 20px;
+}
+
+.title-screen h1 {
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.65);
+}
+
+.title-screen .subtitle {
+  margin-bottom: 28px;
+  color: #c8bddf;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
+.title-stats {
+  margin-top: 20px;
+  font-size: 12px;
+  color: #9a8fc4;
+  text-align: center;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
 }
 
 .btn {
@@ -381,6 +482,55 @@ html, body {
 }
 
 /* Level up */
+.levelup-screen {
+  justify-content: flex-start;
+  padding: 20px 24px 28px;
+}
+
+.levelup-buff-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: min(300px, 34vw);
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  z-index: 2;
+}
+
+.levelup-buff-bar {
+  pointer-events: auto;
+}
+
+.levelup-buff-hint {
+  margin: -2px 0 8px;
+  font-size: 10px;
+  color: #8f84c8;
+  line-height: 1.35;
+}
+
+.levelup-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.buff-chip-affected {
+  border-color: #f7c948;
+  box-shadow: 0 0 14px rgba(247, 201, 72, 0.5);
+  transform: scale(1.06);
+  z-index: 1;
+}
+
+.buff-chip-dimmed {
+  opacity: 0.28;
+}
+
+.buff-chip-preview {
+  border-style: dashed;
+  animation: buff-chip-pulse 0.75s ease infinite;
+}
+
 .levelup-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1102,8 +1252,8 @@ html, body {
   transition: border-color 0.15s, transform 0.15s;
 }
 
-.char-card:hover:not(.locked),
-.char-card.focused {
+.char-card:hover:not(.locked):not(.disabled),
+.char-card.focused:not(.disabled) {
   border-color: #f7c948;
   transform: translateY(-2px);
 }
@@ -1113,8 +1263,14 @@ html, body {
   box-shadow: 0 0 20px rgba(107, 79, 212, 0.4);
 }
 
-.char-card.locked {
+.char-card.locked,
+.char-card.disabled {
   opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.char-card.disabled .char-status {
+  color: #888;
 }
 
 .char-icon { font-size: 40px; margin-bottom: 8px; }
@@ -1131,5 +1287,189 @@ html, body {
   max-height: 40vh;
   overflow-y: auto;
   text-align: left;
+}
+
+.quest-board-screen {
+  width: min(920px, 94vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.quest-board-heading {
+  color: #b8a8ff;
+  margin: 0;
+  text-align: center;
+}
+
+.quest-board-summary {
+  color: #888;
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.quest-board-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  padding: 4px 8px 8px;
+  margin: 0 -4px;
+  scrollbar-gutter: stable;
+}
+
+.quest-board-section + .quest-board-section {
+  margin-top: 16px;
+}
+
+.quest-board-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #b8a8ff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.quest-board-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(107, 79, 212, 0.25);
+  color: #d8ccff;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.quest-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+}
+
+.quest-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 108px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid #4a3a8a;
+  background: rgba(14, 10, 30, 0.95);
+  text-align: left;
+}
+
+.quest-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quest-tile-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #d8ccff;
+}
+
+.quest-tile-reward {
+  font-size: 11px;
+  font-weight: 800;
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+.quest-tile-desc {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #e8e0ff;
+}
+
+.quest-tile-progress {
+  font-size: 12px;
+  font-weight: 800;
+  color: #f7c948;
+  font-variant-numeric: tabular-nums;
+}
+
+.quest-tile-progress-muted {
+  color: #8f84c8;
+  font-weight: 600;
+}
+
+.quest-tile-current {
+  border-color: #f7c948;
+  box-shadow: 0 0 0 1px rgba(247, 201, 72, 0.15), 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+.quest-tile-current .quest-tile-badge {
+  color: #f7c948;
+}
+
+.quest-tile-next {
+  border-color: #6b4fd4;
+  border-style: dashed;
+  background: rgba(20, 14, 42, 0.88);
+}
+
+.quest-tile-next .quest-tile-badge {
+  color: #9d8cff;
+}
+
+.quest-tile-completed {
+  border-color: #355c45;
+  background: rgba(10, 22, 16, 0.88);
+  opacity: 0.82;
+}
+
+.quest-tile-completed .quest-tile-desc {
+  color: #9fd0ad;
+  text-decoration: line-through;
+  text-decoration-color: rgba(159, 208, 173, 0.45);
+}
+
+.quest-tile-completed .quest-tile-badge {
+  color: #4ade80;
+}
+
+.quest-tile-completed .quest-tile-progress {
+  color: #4ade80;
+}
+
+.quest-tile-locked {
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  border-color: #2f2850;
+  background: rgba(8, 6, 18, 0.92);
+}
+
+.quest-tile-lock {
+  font-size: 28px;
+  line-height: 1;
+  opacity: 0.55;
+  filter: grayscale(0.2);
+}
+
+.quest-board-hint {
+  margin: 0;
+  text-align: center;
+}
+
+.quest-board-screen .btn {
+  align-self: center;
+  margin-top: 4px;
 }
 

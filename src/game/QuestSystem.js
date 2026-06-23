@@ -14,17 +14,32 @@ export class QuestSystem {
       pots: 0,
       gems: 0,
       guardians: 0,
+      elites: 0,
       time: 0,
       level: 1,
+      wave: 1,
       bosses: 0,
       rifts: 0,
       gigaspawns: 0,
+      coins: 0,
+      combo: 0,
+      shrines: 0,
     };
   }
 
-  update(dt, player) {
+  update(dt, player, extras = {}) {
     this.progress.time += dt;
     this.progress.level = player.level;
+    if (extras.wave) {
+      this.progress.wave = Math.max(this.progress.wave || 1, extras.wave);
+    }
+    if (extras.runCoins != null) {
+      this.progress.coins = Math.max(this.progress.coins || 0, extras.runCoins);
+    }
+    if (player.combo > (this.progress.combo || 0)) {
+      this.progress.combo = player.combo;
+    }
+    this.checkCompletions();
   }
 
   track(type, amount = 1) {
@@ -50,6 +65,7 @@ export class QuestSystem {
       }
       if (!completed) break;
       lastCompleted = completed;
+      this.discoverUpcoming(2);
       this.assignNewQuests();
     }
     return lastCompleted;
@@ -76,12 +92,55 @@ export class QuestSystem {
       !saveData.data.completedQuests.includes(q.id) &&
       !saveData.data.activeQuests.includes(q.id)
     );
-    let added = false;
+    const newlyActive = [];
     while (saveData.data.activeQuests.length < 3 && available.length > 0) {
       const pick = available.splice(Math.floor(Math.random() * available.length), 1)[0];
       saveData.data.activeQuests.push(pick.id);
-      added = true;
+      newlyActive.push(pick.id);
     }
-    if (added) saveData.save();
+    if (newlyActive.length > 0) {
+      saveData.discoverQuests(newlyActive);
+      saveData.save();
+    }
+  }
+
+  discoverUpcoming(count = 2) {
+    const locked = QUESTS.filter((q) => !saveData.data.discoveredQuests.includes(q.id));
+    const picks = [];
+    for (let i = 0; i < count && locked.length > 0; i++) {
+      const idx = Math.floor(Math.random() * locked.length);
+      picks.push(locked.splice(idx, 1)[0].id);
+    }
+    if (picks.length > 0) saveData.discoverQuests(picks);
+  }
+
+  getQuestBoardTiles() {
+    const activeMap = new Map(this.getActiveQuests().map((q) => [q.id, q]));
+    const completed = new Set(saveData.data.completedQuests);
+    const active = new Set(saveData.data.activeQuests);
+    const discovered = new Set(saveData.data.discoveredQuests);
+
+    const tiles = QUESTS.map((quest) => {
+      let status;
+      if (completed.has(quest.id)) status = 'completed';
+      else if (active.has(quest.id)) status = 'current';
+      else if (discovered.has(quest.id)) status = 'next';
+      else status = 'locked';
+
+      const activeQuest = activeMap.get(quest.id);
+      return {
+        ...quest,
+        status,
+        current: activeQuest?.current ?? 0,
+      };
+    });
+
+    const order = { current: 0, next: 1, completed: 2, locked: 3 };
+    tiles.sort((a, b) => {
+      const byStatus = order[a.status] - order[b.status];
+      if (byStatus !== 0) return byStatus;
+      return a.desc.localeCompare(b.desc);
+    });
+    return tiles;
   }
 }

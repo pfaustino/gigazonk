@@ -1,4 +1,4 @@
-import { PLAYER_BASE } from './constants.js';
+import { PLAYER_BASE, CRIT_CHANCE_CAP } from './constants.js';
 
 export const SKILL_MAX_LEVEL = 10;
 
@@ -152,7 +152,7 @@ export function computeSkillBonuses(skillLevels = {}) {
     }
   }
   if (b.pierce != null) b.pierce = Math.min(5, b.pierce);
-  if (b.critChance != null) b.critChance = Math.min(0.75, b.critChance);
+  if (b.critChance != null) b.critChance = Math.min(CRIT_CHANCE_CAP, b.critChance);
   if (b.evasion != null) b.evasion = Math.min(0.75, b.evasion);
   if (b.armor != null) b.armor = Math.min(0.5, b.armor);
   if (b.lifesteal != null) b.lifesteal = Math.min(0.5, b.lifesteal);

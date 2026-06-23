@@ -1,7 +1,12 @@
 {
   "tracks": {
     "title": "pixabay-the_mountain-whimsical-acoustic-375992.mp3",
-    "village": "pixabay-leberch-whimsical-248036.mp3",
-    "arena": "pixabay-leberch-whimsical-250869.mp3"
-  }
+    "village": "pixabay-leberch-whimsical-248036.mp3"
+  },
+  "arena": [
+    "pixabay-leberch-whimsical-250869.mp3",
+    "pixabay-starostin-whimsical-awkward-comic-music-261166.mp3",
+    "pixabay-maksymmalko-whimsical-comic-awkward-music-249671.mp3",
+    "pixabay-hitslab-awkward-comic-whimsical-music-406381.mp3"
+  ]
 }

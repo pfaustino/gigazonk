@@ -1,3 +1,5 @@
+import { CRIT_CHANCE_CAP } from './constants.js';
+
 /** Award rarity tiers — weight controls drop rate, effectMult scales bonuses. */
 export const RARITIES = {
   common: { id: 'common', label: 'Common', weight: 52, effectMult: 0.55, color: '#b0b8c8' },
@@ -61,6 +63,7 @@ const FIXED_KEYS = new Set(['pierce', 'element', 'doubleJump', 'familiars', 'pro
 
 function scaleValue(key, value, mult, template) {
   if (template.fixedEffect && FIXED_KEYS.has(key)) return value;
+  if (key === 'element') return value;
   if (key === 'pierce') return 1;
   if (key === 'lightningChains') return value;
   if (template.integerEffect && Number.isInteger(value)) {
@@ -89,7 +92,9 @@ export function formatOfferDesc(template, effect) {
   if (effect.maxHp) return `+${Math.round(effect.maxHp)} max HP & heal`;
   if (effect.hpRegen) return `+${effect.hpRegen.toFixed(2)} HP regen / sec`;
   if (effect.runXpMult) return `+${Math.round(effect.runXpMult * 100)}% XP gain`;
-  if (effect.critChance) return `+${Math.round(effect.critChance * 100)}% crit chance`;
+  if (effect.critChance) {
+    return `+${Math.round(effect.critChance * 100)}% crit chance (max ${Math.round(CRIT_CHANCE_CAP * 100)}%)`;
+  }
   if (effect.coinMult) return `+${Math.round(effect.coinMult * 100)}% coins from kills`;
   if (effect.pickupMult) return `+${Math.round(effect.pickupMult * 100)}% pickup radius`;
   if (effect.areaMult) return `+${Math.round(effect.areaMult * 100)}% blast radius`;
@@ -101,7 +106,7 @@ export function formatOfferDesc(template, effect) {
   if (effect.thorns) return `+${Math.round(effect.thorns)} thorn damage`;
   if (effect.healOnKill) return `${Math.round(effect.healOnKill * 100)}% chance to heal on kill`;
   if (effect.killXpMult) return `+${Math.round(effect.killXpMult * 100)}% kill XP`;
-  if (effect.meleeBonus) return `+${Math.round(effect.meleeBonus * 100)}% melee damage`;
+  if (effect.meleeBonus) return `+${Math.round(effect.meleeBonus * 100)}% close range damage`;
   if (effect.airDamageMult) return `+${Math.round(effect.airDamageMult * 100)}% airborne damage`;
   if (effect.critDamageMult) return `+${Math.round(effect.critDamageMult * 100)}% crit damage`;
   if (effect.bossDamageMult) return `+${Math.round(effect.bossDamageMult * 100)}% boss damage`;

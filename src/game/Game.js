@@ -63,6 +63,15 @@ export class Game {
     this.player._onJump = () => this.audio.dodge();
     this.player._onMagnet = () => this.audio.magnet();
     this.player._onHurt = () => this.audio.hurt();
+    this.player._onDamageTaken = (amount) => {
+      this._floatHurtAcc += amount;
+      if (amount >= 1.5) this._floatHurtTimer = 0;
+    };
+    this.player._onHeal = (amount) => { this._floatHealAcc += amount; };
+    this._floatHurtAcc = 0;
+    this._floatHealAcc = 0;
+    this._floatHurtTimer = 0;
+    this._floatHealTimer = 0;
 
     this.village = new Village(this.scene);
     this.arena = new Arena(this.scene);
@@ -83,6 +92,7 @@ export class Game {
     this.currentBiome = null;
     this.pendingAction = null;
     this.pendingLevelUps = 0;
+    this._gameOverActive = false;
 
     canvas.addEventListener('click', () => this.audio.resume());
 
@@ -165,6 +175,7 @@ export class Game {
   }
 
   enterVillage() {
+    this._gameOverActive = false;
     saveData.data.runSnapshot = null;
     saveData.save();
     this.state = 'village';
@@ -223,6 +234,7 @@ export class Game {
   }
 
   resetRun() {
+    this._gameOverActive = false;
     this.elapsed = 0;
     this.paused = false;
     this.modalPause = false;
@@ -251,6 +263,10 @@ export class Game {
     this.particles.reset();
     this.upgrades.reset();
     this.quests.resetRun();
+    this._floatHurtAcc = 0;
+    this._floatHealAcc = 0;
+    this._floatHurtTimer = 0;
+    this._floatHealTimer = 0;
   }
 
   hideCombat() {
@@ -284,6 +300,7 @@ export class Game {
       }
       return;
     }
+    if (this.ui.hasModalScreen()) return;
     if (!this.modalPause && !this.paused) return;
     if (this.ui.gameMenu.isOpen()) return;
 
@@ -633,6 +650,9 @@ export class Game {
         this.runCoins += Math.max(1, Math.floor(this.player.coinMult * 10));
       }
       this.quests.track('kills');
+      if (enemy?.type === 'elite' && !killResult.isBoss) {
+        this.quests.track('elites');
+      }
       if (killResult.isBoss) {
         this.quests.track('bosses');
         if (enemy?.isMesaGuardian) {
@@ -706,6 +726,26 @@ export class Game {
     this.ui.toast(`⚠️ ZONK LORD #${this.bossCount} APPROACHES!`, 'synergy');
   }
 
+  _flushPlayerFloatNumbers(dt) {
+    const px = this.player.position.x;
+    const pz = this.player.position.z;
+    const py = this.player.getViewY();
+
+    this._floatHurtTimer -= dt;
+    if (this._floatHurtAcc > 0 && this._floatHurtTimer <= 0) {
+      this.particles.floatingNumber(px, pz, this._floatHurtAcc, 'hurt', py);
+      this._floatHurtAcc = 0;
+      this._floatHurtTimer = 0.35;
+    }
+
+    this._floatHealTimer -= dt;
+    if (this._floatHealAcc > 0 && this._floatHealTimer <= 0) {
+      this.particles.floatingNumber(px, pz, this._floatHealAcc, 'heal', py);
+      this._floatHealAcc = 0;
+      this._floatHealTimer = 0.22;
+    }
+  }
+
   updateArena(dt) {
     if (!this.modalPause && !this.ui.gameMenu.isOpen() && this.input.wasPressed('Escape')) {
       this.openGameMenu();
@@ -719,7 +759,10 @@ export class Game {
     if (this.paused) return;
 
     this.elapsed += dt;
-    this.quests.update(dt, this.player);
+    this.quests.update(dt, this.player, {
+      wave: this.arena.getWave(this.elapsed),
+      runCoins: this.runCoins,
+    });
 
     const nightFactor = this.arena.getNightFactor();
     const diffSetting = getDifficultyFromId(saveData.data.settings.difficulty);
@@ -875,7 +918,10 @@ export class Game {
           onChest: () => { this.quests.track('chests'); this.audio.chest(); },
           onPot: () => { this.quests.track('pots'); this.audio.chest(); },
           onMesaCache: () => { this.quests.track('chests'); this.audio.chest(); },
-          onShrine: () => this.ui.toast('Power surges through you!'),
+          onShrine: () => {
+            this.quests.track('shrines');
+            this.ui.toast('Power surges through you!');
+          },
           onCoins: (v) => { this.runCoins += v; },
           onToast: (msg) => this.ui.toast(msg),
         });
@@ -885,6 +931,7 @@ export class Game {
               icon: result.icon || '🎁',
               name: result.name || result.loot?.label || 'Reward',
               stats: result.preview || [],
+              player: this.player,
             });
           }
         }
@@ -902,6 +949,7 @@ export class Game {
       this.ui.toast(`Quest complete! +${questComplete.reward} coins`, 'synergy');
     }
 
+    this._flushPlayerFloatNumbers(dt);
     this.particles.update(dt, this.camera, this.renderer, this.enemies.enemies);
 
     this.zonkDomes.update(dt, this.player, this.arena, this.elapsed, {
@@ -957,7 +1005,7 @@ export class Game {
         this.audio.ui();
         if (npc.id === 'questgiver') {
           this.quests.assignNewQuests();
-          this.ui.showQuestBoard(this.quests.getActiveQuests(), () => {});
+          this.ui.showQuestBoard(this.quests, () => {});
         } else if (npc.id === 'trainer') {
           this.ui.showSkillTree(() => {
             this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
@@ -1035,6 +1083,7 @@ export class Game {
             name: upgrade.name,
             stats: preview,
             rarity: upgrade.rarity,
+            player: this.player,
           });
           if (this.upgrades.checkSynergy(this.player)) {
             this.ui.toast(`🔥 Synergy unlocked: ${SYNERGY_NAME}!`, 'synergy');
@@ -1059,6 +1108,8 @@ export class Game {
   }
 
   gameOver() {
+    if (this._gameOverActive) return;
+    this._gameOverActive = true;
     this.modalPause = true;
     this.paused = true;
     this.input.releaseCameraLook();
@@ -1074,16 +1125,24 @@ export class Game {
       kills: this.player.kills,
       coins,
     }, (action) => {
-      this.modalPause = false;
-      this.paused = false;
       this.ui.removeScreens();
       if (action === 'retry') {
         this.ui.showCharacterSelect(
           () => { this.ui.removeScreens(); this.startArena(); },
-          () => { this.ui.removeScreens(); this.enterVillage(); }
+          () => {
+            this.modalPause = false;
+            this.paused = false;
+            this._gameOverActive = false;
+            this.ui.removeScreens();
+            this.enterVillage();
+          }
         );
+        return;
       }
-      else this.enterVillage();
+      this.modalPause = false;
+      this.paused = false;
+      this._gameOverActive = false;
+      this.enterVillage();
     });
   }
 

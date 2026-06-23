@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from './settings.js';
-import { QUESTS } from './constants.js';
+import { QUESTS, isCharacterPlayable, DEFAULT_PLAYABLE_CHARACTER } from './constants.js';
 import {
   SKILL_MAX_LEVEL,
   SKILL_TREE,
@@ -19,12 +19,30 @@ const DEFAULT_SAVE = {
   bestTime: 0,
   activeQuests: ['kill_50', 'chests_3', 'survive_5'],
   completedQuests: [],
+  discoveredQuests: ['kill_50', 'chests_3', 'survive_5'],
   selectedCharacter: 'fox',
-  unlockedCharacters: ['fox', 'knight'],
+  unlockedCharacters: ['fox'],
   settings: { ...DEFAULT_SETTINGS },
   runSnapshot: null,
   savedAt: null,
 };
+
+function migrateDiscoveredQuests(parsed) {
+  const discovered = new Set([
+    ...(parsed.discoveredQuests ?? []),
+    ...(parsed.activeQuests ?? DEFAULT_SAVE.activeQuests),
+    ...(parsed.completedQuests ?? []),
+  ]);
+  // Legacy saves: reveal the full remaining pool as "up next" instead of locking it.
+  if (!parsed.discoveredQuests) {
+    for (const quest of QUESTS) {
+      if (!parsed.completedQuests?.includes(quest.id) && !parsed.activeQuests?.includes(quest.id)) {
+        discovered.add(quest.id);
+      }
+    }
+  }
+  return [...discovered].filter((id) => QUESTS.some((q) => q.id === id));
+}
 
 export class SaveData {
   constructor() {
@@ -43,8 +61,11 @@ export class SaveData {
           skillLevels: migrateSkillLevels(parsed),
           activeQuests: (parsed.activeQuests ?? DEFAULT_SAVE.activeQuests)
             .filter((id) => QUESTS.some((q) => q.id === id)),
+          discoveredQuests: migrateDiscoveredQuests(parsed),
           unlockedCharacters: parsed.unlockedCharacters || DEFAULT_SAVE.unlockedCharacters,
-          selectedCharacter: parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter,
+          selectedCharacter: isCharacterPlayable(parsed.selectedCharacter)
+            ? (parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter)
+            : DEFAULT_PLAYABLE_CHARACTER,
           runSnapshot: parsed.runSnapshot ?? null,
           savedAt: parsed.savedAt ?? null,
         };
@@ -98,8 +119,25 @@ export class SaveData {
     if (!this.data.completedQuests.includes(id)) {
       this.data.completedQuests.push(id);
       this.data.activeQuests = this.data.activeQuests.filter(q => q !== id);
+      this.discoverQuest(id);
       this.save();
     }
+  }
+
+  discoverQuest(id) {
+    if (!QUESTS.some((q) => q.id === id)) return false;
+    if (this.data.discoveredQuests.includes(id)) return false;
+    this.data.discoveredQuests.push(id);
+    return true;
+  }
+
+  discoverQuests(ids) {
+    let changed = false;
+    for (const id of ids) {
+      if (this.discoverQuest(id)) changed = true;
+    }
+    if (changed) this.save();
+    return changed;
   }
 
   addReputation(amount) {

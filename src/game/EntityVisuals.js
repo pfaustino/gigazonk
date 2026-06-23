@@ -1,14 +1,26 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-function part(geo, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+function paintSolid(geo, r, g, b) {
+  const count = geo.attributes.position.count;
+  const colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    colors[i * 3] = r;
+    colors[i * 3 + 1] = g;
+    colors[i * 3 + 2] = b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+function part(geo, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1, rgb = [1, 1, 1]) {
   const g = geo.clone();
   g.scale(sx, sy, sz);
   if (rx) g.rotateX(rx);
   if (ry) g.rotateY(ry);
   if (rz) g.rotateZ(rz);
   g.translate(x, y, z);
-  return g;
+  return paintSolid(g, rgb[0], rgb[1], rgb[2]);
 }
 
 function mergeParts(parts) {
@@ -21,6 +33,14 @@ const _box = new THREE.BoxGeometry(1, 1, 1);
 const _sphere = new THREE.SphereGeometry(1, 6, 5);
 const _cone = new THREE.ConeGeometry(1, 1, 4);
 const _cyl = new THREE.CylinderGeometry(1, 1, 1, 6);
+const _eye = new THREE.SphereGeometry(1, 5, 4);
+
+function eyePair(y, z, spacing, size, rgb = [0, 0, 0]) {
+  return [
+    part(_eye, -spacing, y, z, 0, 0, 0, size, size, size * 0.9, rgb),
+    part(_eye, spacing, y, z, 0, 0, 0, size, size, size * 0.9, rgb),
+  ];
+}
 
 export const ENEMY_MESH_CAPS = {
   grunt: 350,
@@ -39,6 +59,7 @@ export function buildEnemyGeometry(type) {
         part(_cone, 0, 0.35, -0.22, 0.6, 0, 0, 0.12, 0.35, 0.12),
         part(_box, -0.18, 0.2, 0.1, 0, 0, 0, 0.08, 0.08, 0.2),
         part(_box, 0.18, 0.2, 0.1, 0, 0, 0, 0.08, 0.08, 0.2),
+        ...eyePair(0.76, 0.42, 0.075, 0.06),
       ]);
     case 'brute':
       return mergeParts([
@@ -48,12 +69,14 @@ export function buildEnemyGeometry(type) {
         part(_box, 0.55, 0.75, 0, 0, 0, 0, 0.22, 0.22, 0.22),
         part(_cone, -0.2, 1.35, 0, 0, 0, 0.25, 0.12, 0.28, 0.12),
         part(_cone, 0.2, 1.35, 0, 0, 0, -0.25, 0.12, 0.28, 0.12),
+        ...eyePair(1.1, 0.44, 0.14, 0.09),
       ]);
     case 'wisp':
       return mergeParts([
         part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.35, 0.35, 0.35),
         part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.55, 0.55, 0.55),
         part(_cone, 0, 0.2, 0, Math.PI, 0, 0, 0.2, 0.35, 0.2),
+        ...eyePair(0.62, 0.36, 0.09, 0.065),
       ]);
     case 'elite':
       return mergeParts([
@@ -64,7 +87,9 @@ export function buildEnemyGeometry(type) {
         part(_cone, 0.28, 1.25, 0, 0, 0, -0.35, 0.14, 0.35, 0.14),
         part(_box, -0.65, 0.65, 0, 0, 0, 0.3, 0.15, 0.45, 0.15),
         part(_box, 0.65, 0.65, 0, 0, 0, -0.3, 0.15, 0.45, 0.15),
+        ...eyePair(1.15, 0.4, 0.12, 0.08),
       ]);
+    case 'grunt':
     default:
       return mergeParts([
         part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.42, 0.48, 0.42),
@@ -72,12 +97,13 @@ export function buildEnemyGeometry(type) {
         part(_cone, -0.22, 1.1, 0, 0, 0, 0.35, 0.12, 0.3, 0.12),
         part(_cone, 0.22, 1.1, 0, 0, 0, -0.35, 0.12, 0.3, 0.12),
         part(_box, 0, 0.18, 0, 0, 0, 0, 0.5, 0.22, 0.4),
+        ...eyePair(1.0, 0.38, 0.11, 0.085),
       ]);
   }
 }
 
 export function createEnemyMaterial() {
-  return new THREE.MeshBasicMaterial({ color: 0xffffff });
+  return new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true });
 }
 
 export function buildProjectileGeometry() {

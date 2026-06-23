@@ -4,6 +4,7 @@ import {
   ARENA_LOOT_MIN_RADIUS,
   ARENA_SHRINE_RADIUS,
   ARENA_SIZE,
+  CRIT_CHANCE_CAP,
 } from './constants.js';
 import { isLootSpotClear } from './TerrainFeatures.js';
 import { getLootPreview, getShrinePreview, LOOT_REWARD_ICONS } from './UpgradeSystem.js';
@@ -389,7 +390,7 @@ export class Interactables {
         setTimeout(() => { player.magnetActive = false; }, 2000);
         break;
       case 'crit':
-        player.critChance = Math.min(0.75, player.critChance + loot.value);
+        player.critChance = Math.min(CRIT_CHANCE_CAP, player.critChance + loot.value);
         break;
       case 'regen':
         player.hpRegen += loot.value;

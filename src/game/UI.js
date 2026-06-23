@@ -8,12 +8,14 @@ import {
   isSkillUnlocked,
 } from './SkillTree.js';
 import { GameMenu } from './GameMenu.js';
-import { getUpgradePreview, getActiveBuffs, RARITIES } from './UpgradeSystem.js';
+import { getUpgradePreview, getActiveBuffs, formatBuffTooltip, getBuffTargetsFromStats, getUpgradeBuffHighlights, RARITIES } from './UpgradeSystem.js';
 
 const CONFIRM_KEYS = ['Enter', 'NumpadEnter', 'Space', 'KeyF'];
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
 const REWARD_SHOWCASE_HOLD_MS = 2000;
 const REWARD_FLY_MS = 700;
+const BUFF_FLY_MS = 550;
+const BUFF_PULSE_HOLD_MS = 380;
 
 export class UI {
   constructor() {
@@ -30,6 +32,10 @@ export class UI {
 
   isLevelUpOpen() {
     return this.levelUpActive || !!document.getElementById('levelup-overlay');
+  }
+
+  hasModalScreen() {
+    return !!this.layer?.querySelector('.screen') || this.isLevelUpOpen() || this.gameMenu.isOpen();
   }
 
   dismissRewardFlyers() {
@@ -57,16 +63,24 @@ export class UI {
     this._navCleanup = null;
     this.clear();
     const screen = this._screen();
+    screen.classList.add('title-screen');
+    const heroSrc = `${import.meta.env.BASE_URL}images/title-hero.png`;
     screen.innerHTML = `
-      <h1>GigaZonk</h1>
-      <p class="subtitle">Survive. Zonk. Ascend.</p>
-      <p class="menu-hint" style="margin-bottom:20px">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
-      <button class="btn btn-primary" id="btn-village">Enter Village</button>
-      <button class="btn btn-secondary" id="btn-arena">Quick Arena Run</button>
-      <p style="margin-top:24px;font-size:12px;color:#666">
-        Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
-      </p>
-      <p class="title-version">v${GAME_VERSION}</p>
+      <div class="title-hero" aria-hidden="true">
+        <img class="title-hero-img" src="${heroSrc}" alt="" />
+        <div class="title-hero-scrim"></div>
+      </div>
+      <div class="title-content">
+        <h1>GigaZonk</h1>
+        <p class="subtitle">Survive. Zonk. Ascend.</p>
+        <p class="menu-hint" style="margin-bottom:20px">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
+        <button class="btn btn-primary" id="btn-village">Enter Village</button>
+        <button class="btn btn-secondary" id="btn-arena">Quick Arena Run</button>
+        <p class="title-stats">
+          Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
+        </p>
+        <p class="title-version">v${GAME_VERSION}</p>
+      </div>
     `;
     const village = screen.querySelector('#btn-village');
     const arena = screen.querySelector('#btn-arena');
@@ -83,14 +97,19 @@ export class UI {
     this.clear();
     const screen = this._screen();
     const cards = CHARACTERS.map(char => {
-      const unlocked = saveData.data.unlockedCharacters.includes(char.id);
-      const selected = saveData.data.selectedCharacter === char.id;
+      const playable = char.playable !== false;
+      const unlocked = playable && saveData.data.unlockedCharacters.includes(char.id);
+      const selected = playable && saveData.data.selectedCharacter === char.id;
+      const cardClass = !playable ? 'disabled' : (unlocked ? '' : 'locked');
+      const status = !playable
+        ? 'Coming soon'
+        : (unlocked ? (selected ? 'SELECTED' : 'Click to select') : `🔒 ${char.unlockCost} coins`);
       return `
-        <div class="char-card ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}" data-id="${char.id}">
+        <div class="char-card ${cardClass} ${selected ? 'selected' : ''}" data-id="${char.id}" data-playable="${playable ? '1' : '0'}">
           <div class="char-icon">${char.icon}</div>
           <h4>${char.name}</h4>
           <p>${char.desc}</p>
-          <div class="char-status">${unlocked ? (selected ? 'SELECTED' : 'Click to select') : `🔒 ${char.unlockCost} coins`}</div>
+          <div class="char-status">${status}</div>
         </div>
       `;
     }).join('');
@@ -109,14 +128,18 @@ export class UI {
     const refreshSelection = () => {
       cardEls.forEach((el) => {
         const id = el.dataset.id;
-        const unlocked = saveData.data.unlockedCharacters.includes(id);
-        const selected = saveData.data.selectedCharacter === id;
+        const char = CHARACTERS.find((c) => c.id === id);
+        const playable = char?.playable !== false;
+        const unlocked = playable && saveData.data.unlockedCharacters.includes(id);
+        const selected = playable && saveData.data.selectedCharacter === id;
         el.classList.toggle('selected', selected);
         const status = el.querySelector('.char-status');
         if (status) {
-          status.textContent = unlocked
-            ? (selected ? 'SELECTED' : 'Click to select')
-            : `🔒 ${CHARACTERS.find(c => c.id === id)?.unlockCost ?? 0} coins`;
+          status.textContent = !playable
+            ? 'Coming soon'
+            : (unlocked
+              ? (selected ? 'SELECTED' : 'Click to select')
+              : `🔒 ${char?.unlockCost ?? 0} coins`);
         }
       });
     };
@@ -124,6 +147,10 @@ export class UI {
     const selectCard = (el) => {
       const id = el.dataset.id;
       const char = CHARACTERS.find(c => c.id === id);
+      if (!char || char.playable === false) {
+        this.toast('Coming soon!');
+        return;
+      }
       const unlocked = saveData.data.unlockedCharacters.includes(id);
       if (unlocked) {
         saveData.data.selectedCharacter = id;
@@ -161,6 +188,9 @@ export class UI {
     screen.querySelector('#btn-back').onclick = goBack;
 
     let initialIndex = cardEls.findIndex(el => el.dataset.id === saveData.data.selectedCharacter);
+    if (initialIndex < 0 || cardEls[initialIndex]?.dataset.playable !== '1') {
+      initialIndex = cardEls.findIndex((el) => el.dataset.playable === '1');
+    }
     if (initialIndex < 0) initialIndex = 0;
 
     this._navCleanup = this._bindGridNavigation({
@@ -170,6 +200,7 @@ export class UI {
       initialIndex,
       onFocusChange: (index) => {
         const el = cardEls[index];
+        if (el.dataset.playable !== '1') return;
         if (saveData.data.unlockedCharacters.includes(el.dataset.id)) {
           saveData.data.selectedCharacter = el.dataset.id;
           saveData.save();
@@ -181,27 +212,39 @@ export class UI {
     });
   }
 
-  showQuestBoard(quests, onClose) {
+  showQuestBoard(questSystem, onClose) {
     this._navCleanup?.();
     this._navCleanup = null;
     const screen = this._screen();
-    const active = quests.map(q =>
-      `<div class="quest-item"><span class="progress">${q.current}/${q.target}</span> ${q.desc} <span style="color:#4ade80">+${q.reward}🪙</span></div>`
-    ).join('') || '<p style="color:#888">No active quests</p>';
+    screen.classList.add('quest-board-screen');
 
-    const available = QUESTS.filter(q =>
-      !saveData.data.completedQuests.includes(q.id) &&
-      !saveData.data.activeQuests.includes(q.id)
-    );
+    const tiles = questSystem.getQuestBoardTiles();
     const completed = saveData.data.completedQuests.length;
+    const sections = [
+      { key: 'current', label: 'Active Quests' },
+      { key: 'next', label: 'Up Next' },
+      { key: 'completed', label: 'Completed' },
+      { key: 'locked', label: 'Undiscovered' },
+    ];
+
+    const tilesHtml = sections.map(({ key, label }) => {
+      const group = tiles.filter((t) => t.status === key);
+      if (group.length === 0) return '';
+      const cards = group.map((q) => this._questBoardTileHTML(q)).join('');
+      return `
+        <div class="quest-board-section">
+          <h3 class="quest-board-section-title">${label} <span class="quest-board-section-count">${group.length}</span></h3>
+          <div class="quest-tile-grid">${cards}</div>
+        </div>
+      `;
+    }).join('');
 
     screen.innerHTML = `
-      <h2 style="color:#b8a8ff">📜 Elder Zonka's Quest Board</h2>
-      <p style="color:#888;margin:8px 0">${completed}/${QUESTS.length} quests completed</p>
-      <div class="quest-board">${active}</div>
-      ${available.length ? `<p style="color:#666;font-size:12px;margin-top:12px">${available.length} more quests available</p>` : ''}
-      <p class="menu-hint" style="margin-top:16px">${CONFIRM_HINT} | Esc back</p>
-      <button class="btn btn-secondary" id="btn-close" style="margin-top:12px">Close</button>
+      <h2 class="quest-board-heading">📜 Elder Zonka's Quest Board</h2>
+      <p class="quest-board-summary">${completed}/${QUESTS.length} quests completed</p>
+      <div class="quest-board-scroll">${tilesHtml}</div>
+      <p class="menu-hint quest-board-hint">${CONFIRM_HINT} | Esc back</p>
+      <button class="btn btn-secondary" id="btn-close">Close</button>
     `;
     const closeBtn = screen.querySelector('#btn-close');
     const close = () => {
@@ -212,6 +255,42 @@ export class UI {
     };
     closeBtn.onclick = close;
     this._navCleanup = this._bindMenuList([closeBtn], close);
+  }
+
+  _questBoardTileHTML(quest) {
+    if (quest.status === 'locked') {
+      return `<div class="quest-tile quest-tile-locked" aria-label="Undiscovered quest"><span class="quest-tile-lock">🔒</span></div>`;
+    }
+
+    if (quest.status === 'completed') {
+      return `
+        <div class="quest-tile quest-tile-completed">
+          <div class="quest-tile-top">
+            <span class="quest-tile-badge">Done</span>
+            <span class="quest-tile-reward">+${quest.reward}🪙</span>
+          </div>
+          <div class="quest-tile-desc">${quest.desc}</div>
+          <div class="quest-tile-progress">${quest.target}/${quest.target}</div>
+        </div>
+      `;
+    }
+
+    const progress = quest.status === 'current'
+      ? `<div class="quest-tile-progress">${quest.current}/${quest.target}</div>`
+      : `<div class="quest-tile-progress quest-tile-progress-muted">Goal: ${quest.target}</div>`;
+    const badge = quest.status === 'current' ? 'Active' : 'Up Next';
+    const statusClass = quest.status === 'current' ? 'quest-tile-current' : 'quest-tile-next';
+
+    return `
+      <div class="quest-tile ${statusClass}">
+        <div class="quest-tile-top">
+          <span class="quest-tile-badge">${badge}</span>
+          <span class="quest-tile-reward">+${quest.reward}🪙</span>
+        </div>
+        <div class="quest-tile-desc">${quest.desc}</div>
+        ${progress}
+      </div>
+    `;
   }
 
   showHUD(player, quests, elapsed, enemyCount, inRift) {
@@ -255,7 +334,9 @@ export class UI {
       <div class="buff-bar-track" id="buff-bar-track">
         <span class="buff-empty">None yet</span>
       </div>
+      <div id="buff-tooltip" class="buff-tooltip hidden" role="tooltip"></div>
     `;
+    this._bindBuffTooltips(buffBar);
 
     const quests = document.createElement('div');
     quests.className = 'quest-panel';
@@ -339,7 +420,9 @@ export class UI {
     `;
   }
 
-  pushReward({ icon, name, stats = [], rarity = null }) {
+  pushReward({ icon, name, stats = [], rarity = null, buffTargets = null, player = null }) {
+    if (player) this.renderBuffBar(player);
+
     const track = document.getElementById('reward-strip-track');
     const prevById = new Map();
     if (track) {
@@ -348,12 +431,15 @@ export class UI {
       }
     }
 
+    const resolvedBuffTargets = buffTargets ?? getBuffTargetsFromStats(stats);
+
     const reward = {
       id: ++this._rewardSeq,
       icon,
       name,
       stats,
       rarity,
+      buffTargets: resolvedBuffTargets,
       entering: true,
     };
 
@@ -465,30 +551,34 @@ export class UI {
 
       fadeIn.onfinish = () => {
         setTimeout(() => {
-          const dest = target.getBoundingClientRect();
-          const fly = flyer.animate([
-            {
-              left: `${centerLeft}px`,
-              top: `${centerTop}px`,
-              width: `${startW}px`,
-              height: `${startH}px`,
-              opacity: 1,
-              transform: 'scale(1)',
+          const flyToStrip = () => {
+            const dest = target.getBoundingClientRect();
+            const from = flyer.getBoundingClientRect();
+            this._flyRewardElement(flyer, from, dest, {
+              duration: REWARD_FLY_MS,
+              endOpacity,
+              onFinish: finishEntrance,
+            });
+          };
+
+          const buffTargetId = reward.buffTargets?.find((id) => this._getBuffChip(id));
+          const buffChip = buffTargetId ? this._getBuffChip(buffTargetId) : null;
+          if (!buffChip) {
+            flyToStrip();
+            return;
+          }
+
+          const fromCenter = flyer.getBoundingClientRect();
+          const buffDest = buffChip.getBoundingClientRect();
+          this._flyRewardElement(flyer, fromCenter, buffDest, {
+            duration: BUFF_FLY_MS,
+            endOpacity: 1,
+            onFinish: () => {
+              const pulseIds = reward.buffTargets.filter((id) => this._getBuffChip(id));
+              this._pulseBuffChips(pulseIds);
+              setTimeout(flyToStrip, BUFF_PULSE_HOLD_MS);
             },
-            {
-              left: `${dest.left}px`,
-              top: `${dest.top}px`,
-              width: `${dest.width}px`,
-              height: `${dest.height}px`,
-              opacity: endOpacity,
-              transform: 'scale(1)',
-            },
-          ], {
-            duration: REWARD_FLY_MS,
-            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-            fill: 'forwards',
           });
-          fly.onfinish = finishEntrance;
         }, REWARD_SHOWCASE_HOLD_MS);
       };
     });
@@ -543,22 +633,188 @@ export class UI {
     this.renderBuffBar(player);
   }
 
-  renderBuffBar(player) {
-    const track = document.getElementById('buff-bar-track');
-    if (!track) return;
+  _getBuffChip(buffId) {
+    if (!buffId) return null;
+    return document.getElementById('buff-bar-track')?.querySelector(`[data-buff-id="${buffId}"]`) ?? null;
+  }
 
-    const buffs = getActiveBuffs(player);
+  _flyRewardElement(el, from, to, { duration, endOpacity = 1, onFinish }) {
+    const anim = el.animate([
+      {
+        left: `${from.left}px`,
+        top: `${from.top}px`,
+        width: `${from.width}px`,
+        height: `${from.height}px`,
+        opacity: from.opacity ?? 1,
+        transform: 'scale(1)',
+      },
+      {
+        left: `${to.left}px`,
+        top: `${to.top}px`,
+        width: `${to.width}px`,
+        height: `${to.height}px`,
+        opacity: endOpacity,
+        transform: 'scale(1)',
+      },
+    ], {
+      duration,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      fill: 'forwards',
+    });
+    anim.onfinish = () => {
+      Object.assign(el.style, {
+        left: `${to.left}px`,
+        top: `${to.top}px`,
+        width: `${to.width}px`,
+        height: `${to.height}px`,
+        opacity: String(endOpacity),
+      });
+      onFinish?.();
+    };
+    return anim;
+  }
+
+  _pulseBuffChips(buffIds = []) {
+    for (const id of buffIds) {
+      const chip = this._getBuffChip(id);
+      if (!chip) continue;
+      chip.classList.remove('buff-chip-highlight');
+      void chip.offsetWidth;
+      chip.classList.add('buff-chip-highlight');
+      chip.addEventListener('animationend', () => chip.classList.remove('buff-chip-highlight'), { once: true });
+    }
+  }
+
+  _escapeAttr(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  }
+
+  _bindBuffTooltips(buffBar, { tooltipId = 'buff-tooltip' } = {}) {
+    if (buffBar.dataset.tooltipsBound) return;
+    buffBar.dataset.tooltipsBound = '1';
+    const tooltip = () => document.getElementById(tooltipId);
+
+    buffBar.addEventListener('mousemove', (e) => {
+      const chip = e.target.closest('.buff-chip');
+      const tip = tooltip();
+      if (!tip) return;
+      if (!chip?.dataset.tip) {
+        tip.classList.add('hidden');
+        return;
+      }
+      tip.textContent = chip.dataset.tip;
+      tip.classList.remove('hidden');
+      const rect = chip.getBoundingClientRect();
+      tip.style.left = `${rect.left + rect.width / 2}px`;
+      tip.style.top = `${rect.bottom + 6}px`;
+    });
+
+    buffBar.addEventListener('mouseleave', () => {
+      tooltip()?.classList.add('hidden');
+    });
+  }
+
+  _renderBuffBarTrack(track, buffs) {
     if (buffs.length === 0) {
       track.innerHTML = '<span class="buff-empty">None yet</span>';
       return;
     }
 
     track.innerHTML = buffs.map((buff) => `
-      <div class="buff-chip${buff.meta ? ' buff-chip-meta' : ''}" title="${buff.title}">
+      <div class="buff-chip${buff.meta ? ' buff-chip-meta' : ''}${buff.debuff ? ' buff-chip-debuff' : ''}" data-buff-id="${buff.id}" data-tip="${this._escapeAttr(formatBuffTooltip(buff))}">
         <span class="buff-chip-icon">${buff.icon}</span>
         <span class="buff-chip-amount">${buff.amount}</span>
       </div>
     `).join('');
+  }
+
+  applyBuffBarHighlights(trackId, highlights = [], { tooltipId = null } = {}) {
+    const track = document.getElementById(trackId);
+    if (!track) return;
+
+    const chipPreviewAmount = (highlight) =>
+      highlight.previewLabel ?? highlight.previewAmount ?? highlight.amount;
+
+    track.querySelectorAll('.buff-chip-preview').forEach((el) => el.remove());
+    track.querySelectorAll('.buff-chip').forEach((chip) => {
+      chip.classList.remove('buff-chip-affected', 'buff-chip-dimmed');
+      const amountEl = chip.querySelector('.buff-chip-amount');
+      if (chip.dataset.baseAmount && amountEl) {
+        amountEl.textContent = chip.dataset.baseAmount;
+        delete chip.dataset.baseAmount;
+      }
+      if (chip.dataset.baseTip) {
+        chip.dataset.tip = chip.dataset.baseTip;
+        delete chip.dataset.baseTip;
+      }
+    });
+
+    if (!highlights.length) return;
+
+    track.querySelector('.buff-empty')?.remove();
+
+    const targetIds = new Set(highlights.map((h) => h.id));
+    const byId = new Map(highlights.map((h) => [h.id, h]));
+
+    track.querySelectorAll('.buff-chip[data-buff-id]').forEach((chip) => {
+      const id = chip.dataset.buffId;
+      if (!targetIds.has(id)) return;
+      chip.classList.add('buff-chip-affected');
+      const highlight = byId.get(id);
+      const amountEl = chip.querySelector('.buff-chip-amount');
+      const previewText = chipPreviewAmount(highlight);
+      if (previewText != null && previewText !== '' && amountEl) {
+        if (!chip.dataset.baseAmount) chip.dataset.baseAmount = amountEl.textContent;
+        amountEl.textContent = previewText;
+      }
+      if (highlight?.delta) {
+        chip.dataset.baseTip = chip.dataset.tip ?? '';
+        chip.dataset.tip = `${chip.dataset.baseTip} (${highlight.delta})`;
+      }
+    });
+
+    for (const highlight of highlights.filter((h) => h.isNew)) {
+      const previewText = chipPreviewAmount(highlight);
+      const tip = formatBuffTooltip({
+        title: highlight.title,
+        amount: previewText,
+      });
+      const chip = document.createElement('div');
+      chip.className = `buff-chip buff-chip-affected buff-chip-preview${highlight.isDebuff ? ' buff-chip-debuff' : ''}`;
+      chip.dataset.buffId = highlight.id;
+      chip.dataset.tip = highlight.delta ? `${tip} (${highlight.delta})` : tip;
+      chip.innerHTML = `
+        <span class="buff-chip-icon">${highlight.icon}</span>
+        <span class="buff-chip-amount">${previewText}</span>
+      `;
+      track.appendChild(chip);
+    }
+
+    if (tooltipId) document.getElementById(tooltipId)?.classList.add('hidden');
+  }
+
+  renderBuffBar(player, { trackId = 'buff-bar-track', tooltipId = 'buff-tooltip' } = {}) {
+    const track = document.getElementById(trackId);
+    if (!track) return;
+
+    const buffs = getActiveBuffs(player);
+    const signature = buffs.map((b) => `${b.id}|${b.icon}|${b.amount}|${b.title}|${b.debuff ? 1 : 0}`).join(';;');
+    if (track.dataset.buffSig === signature && !track.dataset.highlightSig) {
+      return;
+    }
+    track.dataset.buffSig = signature;
+    delete track.dataset.highlightSig;
+
+    if (buffs.length === 0) {
+      track.innerHTML = '<span class="buff-empty">None yet</span>';
+      document.getElementById(tooltipId)?.classList.add('hidden');
+      return;
+    }
+
+    this._renderBuffBarTrack(track, buffs);
   }
 
   showInteractPrompt(show, text = '[F] Interact') {
@@ -583,18 +839,47 @@ export class UI {
 
     this.dismissLevelUp();
     this.dismissRewardFlyers();
+    this.renderBuffBar(player);
 
     const container = document.getElementById('game-container') || this.layer;
     const screen = document.createElement('div');
     screen.id = 'levelup-overlay';
     screen.className = 'screen levelup-screen';
     screen.innerHTML = `
-      <h2 style="font-size:36px;color:#f7c948">LEVEL UP!</h2>
-      <p style="color:#888;margin-bottom:8px">Choose your Zonk upgrade</p>
-      <p style="color:#666;font-size:12px;margin-bottom:8px">← → or A D to select | ${CONFIRM_HINT}</p>
-      <div class="levelup-grid" id="upgrade-grid"></div>
+      <div class="levelup-buff-panel">
+        <div class="buff-bar levelup-buff-bar" id="levelup-buff-bar">
+          <h3>Buffs</h3>
+          <p class="levelup-buff-hint">Run buffs — gold chips change with the selected card</p>
+          <div class="buff-bar-track" id="levelup-buff-bar-track">
+            <span class="buff-empty">None yet</span>
+          </div>
+          <div id="levelup-buff-tooltip" class="buff-tooltip hidden" role="tooltip"></div>
+        </div>
+      </div>
+      <div class="levelup-body">
+        <h2 style="font-size:36px;color:#f7c948">LEVEL UP!</h2>
+        <p style="color:#888;margin-bottom:8px">Choose your Zonk upgrade</p>
+        <p style="color:#666;font-size:12px;margin-bottom:8px">← → or A D to select | ${CONFIRM_HINT}</p>
+        <div class="levelup-grid" id="upgrade-grid"></div>
+      </div>
     `;
     const grid = screen.querySelector('#upgrade-grid');
+    const levelupBuffBar = screen.querySelector('#levelup-buff-bar');
+    container.appendChild(screen);
+    this.renderBuffBar(player, { trackId: 'levelup-buff-bar-track', tooltipId: 'levelup-buff-tooltip' });
+    this._bindBuffTooltips(levelupBuffBar, { tooltipId: 'levelup-buff-tooltip' });
+
+    const previewUpgradeBuffs = (upgrade) => {
+      const highlights = getUpgradeBuffHighlights(player, upgrade);
+      const track = document.getElementById('levelup-buff-bar-track');
+      if (track) {
+        track.dataset.highlightSig = highlights.map((h) => `${h.id}|${h.delta}`).join(';;');
+      }
+      this.applyBuffBarHighlights('levelup-buff-bar-track', highlights, {
+        tooltipId: 'levelup-buff-tooltip',
+      });
+    };
+
     const cards = choices.map((upgrade) => {
       const preview = getUpgradePreview(player, upgrade);
       const statsHtml = preview.map((row) => `
@@ -617,6 +902,7 @@ export class UI {
         <p>${upgrade.desc}</p>
         ${statsHtml ? `<div class="upgrade-stats">${statsHtml}</div>` : ''}
       `;
+      card.addEventListener('mouseenter', () => previewUpgradeBuffs(upgrade));
       grid.appendChild(card);
       return card;
     });
@@ -630,15 +916,16 @@ export class UI {
       card.onclick = () => confirm(choices[i]);
     });
 
-    container.appendChild(screen);
     try {
       this.levelUpActive = true;
       this._navCleanup = this._bindGridNavigation({
         cards,
         columns: Math.min(3, cards.length),
         focusClass: 'focused',
+        onFocusChange: (idx) => previewUpgradeBuffs(choices[idx]),
         onConfirm: (idx) => confirm(choices[idx]),
       });
+      previewUpgradeBuffs(choices[0]);
       return true;
     } catch (err) {
       this.dismissLevelUp();

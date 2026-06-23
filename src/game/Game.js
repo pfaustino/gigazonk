@@ -1340,8 +1340,9 @@ export class Game {
 
   devForceLevelUp() {
     if (this.state !== 'arena') return;
-    const levels = this.player.addXp(this.player.xpToNext);
+    const levels = this.player.addXp(this.player.xpToNext, { ignorePickupMult: true });
     if (levels > 0) this.queueLevelUp(levels);
+    this.flushPendingLevelUp();
     this.ui.toast('Dev: forced level up', 'synergy');
   }
 
@@ -1393,8 +1394,9 @@ export class Game {
 
   devFillXp() {
     if (this.state !== 'arena') return;
-    const levels = this.player.addXp(this.player.xpToNext * 3);
+    const levels = this.player.addXp(this.player.xpToNext * 3, { ignorePickupMult: true });
     if (levels > 0) this.queueLevelUp(levels);
+    this.flushPendingLevelUp();
     this.ui.toast(levels > 0 ? `Dev: +${levels} level(s)` : 'Dev: XP filled', 'synergy');
   }
 

@@ -427,8 +427,9 @@ export class Player {
     if (healed > 0) this._onHeal?.(healed);
   }
 
-  addXp(amount) {
-    this.xp += Math.floor(amount * XP_PICKUP_MULT * this.xpMult);
+  addXp(amount, opts = {}) {
+    const pickup = opts.ignorePickupMult ? 1 : XP_PICKUP_MULT;
+    this.xp += Math.floor(amount * pickup * this.xpMult);
     let levelsGained = 0;
     while (this.xp >= this.xpToNext) {
       this.xp -= this.xpToNext;

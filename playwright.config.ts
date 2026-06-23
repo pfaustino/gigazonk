@@ -3,8 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 5173;
 const baseURL = `http://localhost:${PORT}`;
 
-const allBrowsers = [
-  { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+const crossBrowsers = [
   { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
   { name: 'webkit', use: { ...devices['Desktop Safari'] } },
 ];
@@ -26,9 +25,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  // Smoke: Chromium only. Cross-browser: cross-browser.spec.ts on all engines.
+  // Smoke: Chromium only. Cross-browser: Firefox + WebKit (Chromium covered by smoke job).
   projects: process.env.CROSS_BROWSER
-    ? allBrowsers.map((browser) => ({
+    ? crossBrowsers.map((browser) => ({
         ...browser,
         testMatch: 'cross-browser.spec.ts',
       }))

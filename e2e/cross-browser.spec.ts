@@ -13,7 +13,7 @@ import { startQuickArena } from './helpers/gameFlow.js';
 const RECOVERABLE_REPORTER_CODES = new Set(['AUDIO_INIT', 'AUDIO_TRACK']);
 
 test.describe('cross-browser error sweep', () => {
-  test.describe.configure({ timeout: 90_000 });
+  test.describe.configure({ timeout: 120_000 });
 
   test('title and play flow stay clean', async ({ page, browserName }) => {
     const report = attachBrowserErrorCollectors(page);

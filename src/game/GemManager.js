@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { MAX_GEMS } from './constants.js';
 import { buildGemGeometry } from './EntityVisuals.js';
+import { runRandom } from '../lib/runRandom.js';
+import { assert } from '../lib/assert.js';
 
 const dummy = new THREE.Object3D();
 
@@ -33,8 +35,10 @@ export class GemManager {
     }
     if (this.freeSlots.length === 0) return value;
 
+    assert(this.freeSlots.length > 0, 'GEM_POOL_EMPTY');
     const slot = this.freeSlots.pop();
-    const g = { slot, x, z, value, alive: true, vy: 2 + Math.random() * 2 };
+    assert(slot !== undefined && slot >= 0 && slot < MAX_GEMS, 'GEM_SLOT_INVALID');
+    const g = { slot, x, z, value, alive: true, vy: 2 + runRandom() * 2 };
     this.gems.push(g);
     this.mesh.count = Math.max(this.mesh.count, slot + 1);
     this.updateInstance(g);

@@ -11,8 +11,12 @@ import {
   ENEMY_NEAR_RADIUS,
   MAX_SPAWN_GROUP_SIZE,
   MAX_GIGA_GROUP_SIZE,
+  MESA_GUARDIAN_HP_HITS,
   ENEMY_MESH_LIFT,
+  pickGruntColor,
 } from './constants.js';
+import { runRandom, runRandomInt } from '../lib/runRandom.js';
+import { assert } from '../lib/assert.js';
 import {
   ENEMY_MESH_CAPS,
   buildEnemyGeometry,
@@ -32,6 +36,7 @@ export class EnemyManager {
     this.grid = new Map();
     this.spawnTimer = 0;
     this._deadSinceCompact = 0;
+    this._threatDmg = 10;
 
     this.meshes = {};
     this.freeSlots = {};
@@ -59,6 +64,7 @@ export class EnemyManager {
     this.grid.clear();
     this.spawnTimer = 0;
     this._deadSinceCompact = 0;
+    this._threatDmg = 10;
     this.lastGroupAnchor = null;
     for (const type of Object.keys(this.meshes)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
@@ -72,14 +78,29 @@ export class EnemyManager {
     return this.meshes[enemy.type] || this.meshes.grunt;
   }
 
-  spawn(type, x, z, playerDmg = 10, hpMult = 1, speedMult = 1) {
+  setThreatDamage(dmg) {
+    this._threatDmg = Math.max(1, dmg);
+  }
+
+  _applyMesaGuardianHp(enemy) {
+    if (!enemy?.isMesaGuardian || enemy._hpScaled) return;
+    enemy._hpScaled = true;
+    const hp = Math.max(1, this._threatDmg * MESA_GUARDIAN_HP_HITS);
+    enemy.hp = hp;
+    enemy.maxHp = hp;
+    enemy.hpBarVisible = false;
+    this.updateInstance(enemy);
+  }
+
+  spawn(type, x, z, threatDmg = 10, hpMult = 1, speedMult = 1) {
     const pool = this.freeSlots[type];
     if (!pool || pool.length === 0) return null;
 
     const def = ENEMY_TYPES[type] || ENEMY_TYPES.grunt;
     const hits = def.hpHits ?? 1.25;
-    const maxHp = Math.max(1, playerDmg * hits * hpMult);
+    const maxHp = Math.max(1, threatDmg * hits * hpMult);
     const slot = pool.pop();
+    assert(slot !== undefined && slot >= 0, 'ENEMY_SLOT_INVALID');
     const enemy = {
       slot,
       type,
@@ -89,7 +110,7 @@ export class EnemyManager {
       speed: def.speed * speedMult,
       damage: def.damage * hpMult,
       xp: def.xp,
-      color: def.color,
+      color: type === 'grunt' ? pickGruntColor() : def.color,
       scale: def.scale,
       slowTimer: 0,
       burnTimer: 0,
@@ -292,7 +313,11 @@ export class EnemyManager {
 
       if (e.isMesaGuardian && e.mesa) {
         if (!e.mesaAwake) {
-          e.mesaAwake = isOnMesaPlateau(playerPos.x, playerPos.z, e.mesa);
+          const wake = isOnMesaPlateau(playerPos.x, playerPos.z, e.mesa);
+          if (wake) {
+            e.mesaAwake = true;
+            this._applyMesaGuardianHp(e);
+          }
         }
       }
       const mesaGuardianIdle = e.isMesaGuardian && e.mesa && !e.mesaAwake;
@@ -356,6 +381,7 @@ export class EnemyManager {
 
   damageEnemy(enemy, amount, element) {
     if (!enemy.alive || amount <= 0) return null;
+    if (enemy.isMesaGuardian) this._applyMesaGuardianHp(enemy);
     enemy.hpBarVisible = true;
     enemy.hp -= amount;
     if (element === 'fire') enemy.burnTimer = 3;
@@ -377,7 +403,7 @@ export class EnemyManager {
   }
 
   _pickEnemyType(elapsed) {
-    const roll = Math.random();
+    const roll = runRandom();
     if (elapsed > 180 && roll < 0.03) return 'elite';
     if (elapsed > 120 && roll < 0.08) return 'brute';
     if (elapsed > 60 && roll < 0.15) return 'runner';
@@ -395,7 +421,7 @@ export class EnemyManager {
     const base = Math.min(MAX_SPAWN_GROUP_SIZE, BASE_SPAWN_GROUP_SIZE + Math.floor(elapsed / 65));
     let size = base;
     if (isGigaspawn) {
-      const mult = 2 + Math.floor(Math.random() * 2);
+      const mult = 2 + runRandomInt(2);
       size = Math.min(MAX_GIGA_GROUP_SIZE, base * mult);
     }
     const pressure = this._pressureSpawnScale();
@@ -407,8 +433,8 @@ export class EnemyManager {
     let spawned = 0;
     for (let i = 0; i < count; i++) {
       if (this.count >= MAX_ENEMIES) break;
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * GROUP_CLUSTER_RADIUS;
+      const angle = runRandom() * Math.PI * 2;
+      const r = runRandom() * GROUP_CLUSTER_RADIUS;
       const x = anchorX + Math.cos(angle) * r;
       const z = anchorZ + Math.sin(angle) * r;
       if (this.spawn(type, x, z, playerDmg, hpMult, speedMult)) spawned++;
@@ -437,8 +463,8 @@ export class EnemyManager {
 
     const minDist = 12;
     const maxDist = 22;
-    const angle = Math.random() * Math.PI * 2;
-    const dist = minDist + Math.random() * (maxDist - minDist);
+    const angle = runRandom() * Math.PI * 2;
+    const dist = minDist + runRandom() * (maxDist - minDist);
     const anchorX = THREE.MathUtils.clamp(
       playerPos.x + Math.cos(angle) * dist,
       -ARENA_SIZE / 2 + 4,
@@ -476,14 +502,14 @@ export class EnemyManager {
     return boss;
   }
 
-  spawnMesaGuardian(x, z, playerDmg = 10, mesa) {
-    const guardian = this.spawn('grunt', x, z, playerDmg, 1.05, 0.72);
+  spawnMesaGuardian(x, z, threatDmg = 10, mesa) {
+    const guardian = this.spawn('grunt', x, z, threatDmg, 1.05, 0.72);
     if (!guardian) return null;
 
     const topY = mesa?.topY ?? 0;
-    const hits = 14;
-    guardian.hp = playerDmg * hits;
-    guardian.maxHp = guardian.hp;
+    guardian.hp = 1;
+    guardian.maxHp = 1;
+    guardian._hpScaled = false;
     guardian.damage = 18;
     guardian.xp = 45;
     guardian.scale = 2;

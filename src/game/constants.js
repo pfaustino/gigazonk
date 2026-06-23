@@ -1,6 +1,4 @@
 export const ARENA_SIZE = 1200;
-
-/** Bump this on each release. */
 export const GAME_VERSION = '0.1.9';
 
 export const ARENA_REFERENCE_SIZE = 120;
@@ -44,13 +42,14 @@ export const PLAYER_BASE = {
 /** Hard cap on crit chance (75%). Crit damage has no cap. */
 export const CRIT_CHANCE_CAP = 0.75;
 
-export const ENEMY_TYPES = {
-  grunt: { hpHits: 1.25, speed: 2, damage: 8, xp: 3, color: 0x44aa44, scale: 0.8, hpBarTop: 1.12 },
-  runner: { hpHits: 1.0, speed: 4, damage: 5, xp: 2, color: 0xaaaa22, scale: 0.6, hpBarTop: 0.95 },
-  brute: { hpHits: 3.5, speed: 1.4, damage: 20, xp: 12, color: 0xaa4444, scale: 1.4, hpBarTop: 1.48 },
-  wisp: { hpHits: 0.85, speed: 3, damage: 3, xp: 1, color: 0x44aaff, scale: 0.5, hpBarTop: 0.78 },
-  elite: { hpHits: 6, speed: 1.75, damage: 25, xp: 25, color: 0xff44ff, scale: 1.6, hpBarTop: 1.85 },
-};
+import { runRandomInt } from '../lib/runRandom.js';
+import { ENEMY_TYPES, GRUNT_COLORS } from './gameData.js';
+
+export { ENEMY_TYPES, GRUNT_COLORS };
+
+export function pickGruntColor() {
+  return GRUNT_COLORS[runRandomInt(GRUNT_COLORS.length)];
+}
 
 /** Y offset baked into enemy instanced meshes — keep in sync with EnemyManager.updateInstance. */
 export const ENEMY_MESH_LIFT = 0.9;
@@ -82,6 +81,8 @@ export const BASE_SPAWN_GROUP_SIZE = 3;
 export const GROUP_CLUSTER_RADIUS = 3.5;
 export const MAX_SPAWN_GROUP_SIZE = 7;
 export const MAX_GIGA_GROUP_SIZE = 28;
+/** Mesa guardians scale to this many hits of current effective damage when engaged. */
+export const MESA_GUARDIAN_HP_HITS = 5;
 
 // Level-up awards live in Awards.js (UPGRADE_TEMPLATES + rarity tiers).
 
@@ -94,7 +95,8 @@ export const ZONK_DOME_STILL_SPEED = 0.35;
 export const ZONK_DOME_GROW_TIME = 2;
 export const ZONK_DOME_HURT_RADIUS = 8;
 export const ZONK_DOME_FOLLOWUP_COUNT = 4;
-export const ZONK_DOME_FOLLOWUP_DELAY = 0.45;
+/** Seconds between each follow-up anti-camp bubble after the first dome. */
+export const ZONK_DOME_FOLLOWUP_DELAY = 3;
 export const ZONK_DOME_FOLLOWUP_DAMAGE_MULT = 0.65;
 
 export const VILLAGE_NPCS = [

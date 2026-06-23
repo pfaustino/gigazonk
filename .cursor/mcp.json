@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cursor-ide-browser": {
+      "url": "https://mcp.cursor.com/browser"
+    },
+    "vite-mcp": {
+      "url": "http://localhost:5173/__mcp"
+    }
+  }
+}

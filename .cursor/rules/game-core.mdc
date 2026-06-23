@@ -1,0 +1,38 @@
+---
+description: Core standards for all GigaZonk and web game work in this repo
+alwaysApply: true
+---
+
+# Game Development Core
+
+## Scope and diffs
+
+- One feature or fix per change; smallest correct diff.
+- Do not refactor unrelated files; match existing module style.
+- Read surrounding code before adding patterns.
+
+## Architecture
+
+- `Game.js` orchestrates only — no new 100-line features inline; add a manager/module.
+- Balance numbers in `constants.js` or `data/` — not buried in update loops.
+- Files over ~500 lines: split by game mode or UI panel before adding more.
+
+## Quality
+
+- Run `npm run build` after substantive changes.
+- Save changes require migration in `SaveData.js` and `GAME_VERSION` bump.
+- Sync documented constant pairs (e.g. `ENEMY_MESH_LIFT` + hp bar helpers).
+
+## Testing without grinding
+
+- Prefer dev URL flags (`?dev=1`) or `import.meta.env.DEV` cheats for arena/village tests.
+- Use browser MCP to screenshot and verify UI after visual changes.
+
+## Assets
+
+- GLB for 3D; document sources in ASSETS.md.
+- Optimize large GLBs before commit (gltf-transform).
+
+## Commits
+
+- Only commit when user asks. Messages: imperative, explain why.

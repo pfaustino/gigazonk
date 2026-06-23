@@ -1,0 +1,41 @@
+---
+description: Error handling, assertions, and recovery patterns for game code
+globs: src/**/*.js
+alwaysApply: false
+---
+
+# Reliability & Error Handling
+
+## Never swallow errors silently
+
+```js
+// BAD
+} catch { /* ignore */ }
+
+// GOOD — degrade with telemetry
+} catch (err) {
+  ErrorReporter.capture('save_load_failed', err);
+  return structuredClone(DEFAULT_SAVE);
+}
+```
+
+## Bounded iteration
+
+Every gameplay loop must respect documented caps (`MAX_ENEMIES`, `ENEMY_DESPAWN_BATCH`). New `while` loops need a max iteration comment.
+
+## Assertions vs validation
+
+- **Assert** — impossible if code is correct (pool index, apply upgrade twice).
+- **Validate** — external input (settings id, character id) — return fallback.
+
+## User-visible recovery
+
+Combat/UI failures: toast or modal, unstick `paused` / `modalPause`. Never leave player soft-locked.
+
+## Resource cleanup
+
+On enemy/projectile removal: `geometry.dispose()`, `material.dispose()` when not shared.
+
+## Global errors
+
+Gameplay entry must register `error` and `unhandledrejection` handlers that log structured context (game mode, version).

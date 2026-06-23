@@ -1,5 +1,6 @@
 import { QUESTS } from './constants.js';
 import { saveData } from './SaveData.js';
+import { runRandomInt } from '../lib/runRandom.js';
 
 export class QuestSystem {
   constructor() {
@@ -94,7 +95,7 @@ export class QuestSystem {
     );
     const newlyActive = [];
     while (saveData.data.activeQuests.length < 3 && available.length > 0) {
-      const pick = available.splice(Math.floor(Math.random() * available.length), 1)[0];
+      const pick = available.splice(runRandomInt(available.length), 1)[0];
       saveData.data.activeQuests.push(pick.id);
       newlyActive.push(pick.id);
     }
@@ -108,7 +109,7 @@ export class QuestSystem {
     const locked = QUESTS.filter((q) => !saveData.data.discoveredQuests.includes(q.id));
     const picks = [];
     for (let i = 0; i < count && locked.length > 0; i++) {
-      const idx = Math.floor(Math.random() * locked.length);
+      const idx = runRandomInt(locked.length);
       picks.push(locked.splice(idx, 1)[0].id);
     }
     if (picks.length > 0) saveData.discoverQuests(picks);

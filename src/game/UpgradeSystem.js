@@ -5,6 +5,8 @@ import {
   buildUpgradeOffer,
   getTemplateId,
 } from './Awards.js';
+import { runRandom } from '../lib/runRandom.js';
+import { assert } from '../lib/assert.js';
 
 function fmtNum(v, decimals = 0) {
   if (decimals > 0) return Number(v).toFixed(decimals);
@@ -710,7 +712,7 @@ export class UpgradeSystem {
     if (entries.length === 0) return null;
     let total = 0;
     for (const e of entries) total += e.weight;
-    let roll = Math.random() * total;
+    let roll = runRandom() * total;
     for (const entry of entries) {
       roll -= entry.weight;
       if (roll <= 0) return entry;
@@ -740,6 +742,8 @@ export class UpgradeSystem {
   }
 
   apply(upgrade, player) {
+    assert(upgrade?.effect != null, 'UPGRADE_INVALID');
+    assert(player != null, 'UPGRADE_NO_PLAYER');
     const templateId = this._templateId(upgrade);
     const template = UPGRADE_TEMPLATES.find(t => t.id === templateId);
     if (template?.onceOnly) {

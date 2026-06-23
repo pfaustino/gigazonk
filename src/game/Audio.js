@@ -1,3 +1,5 @@
+import { ErrorReporter } from '../lib/ErrorReporter.js';
+
 export class Audio {
   constructor() {
     this.ctx = null;
@@ -29,7 +31,10 @@ export class Audio {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.3;
       this.masterGain.connect(this.ctx.destination);
-    } catch { this.enabled = false; }
+    } catch (err) {
+      ErrorReporter.capture('AUDIO_INIT', err);
+      this.enabled = false;
+    }
   }
 
   async loadMusicManifest() {
@@ -46,7 +51,9 @@ export class Audio {
       } else {
         this.arenaPlaylist = [];
       }
-    } catch { /* no manifest or music files yet */ }
+    } catch (err) {
+      ErrorReporter.capture('AUDIO_MANIFEST', err);
+    }
   }
 
   _playMusicFile(trackId, file, { loop = true, advanceArena = false } = {}) {
@@ -69,6 +76,7 @@ export class Audio {
     this.musicTrackId = trackId;
     el.volume = this._musicVolume();
     el.onerror = () => {
+      ErrorReporter.capture('AUDIO_TRACK', new Error(`Failed to load ${src}`));
       if (this._musicSrc === src) {
         this._musicSrc = null;
         this.musicTrackId = null;

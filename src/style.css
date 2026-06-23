@@ -1473,3 +1473,75 @@ html, body {
   margin-top: 4px;
 }
 
+/* Dev panel (?dev=1 or Vite dev) */
+#dev-panel {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  z-index: 9999;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.dev-panel-toggle {
+  background: #241c36;
+  color: #f7c948;
+  border: 1px solid #3d3058;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.dev-panel-toggle.open {
+  background: #f7c948;
+  color: #1a1428;
+}
+
+.dev-panel-body {
+  margin-top: 6px;
+  padding: 10px;
+  background: rgba(24, 18, 36, 0.94);
+  border: 1px solid #3d3058;
+  max-width: 280px;
+  color: #f0e8ff;
+}
+
+.dev-panel-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #a898c8;
+}
+
+.dev-panel-row code {
+  color: #f7c948;
+  font-size: 11px;
+}
+
+.dev-panel-actions,
+.dev-panel-biomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.dev-panel-actions button,
+.dev-panel-biomes button {
+  background: #2a2040;
+  color: #f0e8ff;
+  border: 1px solid #3d3058;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.dev-panel-actions button:hover,
+.dev-panel-biomes button:hover {
+  border-color: #f7c948;
+  color: #f7c948;
+}
+

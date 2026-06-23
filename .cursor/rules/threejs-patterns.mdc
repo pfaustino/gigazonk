@@ -1,0 +1,37 @@
+---
+description: Three.js patterns for GigaZonk game modules
+globs: src/game/**/*.js
+alwaysApply: false
+---
+
+# Three.js Game Modules
+
+## Scene objects
+
+- Dispose geometries/materials when removing meshes from long-lived scenes.
+- Prefer `InstancedMesh` for many identical enemies/projectiles — no per-entity Mesh in horde paths.
+- Reuse `Vector3` / `Object3D` instances in hot loops; avoid `new` per frame.
+
+## Loading
+
+- GLB via `GLTFLoader`; cache loaded assets; don't reload per spawn.
+- Ground Y / `feetY` / `groundY` must stay consistent for combat and HP bars.
+
+## Updates
+
+- `EnemyManager.updateInstance` and `ENEMY_MESH_LIFT` must stay in sync with `getEnemyHpBarWorldY`.
+- Spatial hash / despawn radius: changing `ARENA_SIZE` requires revisiting spawn and despawn constants.
+
+## Performance
+
+- Test at 300+ enemies when touching spawn, collision, or terrain physics.
+- Shadow casters: minimize count; instancing already handles enemy draw calls.
+
+```js
+// BAD — mesh per enemy in horde
+for (const e of enemies) scene.add(new THREE.Mesh(geo, mat));
+
+// GOOD — instanced pool
+enemyMesh.setMatrixAt(i, matrix);
+enemyMesh.instanceMatrix.needsUpdate = true;
+```

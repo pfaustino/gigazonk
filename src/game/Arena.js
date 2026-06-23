@@ -11,8 +11,11 @@ import {
   getBiomeOuterColor,
   getBiomeRockColor,
 } from './constants.js';
-import { createTerrainLambertMaterial, terrainTexScale } from './TerrainVisuals.js';
+import { ErrorReporter } from '../lib/ErrorReporter.js';
+import { runRandomInt } from '../lib/runRandom.js';
+import { createTerrainLambertMaterial, createGroundTexturedMaterial, GROUND_TEXTURE_TILE_SIZE, loadGroundTextures, loadRockTexture, terrainTexScale } from './TerrainVisuals.js';
 import {
+  applyRockTextureToFeatureMeshes,
   buildFeatureMeshes,
   generateArenaFeatures,
   GROUND_WALL_HEIGHT,
@@ -24,6 +27,17 @@ import {
 function tintTerrainMaterial(material, color) {
   material.color.setHex(color);
   if (material.emissive) material.emissive.setHex(color);
+}
+
+function disposeMaterial(material) {
+  if (!material) return;
+  material.map?.dispose?.();
+  material.dispose?.();
+}
+
+function setMeshTexturedMaterial(mesh, material) {
+  disposeMaterial(mesh.material);
+  mesh.material = material;
 }
 
 const _rockBox = new THREE.Box3();
@@ -52,8 +66,51 @@ export class Arena {
   _applyTerrainColors(biome) {
     const rock = getBiomeRockColor(biome);
     const outer = getBiomeOuterColor(biome);
-    tintTerrainMaterial(this.ground.material, outer);
-    tintTerrainMaterial(this.spawnPad.material, rock);
+    if (!this.ground.material?.map) tintTerrainMaterial(this.ground.material, outer);
+    if (!this.spawnPad.material?.map) tintTerrainMaterial(this.spawnPad.material, rock);
+  }
+
+  _groundTextureForBiome(biome) {
+    return biome?.id === 'grass' ? this._grassTexture : this._dirtTexture;
+  }
+
+  _applyGroundTextures() {
+    if (!this._grassTexture || !this._dirtTexture) return;
+
+    const biome = this.biome;
+    const groundTex = this._groundTextureForBiome(biome);
+    const groundColor = biome?.id === 'grass' ? biome.ground : getBiomeOuterColor(biome);
+    const groundRepeat = ARENA_SIZE / GROUND_TEXTURE_TILE_SIZE;
+
+    setMeshTexturedMaterial(
+      this.ground,
+      createGroundTexturedMaterial(groundTex, groundColor, groundRepeat, groundRepeat)
+    );
+
+    const padDiameter = ARENA_SPAWN_PAD_RADIUS * 2;
+    const padRepeat = padDiameter / GROUND_TEXTURE_TILE_SIZE;
+    setMeshTexturedMaterial(
+      this.spawnPad,
+      createGroundTexturedMaterial(this._dirtTexture, getBiomeRockColor(biome), padRepeat, padRepeat)
+    );
+  }
+
+  _loadTerrainTextures() {
+    this._grassTexture = null;
+    this._dirtTexture = null;
+    loadGroundTextures()
+      .then(([grassTex, dirtTex]) => {
+        this._grassTexture = grassTex;
+        this._dirtTexture = dirtTex;
+        this._applyGroundTextures();
+      })
+      .catch((err) => ErrorReporter.capture('ASSET_LOAD', err, { asset: 'groundTextures' }));
+
+    loadRockTexture()
+      .then((texture) => {
+        applyRockTextureToFeatureMeshes(this.featureMeshes, texture, getBiomeRockColor(this.biome));
+      })
+      .catch((err) => ErrorReporter.capture('ASSET_LOAD', err, { asset: 'rockTexture' }));
   }
 
   build() {
@@ -89,6 +146,7 @@ export class Arena {
     const features = generateArenaFeatures();
     this.mesas = features.mesas;
     this.featureMeshes = buildFeatureMeshes(this.group, features.featureMeshes, 0x666666);
+    this._loadTerrainTextures();
 
     this.obstacles = [...features.obstacles];
     this.rocks = [];
@@ -148,11 +206,12 @@ export class Arena {
       tintTerrainMaterial(rock.material, rockColor);
     }
     tintFeatureMeshes(this.featureMeshes, rockColor);
+    this._applyGroundTextures();
     this._applyTerrainColors(biome);
   }
 
   pickRandomBiome() {
-    const biome = BIOMES[Math.floor(Math.random() * BIOMES.length)];
+    const biome = BIOMES[runRandomInt(BIOMES.length)];
     this.setBiome(biome);
     return biome;
   }

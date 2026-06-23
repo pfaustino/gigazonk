@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MAX_PROJECTILES } from './constants.js';
 import { buildProjectileGeometry } from './EntityVisuals.js';
+import { assert } from '../lib/assert.js';
 
 const dummy = new THREE.Object3D();
 const _color = new THREE.Color();
@@ -34,8 +35,9 @@ export class ProjectileManager {
   }
 
   fire(px, py, pz, angle, speed, damage, area, element, pierce = 0, targetEnemy = null, isCrit = false, lightningChains = 3) {
-    if (this.freeSlots.length === 0) return;
+    assert(this.freeSlots.length > 0, 'PROJECTILE_POOL_EMPTY');
     const slot = this.freeSlots.pop();
+    assert(slot !== undefined && slot >= 0 && slot < MAX_PROJECTILES, 'PROJECTILE_SLOT_INVALID');
     const p = {
       slot, px, py, pz,
       vx: Math.sin(angle) * speed,

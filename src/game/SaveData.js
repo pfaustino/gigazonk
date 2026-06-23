@@ -2,15 +2,15 @@ import { DEFAULT_SETTINGS } from './settings.js';
 import { QUESTS, isCharacterPlayable, DEFAULT_PLAYABLE_CHARACTER } from './constants.js';
 import {
   SKILL_MAX_LEVEL,
-  SKILL_TREE,
   getSkillById,
   getSkillUpgradeCost,
   migrateSkillLevels,
 } from './SkillTree.js';
+import { ErrorReporter } from '../lib/ErrorReporter.js';
 
-const SAVE_KEY = 'gigazonk_save';
+export const SAVE_KEY = 'gigazonk_save';
 
-const DEFAULT_SAVE = {
+export const DEFAULT_SAVE = {
   zonkCoins: 0,
   reputation: 0,
   skillLevels: {},
@@ -33,7 +33,6 @@ function migrateDiscoveredQuests(parsed) {
     ...(parsed.activeQuests ?? DEFAULT_SAVE.activeQuests),
     ...(parsed.completedQuests ?? []),
   ]);
-  // Legacy saves: reveal the full remaining pool as "up next" instead of locking it.
   if (!parsed.discoveredQuests) {
     for (const quest of QUESTS) {
       if (!parsed.completedQuests?.includes(quest.id) && !parsed.activeQuests?.includes(quest.id)) {
@@ -44,39 +43,55 @@ function migrateDiscoveredQuests(parsed) {
   return [...discovered].filter((id) => QUESTS.some((q) => q.id === id));
 }
 
+/** Merge parsed localStorage JSON into a full save record (exported for tests). */
+export function hydrateSave(parsed) {
+  return {
+    ...DEFAULT_SAVE,
+    ...parsed,
+    settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
+    skillLevels: migrateSkillLevels(parsed),
+    activeQuests: (parsed.activeQuests ?? DEFAULT_SAVE.activeQuests)
+      .filter((id) => QUESTS.some((q) => q.id === id)),
+    discoveredQuests: migrateDiscoveredQuests(parsed),
+    unlockedCharacters: parsed.unlockedCharacters || DEFAULT_SAVE.unlockedCharacters,
+    selectedCharacter: isCharacterPlayable(parsed.selectedCharacter)
+      ? (parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter)
+      : DEFAULT_PLAYABLE_CHARACTER,
+    runSnapshot: parsed.runSnapshot ?? null,
+    savedAt: parsed.savedAt ?? null,
+  };
+}
+
 export class SaveData {
   constructor() {
+    this.loadFailed = false;
     this.data = this.load();
   }
 
   load() {
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          ...DEFAULT_SAVE,
-          ...parsed,
-          settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
-          skillLevels: migrateSkillLevels(parsed),
-          activeQuests: (parsed.activeQuests ?? DEFAULT_SAVE.activeQuests)
-            .filter((id) => QUESTS.some((q) => q.id === id)),
-          discoveredQuests: migrateDiscoveredQuests(parsed),
-          unlockedCharacters: parsed.unlockedCharacters || DEFAULT_SAVE.unlockedCharacters,
-          selectedCharacter: isCharacterPlayable(parsed.selectedCharacter)
-            ? (parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter)
-            : DEFAULT_PLAYABLE_CHARACTER,
-          runSnapshot: parsed.runSnapshot ?? null,
-          savedAt: parsed.savedAt ?? null,
-        };
+      if (typeof localStorage === 'undefined') {
+        return structuredClone(DEFAULT_SAVE);
       }
-    } catch { /* ignore */ }
-    return structuredClone(DEFAULT_SAVE);
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return structuredClone(DEFAULT_SAVE);
+      const parsed = JSON.parse(raw);
+      return hydrateSave(parsed);
+    } catch (err) {
+      this.loadFailed = true;
+      ErrorReporter.capture('SAVE_PARSE', err);
+      return structuredClone(DEFAULT_SAVE);
+    }
   }
 
   save() {
-    this.data.savedAt = Date.now();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(this.data));
+    try {
+      if (typeof localStorage === 'undefined') return;
+      this.data.savedAt = Date.now();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.data));
+    } catch (err) {
+      ErrorReporter.capture('SAVE_WRITE', err);
+    }
   }
 
   reload() {

@@ -14,9 +14,14 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, PLAYER_BASE, ZONK_DOME_FOLLOWUP_DAMAGE_MULT } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, PLAYER_BASE, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
+import { parseDevFlags } from '../lib/parseDevFlags.js';
+import { ErrorReporter } from '../lib/ErrorReporter.js';
+import { DevPanel } from '../dev/DevPanel.js';
+import { RunRng } from '../lib/RunRng.js';
+import { setActiveRunRng, getActiveRunRng, runRandom, runRandomInt } from '../lib/runRandom.js';
 
 export class Game {
   constructor(canvas) {
@@ -93,11 +98,22 @@ export class Game {
     this.pendingAction = null;
     this.pendingLevelUps = 0;
     this._gameOverActive = false;
+    this.runSeed = 0;
+    this._devFlags = parseDevFlags();
+    this._pendingRunSeed = this._devFlags.seed;
+    this._devPendingBiome = this._devFlags.biome;
+
+    if (this._devFlags.coins) {
+      saveData.addCoins(this._devFlags.coins);
+    }
 
     canvas.addEventListener('click', () => this.audio.resume());
 
     window.addEventListener('resize', () => this.onResize());
     this.ui.showTitle((action) => this.handleTitleAction(action));
+    if (saveData.loadFailed) {
+      this.ui.toast('Save reset — previous progress file was corrupt', 'warning');
+    }
     this.timer = new THREE.Timer();
     this.timer.connect(document);
     this.audio.applySettings(saveData.data.settings);
@@ -105,6 +121,9 @@ export class Game {
     this.audio.loadMusicManifest().then(() => {
       if (this.state === 'title') this.audio.playMusic('title');
     });
+    if (import.meta.env.DEV || this._devFlags.dev) {
+      this.devPanel = new DevPanel(this);
+    }
     this.animate();
   }
 
@@ -130,7 +149,7 @@ export class Game {
   applyDaylight() {
     this.hemiLight.intensity = 0.44;
     this.ambientLight.intensity = 0.28;
-    this.sunLight.intensity = 0.82;
+    this.sunLight.intensity = 1.2;
   }
 
   applyVillageScene() {
@@ -144,7 +163,7 @@ export class Game {
     this.scene.add(this.hemiLight);
     this.ambientLight = new THREE.AmbientLight(0xe8e4dc, 0.28);
     this.scene.add(this.ambientLight);
-    this.sunLight = new THREE.DirectionalLight(0xffe8c8, 0.82);
+    this.sunLight = new THREE.DirectionalLight(0xfff8e8, 1.2);
     this.sunLight.position.set(30, 55, 18);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
@@ -192,6 +211,7 @@ export class Game {
     this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
     this.quests.assignNewQuests();
     this.audio.playMusic('village');
+    this.clearRunRng();
   }
 
   startArena() {
@@ -204,8 +224,21 @@ export class Game {
     this.quests.assignNewQuests();
     this.ui.clear();
     this.ui.buildHUD();
-    this.currentBiome = this.arena.pickRandomBiome();
-    this.setSkyColor(this.currentBiome.sky);
+    if (this._devPendingBiome) {
+      const biome = BIOMES.find((b) => b.id === this._devPendingBiome);
+      if (biome) {
+        this.currentBiome = biome;
+        this.arena.setBiome(biome);
+        this.setSkyColor(biome.sky);
+      } else {
+        this.currentBiome = this.arena.pickRandomBiome();
+        this.setSkyColor(this.currentBiome.sky);
+      }
+      this._devPendingBiome = null;
+    } else {
+      this.currentBiome = this.arena.pickRandomBiome();
+      this.setSkyColor(this.currentBiome.sky);
+    }
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
     this.interactables.spawnVillagePortal(0, 0);
     this.populateMesaEncounters(true);
@@ -222,7 +255,7 @@ export class Game {
     const roll = this.interactables.populateMesas(
       this.arena.mesas,
       this.enemies,
-      this.player.damage
+      this.player.getEffectiveDamage()
     );
     if (showToast && roll) {
       this.ui.toast(
@@ -231,6 +264,16 @@ export class Game {
       );
     }
     return roll;
+  }
+
+  initRunRng() {
+    this.runSeed = this._pendingRunSeed ?? Math.floor(Math.random() * 1e9);
+    this._pendingRunSeed = null;
+    setActiveRunRng(new RunRng(this.runSeed));
+  }
+
+  clearRunRng() {
+    setActiveRunRng(null);
   }
 
   resetRun() {
@@ -248,6 +291,7 @@ export class Game {
     this.runCoins = 0;
     this.coinsAlreadyBanked = 0;
     this.pendingLevelUps = 0;
+    this.initRunRng();
     this.ui.dismissLevelUp();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
@@ -517,6 +561,8 @@ export class Game {
         z: p.position.z,
       },
       biomeId: this.currentBiome?.id,
+      runSeed: this.runSeed,
+      rngState: getActiveRunRng()?.getState(),
     };
   }
 
@@ -530,6 +576,14 @@ export class Game {
     this.gigaSpawnTimer = snap.gigaSpawnTimer ?? 0;
     this.pendingGigaSpawn = snap.pendingGigaSpawn ?? false;
     this.gigaSpawnSurvivalTimer = snap.gigaSpawnSurvivalTimer ?? 0;
+    if (snap.runSeed != null) {
+      this.runSeed = snap.runSeed;
+      if (snap.rngState != null) {
+        setActiveRunRng(RunRng.fromState(snap.runSeed, snap.rngState));
+      } else {
+        setActiveRunRng(new RunRng(snap.runSeed));
+      }
+    }
     this.applyPlayerSnapshot(snap);
     if (snap.biomeId) {
       const biome = BIOMES.find(b => b.id === snap.biomeId);
@@ -675,17 +729,17 @@ export class Game {
     const ex = enemy.x;
     const ez = enemy.z;
 
-    if (alive && this.player.poisonChance > 0 && Math.random() < this.player.poisonChance) {
+    if (alive && this.player.poisonChance > 0 && runRandom() < this.player.poisonChance) {
       enemy.burnTimer = Math.max(enemy.burnTimer, 3);
     }
 
-    if (alive && this.player.bonkChance > 0 && Math.random() < this.player.bonkChance) {
+    if (alive && this.player.bonkChance > 0 && runRandom() < this.player.bonkChance) {
       const bonkDmg = damage * 19;
       const result = this.enemies.damageEnemy(enemy, bonkDmg, null);
       this.handleCombatHit(bonkDmg, result, null, enemy, { skipProcs: true, isCrit: true });
     }
 
-    if (this.player.explodeChance > 0 && Math.random() < this.player.explodeChance) {
+    if (this.player.explodeChance > 0 && runRandom() < this.player.explodeChance) {
       const explodeDmg = damage * 0.65;
       const nearby = this.enemies.getNearby(ex, ez, 4);
       for (const { enemy: e2 } of nearby) {
@@ -696,7 +750,7 @@ export class Game {
       this.particles.burst(ex, ez, 0xff8844);
     }
 
-    if (isCrit && this.player.critSplash > 0 && Math.random() < this.player.critSplash) {
+    if (isCrit && this.player.critSplash > 0 && runRandom() < this.player.critSplash) {
       const splashDmg = damage * 0.5;
       const nearby = this.enemies.getNearby(ex, ez, 3.5);
       for (const { enemy: e2 } of nearby) {
@@ -709,7 +763,7 @@ export class Game {
 
   spawnBoss() {
     this.bossCount++;
-    const angle = Math.random() * Math.PI * 2;
+    const angle = runRandom() * Math.PI * 2;
     const half = ARENA_SIZE / 2 - 6;
     const bx = THREE.MathUtils.clamp(
       this.player.position.x + Math.cos(angle) * 20,
@@ -721,7 +775,7 @@ export class Game {
       -half,
       half
     );
-    this.enemies.spawnBoss(bx, bz, this.player.damage);
+    this.enemies.spawnBoss(bx, bz, this.player.getEffectiveDamage());
     this.audio.boss();
     this.ui.toast(`⚠️ ZONK LORD #${this.bossCount} APPROACHES!`, 'synergy');
   }
@@ -770,7 +824,7 @@ export class Game {
 
     this.hemiLight.intensity = 0.36 + (1 - nightFactor) * 0.16;
     this.ambientLight.intensity = 0.24 + (1 - nightFactor) * 0.14;
-    this.sunLight.intensity = 0.55 + (1 - nightFactor) * 0.35;
+    this.sunLight.intensity = 0.68 + (1 - nightFactor) * 0.58;
 
     if (this.currentBiome?.sky) {
       const daySky = new THREE.Color(this.currentBiome.sky);
@@ -804,7 +858,7 @@ export class Game {
 
     const spawnResult = this.enemies.spawnWave(
       this.player.position, this.elapsed, this.inRift, diffMult, dt, diffSetting.hpMult,
-      this.player.damage, this.pendingGigaSpawn
+      this.player.getEffectiveDamage(), this.pendingGigaSpawn
     );
     if (spawnResult.spawned > 0 && this.pendingGigaSpawn) {
       this.pendingGigaSpawn = false;
@@ -819,6 +873,7 @@ export class Game {
       this.spawnBoss();
     }
 
+    this.enemies.setThreatDamage(this.player.getEffectiveDamage());
     this.enemies.update(dt, this.player.position, this.arena);
 
     if (this.player.canAttack()) {
@@ -827,10 +882,10 @@ export class Game {
         const sorted = nearby.slice().sort((a, b) => a.dist - b.dist);
         const primary = sorted[0]?.enemy;
         const baseDmg = this.player.computeDamageForEnemy(primary);
-        const isCrit = Math.random() < this.player.critChance;
+        const isCrit = runRandom() < this.player.critChance;
         const finalDmg = isCrit ? baseDmg * this.player.getCritMultiplier() : baseDmg;
         const element = this.player.elements.size > 0
-          ? [...this.player.elements][Math.floor(Math.random() * this.player.elements.size)]
+          ? [...this.player.elements][runRandomInt(this.player.elements.size)]
           : null;
         const px = this.player.position.x;
         const py = this.player.getProjectileY();
@@ -1057,7 +1112,7 @@ export class Game {
     try {
       choices = this.upgrades.getRandomChoices(3, this.player);
     } catch (err) {
-      console.error('Failed to roll level-up choices', err);
+      ErrorReporter.capture('UPGRADE_ROLL', err, this.getErrorContext());
       this.pendingLevelUps = Math.max(0, this.pendingLevelUps - 1);
       this.player.heal(this.player.maxHp * 0.25);
       this.flushPendingLevelUp();
@@ -1100,7 +1155,7 @@ export class Game {
       this.modalPause = true;
       this.paused = true;
     } catch (err) {
-      console.error('Level up UI failed', err);
+      ErrorReporter.capture('UPGRADE_UI', err, this.getErrorContext());
       this.ui.dismissLevelUp();
       this.modalPause = false;
       this.paused = false;
@@ -1172,5 +1227,92 @@ export class Game {
 
     this.input.endFrame();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  getErrorContext() {
+    return {
+      version: GAME_VERSION,
+      state: this.state,
+      elapsed: this.elapsed,
+      runSeed: this.runSeed,
+      rngState: getActiveRunRng()?.getState(),
+      enemies: this.enemies?.count ?? 0,
+      playerLevel: this.player?.level ?? 0,
+    };
+  }
+
+  devSkipToTime(seconds) {
+    if (this.state !== 'arena') return;
+    this.elapsed = Math.max(0, seconds);
+    this.ui.toast(`Dev: time → ${Math.floor(this.elapsed)}s`, 'synergy');
+  }
+
+  devSetBiome(biomeId) {
+    const biome = BIOMES.find((b) => b.id === biomeId);
+    if (!biome) return;
+    this.currentBiome = biome;
+    this.arena.setBiome(biome);
+    this.setSkyColor(biome.sky);
+    if (this.state === 'arena') {
+      this.ui.toast(`Dev: biome → ${biome.name}`, 'synergy');
+    }
+  }
+
+  devSpawnEnemies(count) {
+    if (this.state !== 'arena') return;
+    let spawned = 0;
+    const dmg = this.player.getEffectiveDamage();
+    while (spawned < count && this.enemies.count < MAX_ENEMIES) {
+      const batch = Math.min(20, count - spawned);
+      spawned += this.enemies._spawnCluster(
+        this.player.position.x,
+        this.player.position.z,
+        batch,
+        'grunt',
+        dmg,
+        1,
+        1
+      );
+    }
+    this.ui.toast(`Dev: spawned ${spawned} enemies`, 'synergy');
+  }
+
+  devSpawnBoss() {
+    if (this.state !== 'arena') return;
+    this.spawnBoss();
+    this.ui.toast('Dev: Zonk Lord summoned', 'synergy');
+  }
+
+  devAddMetaCoins(amount) {
+    saveData.addCoins(amount);
+    if (this.state === 'village') {
+      this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+    }
+    this.ui.toast(`Dev: +${amount} Zonk Coins`, 'synergy');
+  }
+
+  devForceLevelUp() {
+    if (this.state !== 'arena') return;
+    this.player.addXp(this.player.xpToNext);
+    this.ui.toast('Dev: forced level up', 'synergy');
+  }
+
+  devExportErrors() {
+    const text = ErrorReporter.exportText();
+    if (!text) {
+      this.ui.toast('No errors captured', 'warning');
+      return;
+    }
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.ui.toast('Error log copied to clipboard', 'synergy');
+      }).catch(() => {
+        console.log(text);
+        this.ui.toast('Errors printed to console', 'warning');
+      });
+    } else {
+      console.log(text);
+      this.ui.toast('Errors printed to console', 'warning');
+    }
   }
 }

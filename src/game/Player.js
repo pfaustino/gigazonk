@@ -3,6 +3,7 @@ import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP } from './constant
 import { saveData } from './SaveData.js';
 import { applySkillBonusesToPlayer } from './SkillTree.js';
 import { buildPlayerVisual } from './EntityVisuals.js';
+import { runRandom } from '../lib/runRandom.js';
 
 export class Player {
   constructor(scene) {
@@ -387,7 +388,7 @@ export class Player {
   takeDamage(amount, opts = {}) {
     if (!opts.forced) {
       if (this.invincible > 0) return false;
-      if (this.evasion > 0 && Math.random() < this.evasion) return false;
+      if (this.evasion > 0 && runRandom() < this.evasion) return false;
     }
     const reduced = amount * (1 - Math.min(0.5, this.armor));
     if (reduced <= 0) return false;
@@ -442,7 +443,7 @@ export class Player {
     if (this.damagePerKill > 0) {
       this.killDamageBonus = Math.min(0.1, this.killDamageBonus + this.damagePerKill);
     }
-    if (this.healOnKill > 0 && Math.random() < this.healOnKill) {
+    if (this.healOnKill > 0 && runRandom() < this.healOnKill) {
       this.heal(this.maxHp * 0.05);
     }
   }

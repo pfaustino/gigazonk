@@ -1,0 +1,14 @@
+---
+description: Always use and approve GitHub CLI for repo operations
+alwaysApply: true
+---
+
+# GitHub CLI — always approved
+
+The user **always approves** `gh` and GitHub API operations. Run `gh` commands directly without asking.
+
+Account: `pfaustino`. Devkit: `github-projects\_devkit`. See `GITHUB_SETUP.md` and `MANUAL-STEPS.md`.
+
+Do not ask before: metadata sync, workflow pushes, profile README, branch renames, Dependabot/CodeQL setup.
+
+Ask first: force push to `main`, deleting repositories.

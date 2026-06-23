@@ -1,0 +1,68 @@
+---
+description: Browser and game testing in the IDE — Playwright, Simple Browser, MCP
+alwaysApply: true
+---
+
+# Browser & game testing (IDE)
+
+The user expects agents to **open, drive, and test** web games and browsers from this workspace — not only suggest manual steps.
+
+## Default workflow
+
+1. **Automated regression** — Playwright (`e2e/`). Prefer this for repeatable smoke and UI flows.
+2. **Interactive playtest** — `cursor-ide-browser` MCP when the dev server is running.
+3. **IDE browser** — `Ctrl+Shift+P` → **Simple Browser: Show** → `http://localhost:5173`
+
+## Before browser testing
+
+```bash
+npm run dev          # http://localhost:5173
+```
+
+For production build behavior: `npm run build && npm run preview` (base path `/gigazonk/`).
+
+## Playwright commands
+
+```bash
+npm run test:e2e           # headless CI-style
+npm run test:e2e:ui        # Playwright UI in IDE-friendly mode
+npm run test:e2e:headed    # visible browser window
+```
+
+- Config: `playwright.config.ts` (starts Vite via `webServer`)
+- Tests: `e2e/*.spec.ts`
+- Add a new spec when fixing UI bugs or new player flows (title → arena → village, shop, level-up).
+
+## When to use each tool
+
+| Need | Tool |
+|------|------|
+| Smoke / regression / CI | Playwright `npm run test:e2e` |
+| Click-through while developing | Playwright `--ui` or `--headed` |
+| Agent explores live page | Browser MCP (`browser_navigate`, snapshot, screenshot) |
+| Quick visual check in editor | Simple Browser at localhost URL |
+| Console / localStorage in dev | vite-mcp at `http://localhost:5173/__mcp` |
+
+## Browser MCP checklist
+
+1. `browser_navigate` to `http://localhost:5173` (dev server must be running)
+2. `browser_snapshot` before clicks
+3. `browser_take_screenshot` after state changes
+4. `browser_lock` / `browser_unlock` for multi-step flows
+
+Use for: GitHub device-login pages, game menus, deploy smoke on Pages URL.
+
+## Test data
+
+- Clear `localStorage` in Playwright before tests (`gigazonk_save`).
+- URL flags: `?dev=1`, `?seed=42`, `?biome=frost`, `?coins=500` (see `DEV.md`).
+
+## Quality gate
+
+- Unit/logic: `npm run test` (Vitest)
+- Browser smoke: `npm run test:e2e`
+- Full gate before ship: `npm run check && npm run test:e2e`
+
+## New e2e tests
+
+Cover player-visible flows from `DEV.md` manual scripts. Use stable selectors (`#btn-play`, `#hp-bar`, HUD ids). Avoid timing-only assertions without visibility checks.

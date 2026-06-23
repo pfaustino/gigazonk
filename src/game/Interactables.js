@@ -8,6 +8,7 @@ import {
 } from './constants.js';
 import { isLootSpotClear } from './TerrainFeatures.js';
 import { getLootPreview, getShrinePreview, LOOT_REWARD_ICONS } from './UpgradeSystem.js';
+import { runRandom } from '../lib/runRandom.js';
 
 const LOOT_TABLE = [
   { weight: 22, type: 'xp', value: 15, label: '+15 XP' },
@@ -29,7 +30,7 @@ const LOOT_TABLE = [
 
 function pickLoot(table = LOOT_TABLE) {
   const total = table.reduce((s, l) => s + l.weight, 0);
-  let roll = Math.random() * total;
+  let roll = runRandom() * total;
   for (const l of table) {
     roll -= l.weight;
     if (roll <= 0) return l;
@@ -171,8 +172,8 @@ export class Interactables {
     const maxDx = mesa.w * 0.5 * inset;
     const maxDz = mesa.d * 0.5 * inset;
     return {
-      x: mesa.cx + (Math.random() - 0.5) * maxDx * 2,
-      z: mesa.cz + (Math.random() - 0.5) * maxDz * 2,
+      x: mesa.cx + (runRandom() - 0.5) * maxDx * 2,
+      z: mesa.cz + (runRandom() - 0.5) * maxDz * 2,
       y: mesa.topY,
     };
   }
@@ -184,7 +185,7 @@ export class Interactables {
 
     for (const mesa of mesas) {
       const spot = this._mesaSpot(mesa);
-      const guardianRoll = Math.random() < 0.55;
+      const guardianRoll = runRandom() < 0.55;
 
       if (guardianRoll && enemyManager) {
         const guardian = enemyManager.spawnMesaGuardian(spot.x, spot.z, playerDmg, mesa);
@@ -224,7 +225,7 @@ export class Interactables {
   }
 
   _pickScatterPoint(bandMin, bandMax, angle) {
-    const r = bandMin + Math.random() * (bandMax - bandMin);
+    const r = bandMin + runRandom() * (bandMax - bandMin);
     const half = ARENA_SIZE / 2 - 4;
     const x = THREE.MathUtils.clamp(Math.cos(angle) * r, -half, half);
     const z = THREE.MathUtils.clamp(Math.sin(angle) * r, -half, half);
@@ -247,15 +248,15 @@ export class Interactables {
 
       for (let i = 0; i < inBand; i++) {
         const baseAngle = (i / inBand) * Math.PI * 2;
-        const angle = baseAngle + (Math.random() - 0.5) * ((Math.PI * 2) / inBand);
+        const angle = baseAngle + (runRandom() - 0.5) * ((Math.PI * 2) / inBand);
         let x;
         let z;
         for (let attempt = 0; attempt < 24; attempt++) {
           ({ x, z } = this._pickScatterPoint(bandMin, bandMax, angle));
           if (!arena || isLootSpotClear(x, z, arena.obstacles, arena.mesas)) break;
-          ({ x, z } = this._pickScatterPoint(bandMin, bandMax, angle + Math.random() * 0.8));
+          ({ x, z } = this._pickScatterPoint(bandMin, bandMax, angle + runRandom() * 0.8));
         }
-        if (Math.random() < 0.7) this.spawnPot(x, z);
+        if (runRandom() < 0.7) this.spawnPot(x, z);
         else this.spawnChest(x, z);
         placed++;
       }

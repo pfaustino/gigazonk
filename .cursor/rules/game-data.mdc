@@ -1,0 +1,29 @@
+---
+description: Data and balance conventions for constants and game data
+globs: src/game/constants.js,src/game/Awards.js,src/game/SkillTree.js,**/data/**
+alwaysApply: false
+---
+
+# Game Data & Balance
+
+## Structure
+
+- Enemy types: single `ENEMY_TYPES` map — hp, speed, damage, xp, scale together.
+- Upgrades: templates in `Awards.js`; application logic in `UpgradeSystem.js` only.
+- Skills: `SkillTree.js` defines tree; costs via `getSkillUpgradeCost`.
+
+## Tuning rules
+
+- Document units in comments (`hpHits`, mult vs flat, per-second).
+- Difficulty multipliers live in `settings.js` (`spawnMult`, `hpMult`) — don't duplicate tables per difficulty.
+- Caps (`CRIT_CHANCE_CAP`) next to the stat they limit.
+
+## UI preview
+
+- `getUpgradePreview` must mirror combat application — one effect schema, two consumers.
+- Changing an upgrade effect shape requires both preview and `applyUpgrade`.
+
+## Migration
+
+- Renaming IDs: alias in `SaveData` migration, never silent drop of player progress.
+- New default quests/skills: merge with `DEFAULT_SAVE`, don't overwrite player lists blindly.

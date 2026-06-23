@@ -4,11 +4,87 @@ import { ARENA_SIZE, ARENA_REFERENCE_SIZE } from './constants.js';
 const _c = new THREE.Color();
 const _b = new THREE.Color();
 
+/** Volcanic rock photo — walls & mesas. Served from /public/images. */
+export const ROCK_TEXTURE_URL = '/images/pixabay-analogicus-volcanic-rock-3836723.jpg';
+export const GRASS_TEXTURE_URL = '/images/pixabay-publicdomainpictures-grass-84622.jpg';
+export const DIRT_TEXTURE_URL = '/images/pixabay-oleg_mit-soil-5342049.jpg';
+/** World meters per texture tile on vertical rock surfaces. */
+export const ROCK_TEXTURE_TILE_SIZE = 3.5;
+/** World meters per texture tile on ground planes. */
+export const GROUND_TEXTURE_TILE_SIZE = 28;
+
+const _textureCache = new Map();
+
 function terrainTexScale() {
   return ARENA_SIZE / ARENA_REFERENCE_SIZE;
 }
 
 export { terrainTexScale };
+
+function loadCachedTexture(url) {
+  let cache = _textureCache.get(url);
+  if (!cache) {
+    cache = { tex: null, promise: null };
+    _textureCache.set(url, cache);
+  }
+  if (cache.tex) return Promise.resolve(cache.tex);
+  if (!cache.promise) {
+    cache.promise = new Promise((resolve, reject) => {
+      new THREE.TextureLoader().load(
+        url,
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.RepeatWrapping;
+          tex.anisotropy = 4;
+          cache.tex = tex;
+          resolve(tex);
+        },
+        undefined,
+        reject
+      );
+    });
+  }
+  return cache.promise;
+}
+
+export function loadRockTexture() {
+  return loadCachedTexture(ROCK_TEXTURE_URL);
+}
+
+export function loadGrassTexture() {
+  return loadCachedTexture(GRASS_TEXTURE_URL);
+}
+
+export function loadDirtTexture() {
+  return loadCachedTexture(DIRT_TEXTURE_URL);
+}
+
+export function loadGroundTextures() {
+  return Promise.all([loadGrassTexture(), loadDirtTexture()]);
+}
+
+function createTiledLambertMaterial(texture, color, repeatX, repeatY, emissiveIntensity) {
+  const map = texture.clone();
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(Math.max(0.25, repeatX), Math.max(0.25, repeatY));
+  map.needsUpdate = true;
+  return new THREE.MeshLambertMaterial({
+    map,
+    color,
+    emissive: color,
+    emissiveIntensity,
+  });
+}
+
+export function createRockTexturedMaterial(texture, color, repeatX, repeatY) {
+  return createTiledLambertMaterial(texture, color, repeatX, repeatY, 0.07);
+}
+
+export function createGroundTexturedMaterial(texture, color, repeatX, repeatY) {
+  return createTiledLambertMaterial(texture, color, repeatX, repeatY, 0.05);
+}
 
 function lerpColors(colors, i, a, b, t) {
   _c.setHex(a);

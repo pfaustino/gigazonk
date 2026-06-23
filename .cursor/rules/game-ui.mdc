@@ -1,0 +1,27 @@
+---
+description: UI and DOM overlay patterns for game screens
+globs: src/game/UI.js,src/game/GameMenu.js,src/style.css
+alwaysApply: false
+---
+
+# Game UI
+
+## DOM overlays on canvas
+
+- UI is HTML/CSS over the canvas — keep game logic out of UI event handlers; call game callbacks.
+- New screens: prefer a dedicated section or small module, not 200 more lines in `UI.js`.
+
+## Accessibility & input
+
+- Keyboard: document new bindings in README controls table.
+- Don't steal focus from canvas movement keys when menus are closed.
+
+## Styling
+
+- Use existing CSS variables and panel patterns in `style.css`.
+- Mobile: test touch targets if adding interactive HUD elements.
+
+## Feedback
+
+- Combat feedback (damage numbers, crits) — keep allocation pooled; no DOM node per hit in horde scenarios.
+- Level-up and shop UIs must handle edge cases (empty choices, max level) with user-visible errors, not silent `console.error` only.

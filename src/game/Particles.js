@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getEnemyHpBarWorldY } from './constants.js';
+import { runRandom } from '../lib/runRandom.js';
 
 export class ParticleSystem {
   constructor(scene) {
@@ -50,13 +51,13 @@ export class ParticleSystem {
       mesh.position.set(x, 1, z);
       this.group.add(mesh);
       const angle = (i / count) * Math.PI * 2;
-      const speed = 3 + Math.random() * 4;
+      const speed = 3 + runRandom() * 4;
       this.particles.push({
         mesh,
         vx: Math.cos(angle) * speed,
-        vy: 2 + Math.random() * 3,
+        vy: 2 + runRandom() * 3,
         vz: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.3,
+        life: 0.5 + runRandom() * 0.3,
       });
     }
   }

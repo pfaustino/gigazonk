@@ -4,7 +4,7 @@ import {
   ARENA_SIZE,
   ARENA_SPAWN_PAD_RADIUS,
 } from './constants.js';
-import { createTerrainLambertMaterial } from './TerrainVisuals.js';
+import { createTerrainLambertMaterial, createRockTexturedMaterial, ROCK_TEXTURE_TILE_SIZE } from './TerrainVisuals.js';
 
 export const GROUND_WALL_HEIGHT = 2.8;
 const WALL_HEIGHT = GROUND_WALL_HEIGHT;
@@ -405,6 +405,16 @@ function createSolidRampGeometry(mesa) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
+
+  const posAttr = geo.attributes.position;
+  const uvs = new Float32Array(posAttr.count * 2);
+  const tile = ROCK_TEXTURE_TILE_SIZE;
+  for (let i = 0; i < posAttr.count; i++) {
+    uvs[i * 2] = posAttr.getX(i) / tile;
+    uvs[i * 2 + 1] = (posAttr.getY(i) * 0.55 + posAttr.getZ(i) * 0.45) / tile;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
   return geo;
 }
 
@@ -536,6 +546,7 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
   const wallMat = createTerrainLambertMaterial(rockColor);
   const mesaMat = createTerrainLambertMaterial(rockColor);
   const rampMat = createTerrainLambertMaterial(rockColor);
+  const tile = ROCK_TEXTURE_TILE_SIZE;
   const meshes = [];
 
   for (const f of featureMeshes) {
@@ -543,6 +554,10 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
       const geo = new THREE.BoxGeometry(f.w, WALL_HEIGHT, f.d);
       const mesh = new THREE.Mesh(geo, wallMat.clone());
       mesh.position.set(f.x, WALL_HEIGHT / 2, f.z);
+      mesh.userData.rockTexRepeat = {
+        x: Math.max(f.w, f.d) / tile,
+        y: WALL_HEIGHT / tile,
+      };
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -552,6 +567,7 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
       const platGeo = new THREE.BoxGeometry(w, topY, d);
       const plat = new THREE.Mesh(platGeo, mesaMat.clone());
       plat.position.set(cx, topY / 2, cz);
+      plat.userData.rockTexRepeat = { x: w / tile, y: topY / tile };
       plat.castShadow = true;
       plat.receiveShadow = true;
       group.add(plat);
@@ -559,6 +575,7 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
 
       const rampGeo = createSolidRampGeometry(f);
       const ramp = new THREE.Mesh(rampGeo, rampMat.clone());
+      ramp.userData.rockTexRepeat = { x: 1, y: 1 };
       ramp.castShadow = true;
       ramp.receiveShadow = true;
       group.add(ramp);
@@ -569,10 +586,22 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
   return meshes;
 }
 
+export function applyRockTextureToFeatureMeshes(meshes, texture, rockColor) {
+  if (!texture || !meshes?.length) return;
+  for (const mesh of meshes) {
+    const rep = mesh.userData.rockTexRepeat;
+    if (!rep) continue;
+    const prev = mesh.material;
+    mesh.material = createRockTexturedMaterial(texture, rockColor, rep.x, rep.y);
+    prev?.dispose?.();
+  }
+}
+
 export function tintFeatureMeshes(meshes, rockColor) {
   for (const mesh of meshes) {
     mesh.material.color.setHex(rockColor);
     if (mesh.material.emissive) mesh.material.emissive.setHex(rockColor);
+    if (mesh.material.map) mesh.material.needsUpdate = true;
   }
 }
 

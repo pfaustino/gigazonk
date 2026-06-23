@@ -9,6 +9,7 @@ import {
   ZONK_DOME_FOLLOWUP_COUNT,
   ZONK_DOME_FOLLOWUP_DELAY,
 } from './constants.js';
+import { runRandom } from '../lib/runRandom.js';
 
 export class FamiliarManager {
   constructor(scene) {
@@ -107,8 +108,8 @@ export class RiftManager {
   }
 
   spawnRift(nearPos) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 15 + Math.random() * 10;
+    const angle = runRandom() * Math.PI * 2;
+    const dist = 15 + runRandom() * 10;
     this.pos.x = nearPos.x + Math.cos(angle) * dist;
     this.pos.z = nearPos.z + Math.sin(angle) * dist;
 

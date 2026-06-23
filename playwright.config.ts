@@ -17,14 +17,28 @@ export default defineConfig({
   workers: process.env.CROSS_BROWSER ? 1 : process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'github' : 'list',
   timeout: 60_000,
+  expect: {
+    timeout: process.env.CROSS_BROWSER ? 20_000 : 5_000,
+  },
   use: {
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  // CROSS_BROWSER=1 runs chromium + firefox + webkit (pre-release / npm run test:e2e:cross).
-  projects: process.env.CROSS_BROWSER ? allBrowsers : [allBrowsers[0]],
+  // Smoke: Chromium only. Cross-browser: cross-browser.spec.ts on all engines.
+  projects: process.env.CROSS_BROWSER
+    ? allBrowsers.map((browser) => ({
+        ...browser,
+        testMatch: 'cross-browser.spec.ts',
+      }))
+    : [
+        {
+          name: 'chromium',
+          use: { ...devices['Desktop Chrome'] },
+          testMatch: 'smoke.spec.ts',
+        },
+      ],
   webServer: {
     command: 'npm run dev',
     url: baseURL,

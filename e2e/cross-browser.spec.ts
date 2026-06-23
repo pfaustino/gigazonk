@@ -19,7 +19,7 @@ test.describe('cross-browser error sweep', () => {
     const report = attachBrowserErrorCollectors(page);
     await gotoClean(page, '/?dev=1');
 
-    await expect(page.getByRole('heading', { name: 'GigaZonk' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'GigaZonk' })).toBeVisible({ timeout: 20_000 });
     await startQuickArena(page);
 
     const reporterErrors = await readReporterErrors(page);

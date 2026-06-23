@@ -55,7 +55,7 @@ After substantive changes, **run the matching stage(s) in the terminal** and fix
 - **Fresh save** — `gotoClean` clears `localStorage` before each test.
 - **New regression** — player-visible bug fix or new menu flow → add/extend spec + run stage 2.
 
-Specs: `e2e/smoke.spec.ts`, `e2e/cross-browser.spec.ts`. Config: `playwright.config.ts` (`workers: 1` when `CROSS_BROWSER=1`).
+Specs: `e2e/smoke.spec.ts` (Chromium / `test:e2e`), `e2e/cross-browser.spec.ts` (all browsers / `test:e2e:cross`). Config: `playwright.config.ts` (`testMatch` split; `workers: 1` when `CROSS_BROWSER=1`).
 
 ## Flake triage
 

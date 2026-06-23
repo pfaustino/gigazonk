@@ -5,80 +5,108 @@ alwaysApply: true
 
 # Browser & game testing (IDE)
 
-The user expects agents to **open, drive, and test** web games and browsers from this workspace — not only suggest manual steps.
+The user expects agents to **run automated tests and drive browsers** from this workspace — not only suggest manual steps.
 
-## Default workflow
+## Development workflow (layered gates)
 
-1. **Automated regression** — Playwright (`e2e/`). Prefer this for repeatable smoke and UI flows.
-2. **Interactive playtest** — `cursor-ide-browser` MCP when the dev server is running.
-3. **IDE browser** — `Ctrl+Shift+P` → **Simple Browser: Show** → `http://localhost:5173`
+Match CI job order, but use **visible Playwright while iterating** and **headless before ship**:
 
-## Before browser testing
-
-```bash
-npm run dev          # http://localhost:5173
+```
+edit code
+  → npm run check              (quality: lint + tsc + vitest + build)
+  → npm run test:e2e:headed    (or :ui — show browser; UI / player-flow changes)
+  → npm run test:e2e           (headless re-run; confirm CI e2e job)
+  → npm run test:e2e:cross     (pre-PR when clicks, keyboard nav, CSS, or e2e touched)
+  → PR → CI runs quality + e2e + e2e-cross
 ```
 
-For production build behavior: `npm run build && npm run preview` (base path `/gigazonk/`).
+| Stage | Command | Purpose |
+|-------|---------|---------|
+| 1 — Fast | `npm run check` | Logic, types, build; blocks bad merges early |
+| 2 — Show | `test:e2e:headed` or `:ui` | User + agent watch title → arena; catch flow breaks |
+| 3 — CI smoke | `test:e2e` | Headless Chromium; same as CI `e2e` job |
+| 4 — CI cross | `test:e2e:cross` | Firefox + WebKit; same as CI `e2e-cross` job |
+| Gap fill | `npm run dev` + browser MCP | Flows not in `e2e/` yet (village, shop, level-up) |
+
+**Docs-only** — skip tests. **Pure logic** — stage 1 is enough; add `tests/*.test.js` when touching algorithms.
+
+Playwright starts its own Vite `webServer` — no `npm run dev` needed for e2e.
+
+## Agent obligation
+
+After substantive changes, **run the matching stage(s) in the terminal** and fix failures before reporting done. Do not end with “you should run tests” unless blocked.
+
+- UI / navigation / HUD → run **stage 2** (`:headed` or `:ui`) so Playwright is visible.
+- Before suggesting merge or opening a PR → run **stages 1 + 3**; add **stage 4** for UI/e2e work.
+- Report what ran and pass/fail counts in the task summary.
+
+## What smoke e2e proves (and does not)
+
+**Covers today:** title boot, canvas, play → character select → arena HUD, dev panel, seeded URL without page errors, cross-browser error sweep.
+
+**Does not cover:** village, shop, skill tree, level-up picks, combat balance, horde perf, save/resume mid-run. Green e2e = **core path intact**, not full game QA.
+
+## E2e conventions (from this repo)
+
+- **Helpers first** — reuse `e2e/helpers/navigation.ts` (`gotoClean`) and `gameFlow.ts` (`startQuickArena`); extend helpers before duplicating steps in specs.
+- **Stable selectors** — `#btn-play`, `#btn-confirm`, `#hp-bar`, HUD ids; `getByRole` for headings.
+- **Visibility over timing** — `toBeVisible()` / `waitForSelector`; avoid bare `waitForTimeout`.
+- **Keyboard-nav / WebKit clicks** — if Playwright click is blocked, use DOM click in helper (see `startQuickArena` `evaluate` pattern); document in helper comment.
+- **Fresh save** — `gotoClean` clears `localStorage` before each test.
+- **New regression** — player-visible bug fix or new menu flow → add/extend spec + run stage 2.
+
+Specs: `e2e/smoke.spec.ts`, `e2e/cross-browser.spec.ts`. Config: `playwright.config.ts` (`workers: 1` when `CROSS_BROWSER=1`).
+
+## Flake triage
+
+1. Re-run failing spec headless: `npm run test:e2e -- e2e/smoke.spec.ts`
+2. Cross-browser timeout → run `test:e2e:cross` alone (sequential workers)
+3. WebKit click failures → check keyboard-nav guard; prefer helper DOM click
+4. Still flaky → `:ui` trace on failing step; tighten selector or visibility wait
+
+Cross-browser failures write `test-results/browser-errors/{browser}.json` — read before guessing.
 
 ## Playwright commands
 
 ```bash
-npm run test:e2e           # headless CI-style
-npm run test:e2e:ui        # Playwright UI in IDE-friendly mode
-npm run test:e2e:headed    # visible browser window
+npm run test:e2e           # headless — CI parity (stage 3)
+npm run test:e2e:headed      # visible browser (stage 2)
+npm run test:e2e:ui          # step-through inspector (stage 2)
+npm run test:e2e:cross       # all browsers (stage 4)
 ```
-
-- Config: `playwright.config.ts` (starts Vite via `webServer`)
-- Tests: `e2e/*.spec.ts`
-- Add a new spec when fixing UI bugs or new player flows (title → arena → village, shop, level-up).
 
 ## When to use each tool
 
 | Need | Tool |
 |------|------|
-| Smoke / regression / CI | Playwright `npm run test:e2e` (Chromium) |
-| Firefox + Safari sweep | `npm run test:e2e:cross` or `npm run verify-browser-debug` |
-| Click-through while developing | Playwright `--ui` or `--headed` |
-| Agent explores live page in Cursor | `cursor-ide-browser` MCP (snapshot, click, `browser_cdp`) |
-| Chrome console + network + perf traces | `chrome-devtools-mcp` — run `npm run setup:mcp` first (Windows) |
-| Quick visual check in editor | Simple Browser at localhost URL |
-| Dev console / localStorage | vite-mcp at `http://localhost:5173/__mcp` |
-| In-game structured errors | `window.__gigazonkErrors.exportJson()` in dev |
+| Regression / CI | Playwright headless (stage 3) |
+| Agent session — show browser | Playwright `--headed` or `--ui` (stage 2) |
+| Firefox + Safari | `test:e2e:cross` (stage 4) |
+| Flow not in e2e yet | `npm run dev` + cursor-ide-browser MCP |
+| Console / localStorage (dev running) | vite-mcp `http://localhost:5173/__mcp` |
+| Chrome traces / Lighthouse | chrome-devtools-mcp |
+| Quick peek in editor | Simple Browser → `http://localhost:5173` |
+| Structured in-game errors | `window.__gigazonkErrors.exportJson()` in dev |
 
 ### chrome-devtools-mcp vs cursor-ide-browser
 
-- **cursor-ide-browser** — Cursor-owned tab; best for agent click-through and quick CDP (`browser_cdp`).
-- **chrome-devtools-mcp** — Dedicated Chrome via Puppeteer; source-mapped console stacks, network list, Lighthouse, performance traces.
-- **vite-mcp** — Only when `npm run dev` is running; reads console + `localStorage` without launching another browser.
-- **Playwright** — Only tool that runs **Firefox and WebKit**; use for cross-browser regression.
+- **Playwright** — repeatable regression; only tool that runs Firefox + WebKit in CI.
+- **cursor-ide-browser** — exploratory click-through when no spec exists yet.
+- **vite-mcp** — dev server console + `localStorage` without extra browser.
+- **chrome-devtools-mcp** — network, perf traces, source-mapped stacks.
 
-Optional: connect chrome-devtools-mcp to your own Chrome (remote debugging on `chrome://inspect`):
+## Manual / MCP checklist (gaps only)
 
-```json
-"args": ["-y", "chrome-devtools-mcp@latest", "--auto-connect", "--no-usage-statistics"]
+1. `npm run dev` → `http://localhost:5173`
+2. `browser_navigate` → snapshot before clicks → screenshot after state change
+3. URL flags: `?dev=1`, `?seed=42`, `?biome=frost`, `?coins=500` (see `DEV.md`)
+
+Production build smoke: `npm run build && npm run preview` (base `/gigazonk/`).
+
+## CI parity
+
+`.github/workflows/ci.yml`: `quality` → `e2e` + `e2e-cross` in parallel. Local pre-push gate:
+
+```bash
+npm run check && npm run test:e2e && npm run test:e2e:cross
 ```
-
-## Browser MCP checklist
-
-1. `browser_navigate` to `http://localhost:5173` (dev server must be running)
-2. `browser_snapshot` before clicks
-3. `browser_take_screenshot` after state changes
-4. `browser_lock` / `browser_unlock` for multi-step flows
-
-Use for: GitHub device-login pages, game menus, deploy smoke on Pages URL.
-
-## Test data
-
-- Clear `localStorage` in Playwright before tests (`gigazonk_save`).
-- URL flags: `?dev=1`, `?seed=42`, `?biome=frost`, `?coins=500` (see `DEV.md`).
-
-## Quality gate
-
-- Unit/logic: `npm run test` (Vitest)
-- Browser smoke: `npm run test:e2e`
-- Full gate before ship: `npm run check && npm run test:e2e`
-
-## New e2e tests
-
-Cover player-visible flows from `DEV.md` manual scripts. Use stable selectors (`#btn-play`, `#hp-bar`, HUD ids). Avoid timing-only assertions without visibility checks.

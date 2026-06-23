@@ -40,6 +40,7 @@ export class EnemyManager {
 
     this.meshes = {};
     this.freeSlots = {};
+    this._dirtyMeshes = new Set();
 
     for (const type of Object.keys(ENEMY_TYPES)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
@@ -66,6 +67,7 @@ export class EnemyManager {
     this._deadSinceCompact = 0;
     this._threatDmg = 10;
     this.lastGroupAnchor = null;
+    this._dirtyMeshes.clear();
     for (const type of Object.keys(this.meshes)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
       this.freeSlots[type] = [];
@@ -76,6 +78,18 @@ export class EnemyManager {
 
   _meshFor(enemy) {
     return this.meshes[enemy.type] || this.meshes.grunt;
+  }
+
+  _markDirty(mesh) {
+    this._dirtyMeshes.add(mesh);
+  }
+
+  _flushInstances() {
+    for (const mesh of this._dirtyMeshes) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+    this._dirtyMeshes.clear();
   }
 
   setThreatDamage(dmg) {
@@ -144,8 +158,7 @@ export class EnemyManager {
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
     mesh.setColorAt(enemy.slot, _color.setHex(enemy.color));
     mesh.count = Math.max(mesh.count, enemy.slot + 1);
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    this._markDirty(mesh);
   }
 
   rebuildGrid() {
@@ -153,12 +166,20 @@ export class EnemyManager {
       this.enemies = this.enemies.filter(e => e.alive);
       this._deadSinceCompact = 0;
     }
-    this.grid.clear();
+    for (const arr of this.grid.values()) {
+      arr.length = 0;
+    }
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      const key = `${Math.floor(e.x / this.spatialCell)},${Math.floor(e.z / this.spatialCell)}`;
-      if (!this.grid.has(key)) this.grid.set(key, []);
-      this.grid.get(key).push(e);
+      const cx = Math.floor(e.x / this.spatialCell);
+      const cz = Math.floor(e.z / this.spatialCell);
+      const key = cx * 10000 + cz;
+      let cell = this.grid.get(key);
+      if (!cell) {
+        cell = [];
+        this.grid.set(key, cell);
+      }
+      cell.push(e);
     }
   }
 
@@ -169,7 +190,7 @@ export class EnemyManager {
     const cz = Math.floor(z / this.spatialCell);
     for (let dx = -r; dx <= r; dx++) {
       for (let dz = -r; dz <= r; dz++) {
-        const cell = this.grid.get(`${cx + dx},${cz + dz}`);
+        const cell = this.grid.get((cx + dx) * 10000 + (cz + dz));
         if (!cell) continue;
         for (const e of cell) {
           const dist = Math.hypot(e.x - x, e.z - z);
@@ -268,7 +289,7 @@ export class EnemyManager {
     dummy.scale.set(0, 0, 0);
     dummy.updateMatrix();
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
-    mesh.instanceMatrix.needsUpdate = true;
+    this._markDirty(mesh);
     this.freeSlots[enemy.type].push(enemy.slot);
   }
 
@@ -359,6 +380,7 @@ export class EnemyManager {
 
       this.updateInstance(e);
     }
+    this._flushInstances();
   }
 
   killEnemy(enemy) {
@@ -374,8 +396,9 @@ export class EnemyManager {
     dummy.scale.set(0, 0, 0);
     dummy.updateMatrix();
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
-    mesh.instanceMatrix.needsUpdate = true;
+    this._markDirty(mesh);
     this.freeSlots[enemy.type].push(enemy.slot);
+    this._flushInstances();
     return { xp, pos, isBoss: enemy.isBoss };
   }
 

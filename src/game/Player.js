@@ -580,4 +580,78 @@ export class Player {
   getEffectiveDamage() {
     return this.computeDamageForEnemy(null);
   }
+
+  /** Serializable run state for mid-arena resume (see RunSnapshot.js). */
+  serialize() {
+    return {
+      hp: this.hp,
+      maxHp: this.maxHp,
+      level: this.level,
+      xp: this.xp,
+      xpToNext: this.xpToNext,
+      kills: this.kills,
+      damage: this.damage,
+      speed: this.speed,
+      attackRate: this.attackRate,
+      projectileCount: this.projectileCount,
+      projectilePierce: this.projectilePierce,
+      projectileSpeed: this.projectileSpeed,
+      projectileSpeedMult: this.projectileSpeedMult,
+      area: this.area,
+      critChance: this.critChance,
+      critDamageMult: this.critDamageMult,
+      lifesteal: this.lifesteal,
+      thorns: this.thorns,
+      familiars: this.familiars,
+      pickupRadius: this.pickupRadius,
+      magnetRadius: this.magnetRadius,
+      maxAirJumps: this.maxAirJumps,
+      hpRegen: this.hpRegen,
+      coinMult: this.coinMult,
+      armor: this.armor,
+      evasion: this.evasion,
+      fireTrailLevel: this.fireTrailLevel,
+      elements: [...this.elements],
+      lightningChains: this.lightningChains ?? 3,
+      x: this.position.x,
+      z: this.position.z,
+    };
+  }
+
+  /** Restore run stats from snapshot after reset(). */
+  applySnapshot(data, characterId) {
+    if (characterId != null) this.characterId = characterId;
+    this.reset();
+    this.hp = data.hp;
+    this.maxHp = data.maxHp;
+    this.level = data.level;
+    this.xp = data.xp;
+    this.xpToNext = data.xpToNext;
+    this.kills = data.kills;
+    this.damage = data.damage;
+    this.speed = data.speed;
+    this.attackRate = data.attackRate;
+    this.projectileCount = data.projectileCount;
+    this.projectilePierce = data.projectilePierce ?? 0;
+    this.projectileSpeed = data.projectileSpeed;
+    this.projectileSpeedMult = data.projectileSpeedMult ?? 0;
+    this.area = data.area;
+    this.critChance = data.critChance;
+    this.critDamageMult = data.critDamageMult ?? PLAYER_BASE.critDamageMult;
+    this.lifesteal = data.lifesteal;
+    this.thorns = data.thorns;
+    this.familiars = data.familiars;
+    this.pickupRadius = data.pickupRadius;
+    this.magnetRadius = data.magnetRadius ?? PLAYER_BASE.magnetRadius;
+    this.maxAirJumps = data.maxAirJumps ?? 0;
+    this.hpRegen = data.hpRegen ?? 0;
+    this.coinMult = data.coinMult ?? 0;
+    this.armor = data.armor ?? 0;
+    this.evasion = data.evasion ?? 0;
+    this.fireTrailLevel = data.fireTrailLevel ?? 0;
+    this.airJumpsUsed = 0;
+    this.elements = new Set(data.elements);
+    this.lightningChains = data.lightningChains ?? 3;
+    this.position.set(data.x, 0, data.z);
+  }
 }

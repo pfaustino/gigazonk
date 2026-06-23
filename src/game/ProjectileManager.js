@@ -55,8 +55,6 @@ export class ProjectileManager {
     this.projectiles.push(p);
     this.mesh.count = Math.max(this.mesh.count, slot + 1);
     this.updateInstance(p);
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
   fireVolley(px, py, pz, targetEnemies, speed, damage, area, element, pierce = 0, isCrit = false, lightningChains = 3) {
@@ -165,8 +163,20 @@ export class ProjectileManager {
       }
       this.updateInstance(p);
     }
+    this._compactDead();
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+
+  _compactDead() {
+    let w = 0;
+    for (let r = 0; r < this.projectiles.length; r++) {
+      if (this.projectiles[r].alive) {
+        if (w !== r) this.projectiles[w] = this.projectiles[r];
+        w++;
+      }
+    }
+    this.projectiles.length = w;
   }
 
   chainLightning(fromX, fromZ, damage, enemyManager, onHit, chainsLeft, hitSet) {
@@ -186,10 +196,19 @@ export class ProjectileManager {
   }
 
   remove(p) {
+    if (!p.alive) return;
     p.alive = false;
     dummy.scale.set(0, 0, 0);
     dummy.updateMatrix();
     this.mesh.setMatrixAt(p.slot, dummy.matrix);
     this.freeSlots.push(p.slot);
+  }
+
+  get aliveCount() {
+    let n = 0;
+    for (const p of this.projectiles) {
+      if (p.alive) n++;
+    }
+    return n;
   }
 }

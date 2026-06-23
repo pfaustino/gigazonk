@@ -54,6 +54,23 @@ description: >-
 4. Update README differentiators table if player-visible
 5. Save migration if meta progression changes
 
+## Verification (layered gates)
+
+Same order as CI; use **headed/ui** while iterating on UI:
+
+| Stage | Command | When |
+|-------|---------|------|
+| 1 | `npm run check` | Any non-docs code change |
+| 2 | `npm run test:e2e:headed` or `:ui` | UI, menus, HUD, navigation |
+| 3 | `npm run test:e2e` | Pre-PR; headless CI parity |
+| 4 | `npm run test:e2e:cross` | Clicks, keyboard nav, CSS; before PR on UI/e2e |
+| — | `npm run test` | Fast loop on `tests/` only |
+
+- Helpers: `e2e/helpers/gameFlow.ts`, `navigation.ts` — extend before new duplicated steps.
+- Player-visible bug or new flow → add spec + run stage 2.
+- Green smoke ≠ full game QA (village, shop, level-up not in e2e yet).
+- Details: `.cursor/rules/browser-game-testing.mdc`.
+
 ## Dev tooling (target)
 
 `DEV.md` cheat keys; `?dev=1` panel — not yet fully implemented; add via `src/dev/` when building test tools.

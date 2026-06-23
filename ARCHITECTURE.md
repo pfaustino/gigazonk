@@ -38,7 +38,10 @@ index.html → main.js
                        ├── QuestSystem.js
                        ├── Effects.js (familiars, rifts, nova, fire trail, domes)
                        ├── ParticleSystem.js
-                       ├── DevPanel.js (?dev=1)
+                       ├── CombatController.js
+                       ├── RunSnapshot.js
+                       ├── UpgradeText.js
+                       ├── ui/MenuNavigation.js, TitleScreens.js, HudScreens.js, LevelUpScreen.js
                        └── lib/ RunRng, assert, ErrorReporter, parseDevFlags
 ```
 
@@ -67,7 +70,10 @@ Arena combat uses seeded `runRandom()` for loot, spawns, upgrades; static visual
 
 | Module | Responsibility |
 |--------|----------------|
-| `Game.js` | State machine, loop, snapshots, dev commands, combat orchestration |
+| `Game.js` | State machine, loop, snapshots, dev commands; delegates combat to `CombatController` |
+| `CombatController.js` | Hit resolution, procs, player auto-fire |
+| `RunSnapshot.js` | Mid-arena save capture/restore (player + timers, not battlefield) |
+| `UpgradeText.js` | Shared upgrade effect descriptions and format helpers |
 | `Player.js` | Movement, stats, dodge, magnet, damage, leveling |
 | `EnemyManager.js` | InstancedMesh pool, spawn waves, spatial hash, despawn |
 | `ProjectileManager.js` | Auto-fire, pierce, elements, object pool |
@@ -94,9 +100,9 @@ Arena combat uses seeded `runRandom()` for loot, spawns, upgrades; static visual
 ## Data flow
 
 ```
-data/enemies.json, data/upgrades.json
+data/enemies.json, data/upgrades.json, data/quests.json, data/skills.json
         ↓
-gameData.ts → constants.js / Awards.js
+gameData.ts → constants.js / Awards.js / SkillTree.js
         ↓
 EnemyManager, UpgradeSystem, Interactables
 
@@ -111,8 +117,21 @@ URL flags (?seed, ?dev, ?biome) → parseDevFlags.ts → Game init
 
 - `MAX_ENEMIES` / `InstancedMesh` — no per-enemy `Mesh` in hot path  
 - `ENEMY_SOFT_CAP`, batch despawn, `ENEMY_NEAR_RADIUS`  
-- Pooled projectiles and gems  
+- Pooled projectiles and gems — **swap-remove** on death keeps update loops O(active)  
+- `ObstacleGrid` broadphase for arena collision / projectile blocking (~700 obstacles)  
+- Enemy spatial hash uses numeric cell keys and reused cell arrays (no per-frame string keys)  
 - Shadow map tuned for horde scale  
+
+### Phase B (performance) — implemented
+
+| Optimization | Module |
+|--------------|--------|
+| Compact projectile/gem arrays | `ProjectileManager`, `GemManager` |
+| Obstacle spatial index | `ObstacleGrid.js`, `Arena.js` |
+| Enemy grid numeric keys + buffer reuse | `EnemyManager.js` |
+| Mesa height spatial index | `MesaHeightIndex.js`, `Arena.js`, `TerrainFeatures.js` |
+| Particle burst pooling + HP bar throttling | `Particles.js` |
+| Instanced mesh dirty batching | `EnemyManager.js`, `ProjectileManager.js` |
 
 ## Build & deploy
 
@@ -124,7 +143,7 @@ URL flags (?seed, ?dev, ?biome) → parseDevFlags.ts → Game init
 | `npm run check` | lint + tsc + vitest + build |
 | `npm run test:e2e` | Playwright smoke |
 
-CI: `.github/workflows/ci.yml`, `codeql.yml`, `deploy-pages.yml`.
+CI: `.github/workflows/ci.yml` — `quality` (lint/tsc/vitest/build), `e2e` (Chromium smoke), `e2e-cross` (Chromium + Firefox + WebKit).
 
 ## Documentation map
 

@@ -1,4 +1,5 @@
 import { SYNERGY_ELEMENTS, SYNERGY_NAME, CRIT_CHANCE_CAP } from './constants.js';
+import { fmtNum, fmtPct } from './UpgradeText.js';
 import {
   RARITIES,
   UPGRADE_TEMPLATES,
@@ -7,15 +8,6 @@ import {
 } from './Awards.js';
 import { runRandom } from '../lib/runRandom.js';
 import { assert } from '../lib/assert.js';
-
-function fmtNum(v, decimals = 0) {
-  if (decimals > 0) return Number(v).toFixed(decimals);
-  return String(Math.round(v));
-}
-
-function fmtPct(v) {
-  return `${Math.round(v * 100)}%`;
-}
 
 /** Run bonus vs baseline — matches buff bar chips (e.g. +32%). */
 function fmtRunMultBonus(value, baselineValue) {

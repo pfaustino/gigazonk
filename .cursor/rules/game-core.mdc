@@ -19,14 +19,15 @@ alwaysApply: true
 
 ## Quality
 
-- Run `npm run build` after substantive changes.
+- **Layered gates:** `npm run check` → `test:e2e:headed` (UI work) → `test:e2e` → `test:e2e:cross` before PR — see `browser-game-testing.mdc`.
 - Save changes require migration in `SaveData.js` and `GAME_VERSION` bump.
 - Sync documented constant pairs (e.g. `ENEMY_MESH_LIFT` + hp bar helpers).
 
 ## Testing without grinding
 
 - Prefer dev URL flags (`?dev=1`) or `import.meta.env.DEV` cheats for arena/village tests.
-- Use browser MCP to screenshot and verify UI after visual changes.
+- Vitest for logic; Playwright helpers (`gameFlow`, `navigation`) for repeatable flows.
+- Browser MCP only for flows not yet in `e2e/`.
 
 ## Assets
 

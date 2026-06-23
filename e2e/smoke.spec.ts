@@ -1,12 +1,6 @@
 import { test, expect } from '@playwright/test';
-
-/** Fresh save before each test. */
-async function gotoClean(page: import('@playwright/test').Page, path = '/') {
-  await page.goto(path);
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.waitForSelector('#game-canvas');
-}
+import { gotoClean } from './helpers/navigation.js';
+import { startQuickArena } from './helpers/gameFlow.js';
 
 test.describe('GigaZonk smoke', () => {
   test('title screen loads', async ({ page }) => {
@@ -18,9 +12,7 @@ test.describe('GigaZonk smoke', () => {
 
   test('play flow reaches arena HUD', async ({ page }) => {
     await gotoClean(page);
-    await page.locator('#btn-play').click();
-    await page.locator('#btn-confirm').click();
-    await expect(page.locator('#hp-bar')).toBeVisible({ timeout: 20_000 });
+    await startQuickArena(page);
     await expect(page.locator('#time-stat')).toBeVisible();
     await expect(page.locator('#enemy-stat')).toContainText('Enemies');
   });

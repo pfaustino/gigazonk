@@ -66,7 +66,9 @@ Same order as CI; use **headed/ui** while iterating on UI:
 | 4 | `npm run test:e2e:cross` | Clicks, keyboard nav, CSS; before PR on UI/e2e |
 | — | `npm run test` | Fast loop on `tests/` only |
 
-- Helpers: `e2e/helpers/gameFlow.ts`, `navigation.ts` — extend before new duplicated steps.
+- Helpers: `e2e/helpers/gameFlow.ts`, `navigation.ts`, `gameReady.ts` — extend before new duplicated steps; wait on `data-game-ready`.
+- Boot readiness: `src/lib/gameReady.js` (`title`, `arena-hud`, `village`); lazy `_ensureVillage()` / `_ensureArena()` in `Game.js`.
+- CI cross-browser: Xvfb + headed Firefox/WebKit (WebGL on Linux). See `.cursor/rules/browser-game-testing.mdc`.
 - Player-visible bug or new flow → add spec + run stage 2.
 - Green smoke ≠ full game QA (village, shop, level-up not in e2e yet).
 - Details: `.cursor/rules/browser-game-testing.mdc`.

@@ -48,13 +48,15 @@ Reload MCP in Cursor Settings. In dev container, port 5173 is forwarded to the h
 npm run gsync
 ```
 
-**Cross-browser errors:** CI runs Chromium only. Before a release run:
+**Cross-browser (Firefox + WebKit):** CI `e2e-cross` runs under **Xvfb + headed** browsers so WebGL works on Linux ([Mozilla #1375585](https://bugzilla.mozilla.org/show_bug.cgi?id=1375585)). Locally:
 
 ```bash
-npm run test:e2e:cross          # all e2e specs on chromium + firefox + webkit
+npm run test:e2e:cross          # Firefox + WebKit cross-browser spec
 npm run collect-browser-errors  # cross-browser sweep + JSON summary in test-results/
 npm run verify-browser-debug    # sweep + pass/fail gate (pre-ship)
 ```
+
+**E2e readiness:** boot sets `<html data-game-ready="title|arena-hud|village">` (`src/lib/gameReady.js`). Helpers in `e2e/helpers/gameReady.ts` wait on that attribute — prefer over long blind timeouts.
 
 Agents can read `window.__gigazonkErrors.exportJson()` in dev, or JSON files under `test-results/browser-errors/`.
 

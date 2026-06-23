@@ -133,6 +133,19 @@ URL flags (?seed, ?dev, ?biome) → parseDevFlags.ts → Game init
 | Particle burst pooling + HP bar throttling | `Particles.js` |
 | Instanced mesh dirty batching | `EnemyManager.js`, `ProjectileManager.js` |
 
+### Boot & e2e readiness
+
+Progressive init keeps the title DOM responsive on slow browsers (CI Firefox):
+
+| Mechanism | Module |
+|-----------|--------|
+| Title before WebGL + managers | `Game.js` constructor |
+| Lazy `_ensureVillage()` / `_ensureArena()` | `Game.js` |
+| Arena field scatter deferred after HUD | `Game.js` `_deferArenaFieldSetup()` |
+| `<html data-game-ready>` phases | `src/lib/gameReady.js`, title/HUD/village UI |
+
+E2e helpers wait on `data-game-ready` (`e2e/helpers/gameReady.ts`). CI cross-browser uses **Xvfb + headed Firefox/WebKit** (`.github/workflows/ci.yml`).
+
 ## Build & deploy
 
 | Command | Output |

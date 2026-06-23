@@ -3,10 +3,31 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 5173;
 const baseURL = `http://localhost:${PORT}`;
 
-const allBrowsers = [
-  { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-  { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+/** Firefox/WebKit need a display + headed mode for WebGL on Linux CI (Mozilla #1375585). */
+const crossHeaded = Boolean(process.env.CROSS_BROWSER && process.env.CI);
+
+const crossBrowsers = [
+  {
+    name: 'firefox',
+    use: {
+      ...devices['Desktop Firefox'],
+      headless: crossHeaded ? false : undefined,
+      launchOptions: {
+        firefoxUserPrefs: {
+          'webgl.force-enabled': true,
+          'webgl.disabled': false,
+          'webgl.forbid-software': false,
+        },
+      },
+    },
+  },
+  {
+    name: 'webkit',
+    use: {
+      ...devices['Desktop Safari'],
+      headless: crossHeaded ? false : undefined,
+    },
+  },
 ];
 
 export default defineConfig({
@@ -17,14 +38,28 @@ export default defineConfig({
   workers: process.env.CROSS_BROWSER ? 1 : process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'github' : 'list',
   timeout: 60_000,
+  expect: {
+    timeout: process.env.CROSS_BROWSER ? 20_000 : 5_000,
+  },
   use: {
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  // CROSS_BROWSER=1 runs chromium + firefox + webkit (pre-release / npm run test:e2e:cross).
-  projects: process.env.CROSS_BROWSER ? allBrowsers : [allBrowsers[0]],
+  // Smoke: Chromium only. Cross-browser: Firefox + WebKit (Chromium covered by smoke job).
+  projects: process.env.CROSS_BROWSER
+    ? crossBrowsers.map((browser) => ({
+        ...browser,
+        testMatch: 'cross-browser.spec.ts',
+      }))
+    : [
+        {
+          name: 'chromium',
+          use: { ...devices['Desktop Chrome'] },
+          testMatch: 'smoke.spec.ts',
+        },
+      ],
   webServer: {
     command: 'npm run dev',
     url: baseURL,

@@ -6,6 +6,7 @@ import {
   bindMenuList,
   createScreen,
 } from './MenuNavigation.js';
+import { setGameReady, GAME_READY } from '../../lib/gameReady.js';
 
 function navCtx(ui) {
   return { layer: ui.layer, audio: ui._audio };
@@ -37,6 +38,7 @@ export function showTitle(ui, onAction) {
   const play = screen.querySelector('#btn-play');
   play.onclick = () => { ui._audio?.ui(); onAction('arena'); };
   ui._navCleanup = bindMenuList(navCtx(ui), [play]);
+  setGameReady(GAME_READY.TITLE);
 }
 
 export function showCharacterSelect(ui, onSelect, onBack) {

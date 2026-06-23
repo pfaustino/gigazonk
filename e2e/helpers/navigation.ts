@@ -1,9 +1,13 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+import { waitForGameReady } from './gameReady.js';
+import { GAME_READY } from '../../src/lib/gameReady.js';
 
-/** Fresh save before each test. */
+/** Fresh save before each test; waits until title screen is interactive. */
 export async function gotoClean(page: Page, path = '/') {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#game-canvas', { state: 'visible', timeout: 30_000 });
+  await page.addInitScript(() => {
+    localStorage.clear();
+  });
+  await page.goto(path, { waitUntil: 'commit' });
+  await waitForGameReady(page, GAME_READY.TITLE);
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
 }

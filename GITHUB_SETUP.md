@@ -102,7 +102,7 @@ Manifest: `.github/deploy-environments.json`
 | Environment | Workflow | Secret name | Status |
 |-------------|----------|-------------|--------|
 | `github-pages` | `deploy-pages.yml` | *(none — OIDC)* | Active |
-| `itch` | `deploy-itch.io` | **`BUTLER_API_KEY`** | **Set this** |
+| `itch` | `deploy-itch.yml` | **`BUTLER_API_KEY`** | **Set this** |
 
 **One-time itch setup:**
 

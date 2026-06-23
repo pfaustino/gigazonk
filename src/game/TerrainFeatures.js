@@ -240,8 +240,6 @@ function addMesaWallObstacles(mesa, obstacles) {
 
   const zMin = rampSide === 'south' ? cz - hd - rampLen : cz - hd;
   const zMax = rampSide === 'north' ? cz + hd + rampLen : cz + hd;
-  const xMin = rampSide === 'west' ? cx - hw - rampLen : cx - hw;
-  const xMax = rampSide === 'east' ? cx + hw + rampLen : cx + hw;
 
   if (rampSide !== 'west') {
     obstacles.push({
@@ -563,7 +561,7 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
       group.add(mesh);
       meshes.push(mesh);
     } else if (f.kind === 'mesa') {
-      const { cx, cz, w, d, topY, rampSide, rampLen } = f;
+      const { cx, cz, w, d, topY } = f;
       const platGeo = new THREE.BoxGeometry(w, topY, d);
       const plat = new THREE.Mesh(platGeo, mesaMat.clone());
       plat.position.set(cx, topY / 2, cz);

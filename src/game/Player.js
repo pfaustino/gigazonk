@@ -328,7 +328,7 @@ export class Player {
     return (this.jumping || this.airborne || this.dodging) ? 0 : Math.sin(Date.now() * 0.008) * 0.05;
   }
 
-  _updateVertical(dt, terrain) {
+  _updateVertical(dt, _terrain) {
     if (this.jumping) {
       if (this.jumpTimer <= 0) {
         this.jumping = false;

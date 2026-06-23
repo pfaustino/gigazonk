@@ -1,0 +1,24 @@
+---
+description: Pre-push lint gate and architecture/wiki sync for GigaZonk
+alwaysApply: true
+---
+
+# Ship quality (GigaZonk)
+
+## Before push
+
+```powershell
+npm run check
+```
+
+Lint uses `--max-warnings 0`. Zero ESLint errors and zero warnings before push.
+
+## Architecture + wiki
+
+After structural or feature changes:
+
+1. Update `ARCHITECTURE.md` and `docs/adr/` as needed.
+2. Run `& "$env:GITHUB_PROJECTS\_devkit\sync-wiki-folder.ps1" -RepoPath (Get-Location)`
+3. Commit `wiki/**` with the code change.
+
+Wiki publishes via `.github/workflows/sync-wiki.yml` on push to `main`.

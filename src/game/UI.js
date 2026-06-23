@@ -290,7 +290,7 @@ export class UI {
     `;
   }
 
-  showHUD(player, quests, elapsed, enemyCount, inRift) {
+  showHUD(_player, _quests, _elapsed, _enemyCount, _inRift) {
   }
 
   buildHUD() {

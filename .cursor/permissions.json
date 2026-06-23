@@ -1,0 +1,29 @@
+{
+  "terminalAllowlist": [
+    "npm:run*",
+    "npm:test*",
+    "npx playwright*",
+    "gh pr*",
+    "gh run*",
+    "git"
+  ],
+  "mcpAllowlist": [
+    "cursor-ide-browser:*",
+    "user-playwright:*",
+    "vite-mcp:*",
+    "chrome-devtools:*",
+    "context7:*",
+    "user-pixellab:*"
+  ],
+  "autoRun": {
+    "allow_instructions": [
+      "GigaZonk game repo: allow npm run check, test, test:e2e, build, dev, and gh without prompting.",
+      "Allow Playwright and browser MCP for smoke tests and UI verification on localhost:5173.",
+      "Allow wiki sync via _devkit Sync-WikiFolder script on this repo."
+    ],
+    "block_instructions": [
+      "Do not commit BUTLER_API_KEY or production secrets.",
+      "Do not force-push main."
+    ]
+  }
+}

@@ -11,6 +11,7 @@ alwaysApply: false
 - Enemy types: single `ENEMY_TYPES` map — hp, speed, damage, xp, scale together.
 - Upgrades: templates in `data/upgrades.json`; offer rolls in `UpgradeOffers.js`; caps in `upgradeStatSchema.js`; application in `UpgradeSystem.js` / `Player.js`.
 - Skills: `SkillTree.js` defines tree; costs via `getSkillUpgradeCost`.
+- Achievements: `data/achievements.json`; unlock via `AchievementSystem.js`; persist in `SaveData.unlockedAchievements`.
 
 ## Tuning rules
 

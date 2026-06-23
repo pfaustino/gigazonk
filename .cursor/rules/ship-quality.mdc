@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Ship quality (GigaZonk)
 
+Follow `.cursor/rules/agent-workflow.mdc` for VERIFY before EMIT (commit/PR).
+
 ## Before push
 
 Run the **layered gates** (see `browser-game-testing.mdc`):

@@ -1,6 +1,6 @@
 ---
 description: UI and DOM overlay patterns for game screens
-globs: src/game/UI.js,src/game/GameMenu.js,src/style.css
+globs: src/game/UI.js,src/game/GameMenu.js,src/game/ui/**,src/style.css
 alwaysApply: false
 ---
 
@@ -9,7 +9,7 @@ alwaysApply: false
 ## DOM overlays on canvas
 
 - UI is HTML/CSS over the canvas — keep game logic out of UI event handlers; call game callbacks.
-- New screens: prefer a dedicated section or small module, not 200 more lines in `UI.js`.
+- New screens: add `src/game/ui/*.js` module; keep `UI.js` as thin facade (see `RunSummaryScreen.js`, `TutorialOverlay.js`).
 
 ## Accessibility & input
 
@@ -19,7 +19,7 @@ alwaysApply: false
 ## Styling
 
 - Use existing CSS variables and panel patterns in `style.css`.
-- Mobile: test touch targets if adding interactive HUD elements.
+- Mobile: touch overlay in `TouchControls.js`; test targets in `style.css` (`.touch-*`, `.tutorial-overlay`).
 
 ## Feedback
 

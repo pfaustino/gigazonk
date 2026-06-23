@@ -14,6 +14,7 @@ alwaysApply: true
 ## Architecture
 
 - `Game.js` orchestrates only — no new 100-line features inline; add a manager/module.
+- Combat systems lazy-init via `_ensureCombatManagers()` (arena/village enter).
 - Balance numbers in `constants.js` or `data/` — not buried in update loops.
 - Files over ~500 lines: split by game mode or UI panel before adding more.
 

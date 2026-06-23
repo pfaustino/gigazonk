@@ -29,7 +29,7 @@ Install extensions once: `npm run setup:extensions` (see `DEV.md`). Vitest + Pla
 | 2 — Show | `test:e2e:headed` or `:ui` | User + agent watch title → arena; catch flow breaks |
 | 3 — CI smoke | `test:e2e` | Headless Chromium; same as CI `e2e` job |
 | 4 — CI cross | `test:e2e:cross` | Firefox + WebKit; same as CI `e2e-cross` job |
-| Gap fill | `npm run dev` + browser MCP | Flows not in `e2e/` yet (village, shop, level-up) |
+| Gap fill | `npm run dev` + browser MCP | Flows not yet in `e2e/` (e.g. full combat loop) |
 
 **Docs-only** — skip tests. **Pure logic** — stage 1 is enough; add `tests/*.test.js` when touching algorithms.
 
@@ -45,14 +45,14 @@ After substantive changes, **run the matching stage(s) in the terminal** and fix
 
 ## What smoke e2e proves (and does not)
 
-**Covers today:** title boot, canvas, play → arena HUD, village hub, dev level-up pick, dev panel, seeded URL without page errors, cross-browser error sweep.
+**Covers today:** title boot, canvas, play → arena HUD, village hub, dev level-up, dev panel, daily challenge label, skill tree, quest board, arena pause/resume, seeded URL without page errors.
 
-**Does not cover:** shop, skill tree, combat balance, horde perf, save/resume mid-run. Green e2e = **core path intact**, not full game QA.
+**Does not cover:** full combat balance QA, horde perf at max cap, mobile layout on real devices, itch/Pages deploy smoke. Green e2e = **core path intact**, not full game QA.
 
 ## E2e conventions (from this repo)
 
 - **Readiness first** — app sets `<html data-game-ready="title|arena-hud|village">` (`src/lib/gameReady.js`); use `e2e/helpers/gameReady.ts` (`waitForGameReady`) instead of long blind timeouts.
-- **Helpers first** — reuse `e2e/helpers/navigation.ts` (`gotoClean`) and `gameFlow.ts` (`startQuickArena`); extend helpers before duplicating steps in specs.
+- **Helpers first** — reuse `navigation.ts` (`gotoClean`), `gameFlow.ts` (`startQuickArena`, `openSkillTreeViaDev`, `pauseArenaAndResume`); extend helpers before duplicating steps.
 - **Stable selectors** — `#btn-play`, `#btn-confirm`, `#hp-bar`, HUD ids; `getByRole` for headings.
 - **Navigation** — `goto(..., { waitUntil: 'commit' })` then readiness/visibility asserts; avoid waiting for all assets on WebGL SPAs.
 - **Visibility over timing** — `toBeVisible()` / `waitForGameReady`; avoid bare `waitForTimeout`.
@@ -110,6 +110,7 @@ npm run test:e2e:cross       # all browsers (stage 4)
 | Quick peek in editor | Simple Browser → `http://localhost:5173` |
 | Balance JSON | JSON Crack extension on `data/*.json` |
 | Structured in-game errors | `window.__gigazonkErrors.exportJson()` in dev |
+| Dev game API (e2e / debug) | `window.__gigazonkGame` in dev (`src/main.js`) |
 
 ### chrome-devtools-mcp vs cursor-ide-browser
 

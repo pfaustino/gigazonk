@@ -38,6 +38,12 @@ jobs:
         id: version
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Verify GAME_VERSION matches package.json
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          GAME=$(node -p "require('fs').readFileSync('src/game/constants.js','utf8').match(/GAME_VERSION = '([^']+)'/)[1]")
+          test "$PKG" = "$GAME" || { echo "Version mismatch: package.json=$PKG GAME_VERSION=$GAME"; exit 1; }
+
       - name: Download butler
         run: |
           curl -L -o butler.zip "https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default"

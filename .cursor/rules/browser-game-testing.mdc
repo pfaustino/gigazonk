@@ -37,11 +37,27 @@ npm run test:e2e:headed    # visible browser window
 
 | Need | Tool |
 |------|------|
-| Smoke / regression / CI | Playwright `npm run test:e2e` |
+| Smoke / regression / CI | Playwright `npm run test:e2e` (Chromium) |
+| Firefox + Safari sweep | `npm run test:e2e:cross` or `npm run verify-browser-debug` |
 | Click-through while developing | Playwright `--ui` or `--headed` |
-| Agent explores live page | Browser MCP (`browser_navigate`, snapshot, screenshot) |
+| Agent explores live page in Cursor | `cursor-ide-browser` MCP (snapshot, click, `browser_cdp`) |
+| Chrome console + network + perf traces | `chrome-devtools-mcp` — run `npm run setup:mcp` first (Windows) |
 | Quick visual check in editor | Simple Browser at localhost URL |
-| Console / localStorage in dev | vite-mcp at `http://localhost:5173/__mcp` |
+| Dev console / localStorage | vite-mcp at `http://localhost:5173/__mcp` |
+| In-game structured errors | `window.__gigazonkErrors.exportJson()` in dev |
+
+### chrome-devtools-mcp vs cursor-ide-browser
+
+- **cursor-ide-browser** — Cursor-owned tab; best for agent click-through and quick CDP (`browser_cdp`).
+- **chrome-devtools-mcp** — Dedicated Chrome via Puppeteer; source-mapped console stacks, network list, Lighthouse, performance traces.
+- **vite-mcp** — Only when `npm run dev` is running; reads console + `localStorage` without launching another browser.
+- **Playwright** — Only tool that runs **Firefox and WebKit**; use for cross-browser regression.
+
+Optional: connect chrome-devtools-mcp to your own Chrome (remote debugging on `chrome://inspect`):
+
+```json
+"args": ["-y", "chrome-devtools-mcp@latest", "--auto-connect", "--no-usage-statistics"]
+```
 
 ## Browser MCP checklist
 

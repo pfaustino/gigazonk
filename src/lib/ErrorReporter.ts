@@ -54,6 +54,11 @@ export class ErrorReporter {
       .join('\n');
   }
 
+  /** Structured export for Playwright, MCP agents, and dev tooling. */
+  static exportJson(): ErrorEntry[] {
+    return ErrorReporter.entries.map((e) => ({ ...e }));
+  }
+
   static clear(): void {
     ErrorReporter.entries = [];
   }

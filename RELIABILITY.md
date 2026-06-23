@@ -23,6 +23,9 @@
 | Data JSON | `data/enemies.json`, `data/upgrades.json` via `gameData.ts` |
 | TypeScript lib | `src/lib/*.ts` — errors, assert, RNG, dev flags |
 | vite-mcp | Dev server MCP at `http://localhost:5173/__mcp` (console + localStorage) |
+| chrome-devtools-mcp | Chrome console (source maps), network, perf traces (`.cursor/mcp.json`) |
+| Cross-browser e2e | `npm run test:e2e:cross` — Playwright firefox + webkit |
+| Error bridge | `window.__gigazonkErrors` in dev for agents / Playwright |
 | Tests | `runRng.test.ts`, `gameData.test.ts`, save + skill tree |
 
 `Math.random` remains for session-static visuals (arena rock scatter, village props, audio noise) — not run-deterministic.
@@ -44,9 +47,10 @@
 ## Debug workflow
 
 1. Reproduce with `?seed=42` or dev panel (seed + RNG state).
-2. Dev panel → Export errors (clipboard).
-3. Browser MCP or vite-mcp console/localStorage at failure state.
-4. Fix + add Vitest for pure logic regression.
+2. Dev panel → Export errors (clipboard) or `window.__gigazonkErrors.exportJson()`.
+3. **Chrome:** chrome-devtools-mcp `list_console_messages` or vite-mcp / cursor-ide-browser CDP.
+4. **Firefox/Safari:** `npm run collect-browser-errors` → `test-results/browser-errors-summary.json`.
+5. Fix + add Vitest for pure logic regression.
 
 ## Error codes
 

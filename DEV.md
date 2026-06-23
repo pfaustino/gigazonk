@@ -1,5 +1,7 @@
 # GigaZonk — Development Guide
 
+**Workspace:** develop on `C:\Dev\github-projects\GigaZonk` (not Google Drive). See [DEV-CONTAINER.md](./DEV-CONTAINER.md).
+
 ## Quick start
 
 ```bash
@@ -8,6 +10,14 @@ npm run dev
 ```
 
 Open http://localhost:5173 (Vite default). Production base path: `/gigazonk/`.
+
+### First-time machine setup
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-dev-workspace.ps1
+```
+
+Then open `C:\Dev\github-projects\GigaZonk` in Cursor → **Reopen in Container** (optional, needs Docker).
 
 ## Dev URL flags
 
@@ -22,7 +32,33 @@ Dev panel shows live **seed** and **RNG state** during arena runs.
 
 ## MCP (dev)
 
-With `npm run dev`, vite-mcp exposes browser tools at `http://localhost:5173/__mcp` (configured in `.cursor/mcp.json`). Use for console logs and `localStorage` (`gigazonk_save`) inspection.
+With `npm run dev`, vite-mcp exposes browser tools at `http://localhost:5173/__mcp` (requires dev server running).
+
+After clone or `npm install` on **`C:\Dev`**:
+
+```bash
+npm run setup:mcp    # LOCALAPPDATA launcher + .cursor/mcp.json
+```
+
+Reload MCP in Cursor Settings. In dev container, port 5173 is forwarded to the host.
+
+**Stage source to Google Drive after ship:**
+
+```bash
+npm run gsync
+```
+
+**Cross-browser errors:** CI runs Chromium only. Before a release run:
+
+```bash
+npm run test:e2e:cross          # all e2e specs on chromium + firefox + webkit
+npm run collect-browser-errors  # cross-browser sweep + JSON summary in test-results/
+npm run verify-browser-debug    # sweep + pass/fail gate (pre-ship)
+```
+
+Agents can read `window.__gigazonkErrors.exportJson()` in dev, or JSON files under `test-results/browser-errors/`.
+
+If `chrome-devtools` still fails to connect, use **cursor-ide-browser** + `browser_cdp` (Log.enable, Runtime.evaluate) — verified working on this machine.
 
 ## Quality commands
 

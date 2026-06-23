@@ -26,8 +26,12 @@ export class Audio {
 
   init() {
     if (this.ctx) return;
-    try {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (typeof Ctx !== 'function') {
+      throw new Error('Web Audio API not available');
+    }
+    this.ctx = new Ctx();
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.3;
       this.masterGain.connect(this.ctx.destination);

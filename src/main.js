@@ -1,6 +1,7 @@
 if (import.meta.env.DEV) {
   void import('virtual:mcp');
 }
+import { ErrorReporter } from './lib/ErrorReporter.js';
 import { installGlobalErrorHandlers } from './lib/errorHandlers.js';
 import { Game } from './game/Game.js';
 
@@ -14,3 +15,10 @@ if (!canvas) {
 }
 
 gameRef = new Game(canvas);
+
+if (import.meta.env.DEV) {
+  window.__gigazonkErrors = {
+    exportText: () => ErrorReporter.exportText(),
+    exportJson: () => ErrorReporter.exportJson(),
+  };
+}

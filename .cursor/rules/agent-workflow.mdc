@@ -1,0 +1,44 @@
+---
+description: Agent ship loop — plan, verify, emit; gm-inspired discipline for GigaZonk
+alwaysApply: true
+---
+
+# Agent workflow (ship loop)
+
+Adapted from [gm](https://anentrypoint.github.io/gm/) — lightweight, not a replacement for project rules.
+
+## PLAN (before coding)
+
+- Confirm scope in one sentence; one feature or fix per change.
+- Read `DEV.md` for player flows; read `.cursor/skills/gigazonk-development/SKILL.md` for architecture.
+- Identify files, save migration need, and which test gates apply (see `browser-game-testing.mdc`).
+
+## EXECUTE
+
+- Data/constants → manager/module → thin `Game.js` wiring.
+- Run commands in the terminal; do not only print them.
+- Minimal diff; match surrounding style; no drive-by refactors.
+
+## VERIFY (before saying "done")
+
+| Change type | Minimum gate |
+|-------------|--------------|
+| Docs only | None |
+| Logic / data | `npm run check` |
+| UI / HUD / menus | `check` + `test:e2e:headed` or `:ui` |
+| Pre-PR / user asked to ship | `check` + `test:e2e`; add `test:e2e:cross` if UI/e2e touched |
+
+Fix failures before reporting complete. Summarize what ran and pass counts.
+
+## EMIT (commit / PR)
+
+- **Only when the user explicitly asks** to commit or open a PR.
+- Commit message: `type(scope): why` — imperative, one logical change.
+- PR via `gh`; never force-push `main`.
+- Structural changes: update `ARCHITECTURE.md`, sync wiki, commit `wiki/**` (see `ship-quality.mdc`).
+
+## COMPLETE
+
+- Player-visible feature → note manual playtest URL (`http://localhost:5173/?dev=1`).
+- Meta/save changes → confirm `GAME_VERSION` + migration in `SaveData.js`.
+- Do not merge PRs unless the user asks.

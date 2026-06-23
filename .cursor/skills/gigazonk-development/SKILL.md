@@ -1,90 +1,99 @@
 ---
 name: gigazonk-development
 description: >-
-  GigaZonk-specific architecture and conventions. Horde survival roguelike with
-  Vite, Three.js, village meta loop, instanced enemies. Use when editing GigaZonk,
-  gigazonk, Zonka Village, arena biomes, or Megabonk-style features.
+  GigaZonk architecture and conventions. Horde survival roguelike with Vite,
+  Three.js, village meta, achievements, tutorial, daily challenge, instanced
+  enemies. Use when editing GigaZonk, arena biomes, save/meta, UI, or balance.
 ---
 
 # GigaZonk Development
 
 ## Stack
 
-- Vite 8, Three.js, vanilla JS (tsconfig present — prefer TS for new data modules)
+- Vite 8, Three.js, vanilla JS (prefer TS for new data modules)
 - Entry: `src/main.js` → `src/game/Game.js`
-- Balance: `src/game/constants.js`, `UpgradeOffers.js`, `upgradeStatSchema.js`, `SkillTree.js`, `UpgradeSystem.js`
-- Save: `SaveData.js` key `gigazonk_save` with migrations
+- Balance: `constants.js`, `data/*.json`, `UpgradeOffers.js`, `SkillTree.js`
+- Save: `SaveData.js` → `localStorage` key `gigazonk_save`
 
 ## Module map
 
 | Module | Responsibility |
 |--------|----------------|
-| `Game.js` | State machine: title / village / arena; loop wiring |
-| `Player.js` | Movement, combat stats, dodge, magnet |
-| `EnemyManager.js` | InstancedMesh horde, spawn, despawn, spatial hash |
-| `ProjectileManager.js` | Auto-fire, pierce, elements |
-| `UpgradeSystem.js` | Run upgrades + preview math |
-| `UI.js` | DOM overlays — split new panels here cautiously |
-| `Arena.js` / `Village.js` | Mode-specific scene setup |
-| `TerrainFeatures.js` / `TerrainVisuals.js` | Biome terrain |
-| `SaveData.js` | Meta progression, skill tree, characters |
+| `Game.js` | State machine; lazy `_ensureCombatManagers()` |
+| `CombatController.js` | Hits, procs, auto-fire |
+| `EnemyManager.js` | InstancedMesh horde, biome spawn weights |
+| `InstancedRockField.js` | Arena rock instancing |
+| `AchievementSystem.js` | Meta achievements (`data/achievements.json`) |
+| `DailyChallenge.js` | Daily survive goal + coin bonus |
+| `Tutorial.js` | First-run tutorial steps |
+| `TouchControls.js` | Mobile overlay → `Input.js` |
+| `ui/RunSummaryScreen.js` | End-of-run summary |
+| `ui/TutorialOverlay.js` | In-arena tutorial card |
+| `SaveData.js` | Meta + `runSnapshot`; bump `GAME_VERSION` on schema change |
+
+Full diagram: `ARCHITECTURE.md`.
 
 ## Game states
 
-`title` → `village` → `arena` → death → village. Quick arena skips village.
+`title` → character select → `village` or `arena` → death (run summary) → village/title.
 
-## Performance constraints
+Run can pause to village via menu; resume from arena portal (`RunSnapshot.js`).
 
-- `MAX_ENEMIES` / instancing — don't add per-enemy Mesh without profiling
-- `ENEMY_NEAR_RADIUS` / despawn batching — respect when changing arena size
-- Shadow map + instancing — test at 300+ enemies before merging
+## Performance
+
+- No per-enemy `Mesh` in spawn hot paths — `InstancedMesh` + pools
+- Combat managers created on first arena/village enter, not at title boot
+- Profile at 300+ enemies before changing `MAX_ENEMIES` or shadow settings
 
 ## Conventions
 
-- Biomes: `BIOMES` in constants; arena randomizes per run
-- Characters: unlock via `zonkCoins`; check `isCharacterPlayable`
-- Synergy nova: Fire + Ice + Lightning elements
-- Procedural audio in `Audio.js` — prefer synth for SFX tweaks
+- All four characters playable; `isCharacterPlayable(id)` requires known `CHARACTERS` entry
+- Biome friction in `BIOMES`; weighted enemies via `EnemyManager.setBiome()`
+- Village rep unlocks: `VILLAGE_LANDMARKS`, `VILLAGE_NPCS` (`minRep`)
+- Synergy nova: fire + ice + lightning
 
-## When adding features
+## Adding features
 
-1. Constants or `data/` first
-2. Manager class second
-3. Wire in `Game.js` last (minimal diff)
-4. Update README differentiators table if player-visible
-5. Save migration if meta progression changes
+1. `data/` or `constants.js`
+2. Manager or `ui/*.js` module
+3. Wire in `Game.js` / `UI.js` (thin)
+4. Save migration if meta changes
+5. E2e helper if new player-visible flow
+6. `ARCHITECTURE.md` + wiki sync if structural
 
-## IDE setup
+## Dev hooks (Vite dev / `?dev=1`)
 
-After clone: `npm run setup:extensions` + `npm run setup:mcp`. Extensions in `.vscode/extensions.json`; MCP regenerates `.cursor/mcp.json` (playwright, context7, chrome-devtools, vite-mcp). Three.js e2e: `window.PLAYWRIGHT_THREE.scene` in dev; import from `e2e/helpers/playwrightThree.ts`.
+| Hook | Use |
+|------|-----|
+| `window.__gigazonkGame` | Arena/village actions, UI smoke from e2e |
+| `window.__gigazonkErrors.exportJson()` | Structured error export |
+| `window.PLAYWRIGHT_THREE.scene` | Scene asserts via `playwrightThree.ts` |
+| `#dev-panel` | Skip time, spawn boss, force level-up |
 
-## Verification (layered gates)
+URL flags: `?dev=1`, `?seed=42`, `?biome=frost`, `?coins=500` — see `DEV.md`.
 
-Same order as CI; use **headed/ui** while iterating on UI:
+## Verification gates
 
 | Stage | Command | When |
 |-------|---------|------|
-| 1 | `npm run check` | Any non-docs code change |
-| 2 | `npm run test:e2e:headed` or `:ui` | UI, menus, HUD, navigation |
-| 3 | `npm run test:e2e` | Pre-PR; headless CI parity |
-| 4 | `npm run test:e2e:cross` | Clicks, keyboard nav, CSS; before PR on UI/e2e |
-| — | `npm run test` | Fast loop on `tests/` only |
+| 1 | `npm run check` | Any code change |
+| 2 | `npm run test:e2e:headed` or `:ui` | UI / menus / HUD |
+| 3 | `npm run test:e2e` | Pre-PR |
+| 4 | `npm run test:e2e:cross` | UI/e2e/CSS changes |
 
-- Helpers: `e2e/helpers/gameFlow.ts`, `navigation.ts`, `gameReady.ts` — extend before new duplicated steps; wait on `data-game-ready`.
-- Boot readiness: `src/lib/gameReady.js` (`title`, `arena-hud`, `village`); lazy `_ensureVillage()` / `_ensureArena()` in `Game.js`.
-- CI cross-browser: Xvfb + headed Firefox/WebKit (WebGL on Linux). See `.cursor/rules/browser-game-testing.mdc`.
-- Player-visible bug or new flow → add spec + run stage 2.
-- Green smoke ≠ full game QA (shop, skill tree, save/resume mid-run not in e2e yet).
-- Details: `.cursor/rules/browser-game-testing.mdc`.
+Helpers: `e2e/helpers/gameFlow.ts`, `gameReady.ts`, `navigation.ts`.
 
-## Dev tooling
+**E2e covers:** title, arena HUD, village, dev level-up, daily label, skill tree, quest board, arena pause/resume.
 
-`?dev=1` panel (`src/dev/DevPanel.js`): skip time, spawn horde/boss, force level-up, biome override, error export. Wired in Vite dev and via URL flag.
+## Play locally
 
-## Deploy
+```powershell
+npm run dev
+# http://localhost:5173  — or ?dev=1&coins=500 for fast meta testing
+```
 
-- **GitHub Pages:** [pfaustino.github.io/gigazonk](https://pfaustino.github.io/gigazonk/) — `deploy-pages.yml` on `main`, `base: '/gigazonk/'`
-- **itch.io:** [pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk) — `deploy-itch.yml` on `main`, `npm run build:itch`, butler `pfaustino/gigazonk:html5`
-- Local itch gate: `npm run check:itch` (never commit `BUTLER_API_KEY`)
-- Manual Pages: `npm run deploy`
-- Manual itch re-push: GitHub Actions → **Deploy to itch.io** → Run workflow
+Pages build behavior: `npm run build && npm run preview` (base `/gigazonk/`).
+
+## Ship
+
+See `.cursor/skills/gigazonk-ship/SKILL.md` for PR, wiki sync, and deploy.

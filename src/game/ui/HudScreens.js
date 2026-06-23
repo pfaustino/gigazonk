@@ -1,4 +1,5 @@
 import { SYNERGY_ELEMENTS } from '../constants.js';
+import { setGameReady, GAME_READY } from '../../lib/gameReady.js';
 
 /** Build arena HUD DOM (bars, quests, buff track, synergy, prompts). */
 export function buildHUD(ui) {
@@ -84,4 +85,5 @@ export function buildHUD(ui) {
   ui._rewardQueue = [];
   ui._rewardShowcaseActive = false;
   ui.layer.append(hud, hudRight, synergy, prompt, toasts, rewardStrip, hint);
+  setGameReady(GAME_READY.ARENA_HUD);
 }

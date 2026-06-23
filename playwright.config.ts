@@ -3,20 +3,31 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 5173;
 const baseURL = `http://localhost:${PORT}`;
 
+/** Firefox/WebKit need a display + headed mode for WebGL on Linux CI (Mozilla #1375585). */
+const crossHeaded = Boolean(process.env.CROSS_BROWSER && process.env.CI);
+
 const crossBrowsers = [
   {
     name: 'firefox',
     use: {
       ...devices['Desktop Firefox'],
+      headless: crossHeaded ? false : undefined,
       launchOptions: {
         firefoxUserPrefs: {
           'webgl.force-enabled': true,
           'webgl.disabled': false,
+          'webgl.forbid-software': false,
         },
       },
     },
   },
-  { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  {
+    name: 'webkit',
+    use: {
+      ...devices['Desktop Safari'],
+      headless: crossHeaded ? false : undefined,
+    },
+  },
 ];
 
 export default defineConfig({

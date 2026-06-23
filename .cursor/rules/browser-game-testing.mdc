@@ -48,21 +48,36 @@ After substantive changes, **run the matching stage(s) in the terminal** and fix
 
 ## E2e conventions (from this repo)
 
+- **Readiness first** — app sets `<html data-game-ready="title|arena-hud|village">` (`src/lib/gameReady.js`); use `e2e/helpers/gameReady.ts` (`waitForGameReady`) instead of long blind timeouts.
 - **Helpers first** — reuse `e2e/helpers/navigation.ts` (`gotoClean`) and `gameFlow.ts` (`startQuickArena`); extend helpers before duplicating steps in specs.
 - **Stable selectors** — `#btn-play`, `#btn-confirm`, `#hp-bar`, HUD ids; `getByRole` for headings.
-- **Visibility over timing** — `toBeVisible()` / `waitForSelector`; avoid bare `waitForTimeout`.
+- **Navigation** — `goto(..., { waitUntil: 'commit' })` then readiness/visibility asserts; avoid waiting for all assets on WebGL SPAs.
+- **Visibility over timing** — `toBeVisible()` / `waitForGameReady`; avoid bare `waitForTimeout`.
 - **Keyboard-nav / WebKit clicks** — if Playwright click is blocked, use DOM click in helper (see `startQuickArena` `evaluate` pattern); document in helper comment.
 - **Fresh save** — `gotoClean` clears `localStorage` before each test.
 - **New regression** — player-visible bug fix or new menu flow → add/extend spec + run stage 2.
 
 Specs: `e2e/smoke.spec.ts` (Chromium / `test:e2e`), `e2e/cross-browser.spec.ts` (Firefox + WebKit / `test:e2e:cross`). Config: `playwright.config.ts` (`testMatch` split; `workers: 1` when `CROSS_BROWSER=1`).
 
+## Firefox / WebKit on Linux CI (WebGL)
+
+GigaZonk uses Three.js WebGL. **Firefox headless on Linux does not support WebGL** ([Mozilla #1375585](https://bugzilla.mozilla.org/show_bug.cgi?id=1375585); [Playwright #13146](https://github.com/microsoft/playwright/issues/13146)).
+
+CI `e2e-cross` job:
+
+- Installs **Xvfb**
+- Runs `xvfb-run --auto-servernum -- npm run test:e2e:cross`
+- Playwright sets **headed** Firefox/WebKit when `CI` + `CROSS_BROWSER` (see `playwright.config.ts`)
+
+`firefoxUserPrefs` alone is not sufficient. Boot optimizations (`Game.js` lazy arena, readiness markers) reduce flake but do not replace Xvfb.
+
 ## Flake triage
 
 1. Re-run failing spec headless: `npm run test:e2e -- e2e/smoke.spec.ts`
-2. Cross-browser timeout → run `test:e2e:cross` alone (sequential workers)
-3. WebKit click failures → check keyboard-nav guard; prefer helper DOM click
-4. Still flaky → `:ui` trace on failing step; tighten selector or visibility wait
+2. Cross-browser timeout → run `test:e2e:cross` alone (sequential workers); confirm `data-game-ready` in trace
+3. Firefox CI only → verify Xvfb + headed in `.github/workflows/ci.yml` and `playwright.config.ts`
+4. WebKit click failures → check keyboard-nav guard; prefer helper DOM click
+5. Still flaky → `:ui` trace on failing step; tighten readiness wait or selector
 
 Cross-browser failures write `test-results/browser-errors/{browser}.json` — read before guessing.
 
@@ -105,7 +120,7 @@ Production build smoke: `npm run build && npm run preview` (base `/gigazonk/`).
 
 ## CI parity
 
-`.github/workflows/ci.yml`: `quality` → `e2e` + `e2e-cross` in parallel. Local pre-push gate:
+`.github/workflows/ci.yml`: `quality` → `e2e` + `e2e-cross` in parallel. `e2e-cross` uses **Xvfb + headed** for WebGL. Local pre-push gate:
 
 ```bash
 npm run check && npm run test:e2e && npm run test:e2e:cross

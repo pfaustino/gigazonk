@@ -19,6 +19,7 @@ import {
 import { showTitle as renderTitle, showCharacterSelect as renderCharacterSelect } from './ui/TitleScreens.js';
 import { showLevelUp as renderLevelUp } from './ui/LevelUpScreen.js';
 import { buildHUD as renderHUD } from './ui/HudScreens.js';
+import { setGameReady, GAME_READY } from '../lib/gameReady.js';
 
 const REWARD_SHOWCASE_HOLD_MS = 2000;
 const REWARD_FLY_MS = 700;
@@ -838,6 +839,7 @@ export class UI {
     prompt.className = 'interact-prompt hidden';
     prompt.id = 'interact-prompt';
     this.layer.append(hint, prompt);
+    setGameReady(GAME_READY.VILLAGE);
   }
 
   _navCtx() {

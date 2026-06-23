@@ -1,12 +1,13 @@
-import type { Page } from '@playwright/test';
-
-const READY_TIMEOUT = 60_000;
+import { expect, type Page } from '@playwright/test';
+import { waitForGameReady } from './gameReady.js';
+import { GAME_READY } from '../../src/lib/gameReady.js';
 
 /** Fresh save before each test; waits until title screen is interactive. */
 export async function gotoClean(page: Page, path = '/') {
   await page.addInitScript(() => {
     localStorage.clear();
   });
-  await page.goto(path, { waitUntil: 'load' });
-  await page.waitForSelector('#btn-play', { state: 'visible', timeout: READY_TIMEOUT });
+  await page.goto(path, { waitUntil: 'commit' });
+  await waitForGameReady(page, GAME_READY.TITLE);
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
 }

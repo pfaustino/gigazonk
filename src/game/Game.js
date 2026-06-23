@@ -64,7 +64,7 @@ export class Game {
     this._devPendingBiome = this._devFlags.biome;
     this.village = null;
     this.arena = null;
-    this._worldWarmPending = false;
+    this._arenaWarmPending = false;
 
     if (this._devFlags.coins) {
       saveData.addCoins(this._devFlags.coins);
@@ -137,10 +137,29 @@ export class Game {
     this.animate();
   }
 
-  _ensureWorldScenes() {
-    if (this.village && this.arena) return;
+  _ensureVillage() {
+    if (this.village) return;
     this.village = new Village(this.scene);
+    this.village.setVisible(false);
+  }
+
+  _ensureArena() {
+    if (this.arena) return;
     this.arena = new Arena(this.scene);
+    this.arena.setVisible(false);
+  }
+
+  _populateArenaField(showToast = false) {
+    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
+    this.interactables.spawnVillagePortal(0, 0);
+    this.populateMesaEncounters(showToast);
+  }
+
+  _deferArenaFieldSetup(showToast = false) {
+    queueMicrotask(() => {
+      if (this.state !== 'arena' || !this.arena) return;
+      this._populateArenaField(showToast);
+    });
   }
 
   setShadowFrustum(halfExtent) {
@@ -210,13 +229,13 @@ export class Game {
   }
 
   enterVillage() {
-    this._ensureWorldScenes();
+    this._ensureVillage();
     this._gameOverActive = false;
     saveData.data.runSnapshot = null;
     saveData.save();
     this.state = 'village';
     this.village.setVisible(true);
-    this.arena.setVisible(false);
+    this.arena?.setVisible(false);
     this.applyVillageScene();
     this.hideCombat();
     this.player.characterId = saveData.data.selectedCharacter;
@@ -232,10 +251,10 @@ export class Game {
   }
 
   startArena() {
-    this._ensureWorldScenes();
+    this._ensureArena();
     saveData.data.runSnapshot = null;
     this.state = 'arena';
-    this.village.setVisible(false);
+    this.village?.setVisible(false);
     this.arena.setVisible(true);
     this.applyArenaScene();
     this.ui.clear();
@@ -257,9 +276,7 @@ export class Game {
       this.currentBiome = this.arena.pickRandomBiome();
       this.setSkyColor(this.currentBiome.sky);
     }
-    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
-    this.interactables.spawnVillagePortal(0, 0);
-    this.populateMesaEncounters(true);
+    this._deferArenaFieldSetup(true);
     this.player.position.set(0, 0, 0);
     this.player.mesh.visible = true;
     this.cameraController.reset();
@@ -415,7 +432,7 @@ export class Game {
 
   leaveArenaForVillage() {
     if (this.state !== 'arena') return;
-    this._ensureWorldScenes();
+    this._ensureVillage();
 
     this.ui._navCleanup?.();
     this.ui.gameMenu.screen?.remove();
@@ -434,7 +451,7 @@ export class Game {
 
     this.state = 'village';
     this.village.setVisible(true);
-    this.arena.setVisible(false);
+    this.arena?.setVisible(false);
     this.applyVillageScene();
     this.hideCombat();
     this.player.position.set(0, 0, 5);
@@ -452,7 +469,7 @@ export class Game {
   }
 
   resumeArenaRun() {
-    this._ensureWorldScenes();
+    this._ensureArena();
     const snap = saveData.data.runSnapshot;
     if (!snap?.pausedInVillage) return;
 
@@ -463,7 +480,7 @@ export class Game {
     this.ui.removeScreens();
 
     this.state = 'arena';
-    this.village.setVisible(false);
+    this.village?.setVisible(false);
     this.arena.setVisible(true);
     this.applyArenaScene();
     this.enemies.reset();
@@ -479,8 +496,7 @@ export class Game {
     this.ui.clear();
     this.ui.buildHUD();
     this.quests.assignNewQuests();
-    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
-    this.interactables.spawnVillagePortal(0, 0);
+    this._deferArenaFieldSetup(false);
     this.player.mesh.visible = true;
     this.cameraController.reset();
 
@@ -542,17 +558,16 @@ export class Game {
   }
 
   startArenaFromSnapshot(snap) {
-    this._ensureWorldScenes();
+    this._ensureArena();
     this.state = 'arena';
-    this.village.setVisible(false);
+    this.village?.setVisible(false);
     this.arena.setVisible(true);
     this.applyArenaScene();
     this.resetRun();
     this.quests.assignNewQuests();
     this.ui.clear();
     this.ui.buildHUD();
-    this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
-    this.interactables.spawnVillagePortal(0, 0);
+    this._deferArenaFieldSetup(false);
     this.player.mesh.visible = true;
     this.cameraController.reset();
     this.restoreArenaFromSnapshot(snap);
@@ -1001,11 +1016,11 @@ export class Game {
 
   animate(timestamp) {
     requestAnimationFrame((t) => this.animate(t));
-    if (this.state === 'title' && !this.village && !this._worldWarmPending) {
-      this._worldWarmPending = true;
+    if (this.state === 'title' && !this.arena && !this._arenaWarmPending) {
+      this._arenaWarmPending = true;
       queueMicrotask(() => {
-        this._ensureWorldScenes();
-        this._worldWarmPending = false;
+        this._ensureArena();
+        this._arenaWarmPending = false;
       });
     }
     this.timer.update(timestamp);

@@ -19,7 +19,14 @@ All changes should pass:
 npm run check
 ```
 
-CI runs the same steps on every pull request.
+CI runs the same steps on every pull request. UI or e2e changes should also pass:
+
+```bash
+npm run test:e2e           # Chromium smoke
+npm run test:e2e:cross     # Firefox + WebKit (matches CI e2e-cross + Xvfb)
+```
+
+Player-flow changes: extend `e2e/helpers/` and wait on `data-game-ready` (`src/lib/gameReady.js`), not arbitrary sleeps.
 
 ## Pull requests
 

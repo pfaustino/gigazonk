@@ -73,5 +73,8 @@ jobs:
       - name: Install Playwright (Chromium, Firefox, WebKit)
         run: npx playwright install --with-deps
 
+      - name: Install Xvfb (Firefox/WebKit WebGL on Linux)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Cross-browser e2e
-        run: npm run test:e2e:cross
+        run: xvfb-run --auto-servernum -- npm run test:e2e:cross

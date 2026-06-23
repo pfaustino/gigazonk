@@ -41,7 +41,6 @@ export class GemManager {
     const g = { slot, x, z, value, alive: true, vy: 2 + runRandom() * 2 };
     this.gems.push(g);
     this.mesh.count = Math.max(this.mesh.count, slot + 1);
-    this.updateInstance(g);
     return 0;
   }
 

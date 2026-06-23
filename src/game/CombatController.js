@@ -1,4 +1,5 @@
 import { runRandom, runRandomInt } from '../lib/runRandom.js';
+import { COMBAT_AOE_PROC_MAX_TARGETS, COMBAT_HORDE_FX_LIMIT } from './constants.js';
 
 /**
  * Combat hit resolution, proc chains, and player auto-fire.
@@ -8,56 +9,217 @@ export class CombatController {
   /** @param {import('./Game.js').Game} game */
   constructor(game) {
     this.game = game;
+    this._frameHitSound = false;
+    this._frameKillSound = false;
+    this._frameHitStop = false;
+    this._dmgNumbersThisFrame = 0;
+    this._killBurstsThisFrame = 0;
+    this._targetScratch = [];
+    this._procScratch = [];
+    this._batchKills = 0;
+    this._batchXp = 0;
+    this._batchElites = 0;
+    this._batchPosX = 0;
+    this._batchPosZ = 0;
+    this._batchPosN = 0;
+  }
+
+  beginFrame() {
+    this._frameHitSound = false;
+    this._frameKillSound = false;
+    this._frameHitStop = false;
+    this._dmgNumbersThisFrame = 0;
+    this._killBurstsThisFrame = 0;
+    this._batchKills = 0;
+    this._batchXp = 0;
+    this._batchElites = 0;
+    this._batchPosX = 0;
+    this._batchPosZ = 0;
+    this._batchPosN = 0;
+  }
+
+  _inHordeCombat() {
+    return this.game.enemies.aliveCount >= COMBAT_HORDE_FX_LIMIT;
+  }
+
+  _dmgNumberCap() {
+    return this._inHordeCombat() ? 6 : 14;
+  }
+
+  _queueKill(killResult, enemy) {
+    this._batchKills++;
+    this._batchXp += killResult.xp;
+    this._batchPosX += killResult.pos.x;
+    this._batchPosZ += killResult.pos.z;
+    this._batchPosN++;
+    if (enemy?.type === 'elite' && !killResult.isBoss) this._batchElites++;
+  }
+
+  flushHordeCombat() {
+    const g = this.game;
+    if (this._batchKills <= 0) return;
+
+    const n = this._batchKills;
+    g.player.kills += n;
+    g.player.combo += n;
+    g.player.comboTimer = 3;
+    if (g.player.damagePerKill > 0) {
+      g.player.killDamageBonus = Math.min(0.1, g.player.killDamageBonus + g.player.damagePerKill * n);
+    }
+    if (g.player.healOnKill > 0 && runRandom() < g.player.healOnKill) {
+      g.player.heal(g.player.maxHp * 0.05);
+    }
+
+    g.quests.track('kills', n);
+    if (this._batchElites > 0) g.quests.track('elites', this._batchElites);
+
+    const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
+    const totalXp = this._batchXp * xpMult;
+    const ax = this._batchPosX / this._batchPosN;
+    const az = this._batchPosZ / this._batchPosN;
+    const overflow = g.gems.spawn(ax, az, totalXp, g.player.position.x, g.player.position.z);
+    if (overflow > 0) {
+      const levels = g.player.addXp(overflow);
+      if (levels > 0) g.queueLevelUp(levels);
+    }
+    if (g.player.coinMult > 0) {
+      g.runCoins += Math.max(1, Math.floor(g.player.coinMult * 10)) * n;
+    }
+
+    if (this._killBurstsThisFrame < 4) {
+      g.particles.burst(ax, az, 0x44ff88, 6);
+      this._killBurstsThisFrame++;
+    }
+    if (!this._frameKillSound) {
+      g.audio.kill();
+      this._frameKillSound = true;
+    }
+  }
+
+  _resolveKill(killResult, enemy, element) {
+    const g = this.game;
+    if (killResult.isBoss) {
+      this._resolveBossKill(killResult, enemy, element);
+      return;
+    }
+    if (this._inHordeCombat()) {
+      this._queueKill(killResult, enemy);
+      return;
+    }
+
+    g.player.addKill();
+    const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
+    const xpValue = killResult.xp * xpMult;
+    const overflow = g.gems.spawn(
+      killResult.pos.x, killResult.pos.z, xpValue,
+      g.player.position.x, g.player.position.z
+    );
+    if (overflow > 0) {
+      const levels = g.player.addXp(overflow);
+      if (levels > 0) g.queueLevelUp(levels);
+    }
+    if (g.player.coinMult > 0) {
+      g.runCoins += Math.max(1, Math.floor(g.player.coinMult * 10));
+    }
+    g.quests.track('kills');
+    if (enemy?.type === 'elite') g.quests.track('elites');
+
+    const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0x44ff88;
+    if (this._killBurstsThisFrame < 4) {
+      const burstCount = this._killBurstsThisFrame === 0 ? 8 : 3;
+      g.particles.burst(killResult.pos.x, killResult.pos.z, color, burstCount);
+      this._killBurstsThisFrame++;
+    }
+    if (!this._frameKillSound) {
+      g.audio.kill();
+      this._frameKillSound = true;
+    }
+  }
+
+  _resolveBossKill(killResult, enemy, element) {
+    const g = this.game;
+    g.player.addKill();
+    const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
+    const xpValue = killResult.xp * xpMult;
+    const overflow = g.gems.spawn(
+      killResult.pos.x, killResult.pos.z, xpValue,
+      g.player.position.x, g.player.position.z
+    );
+    if (overflow > 0) {
+      const levels = g.player.addXp(overflow);
+      if (levels > 0) g.queueLevelUp(levels);
+    }
+    if (g.player.coinMult > 0) {
+      g.runCoins += Math.max(1, Math.floor(g.player.coinMult * 10));
+    }
+    g.quests.track('kills');
+    g.quests.track('bosses');
+    g._runBosses++;
+    if (enemy?.isMesaGuardian) {
+      g.quests.track('guardians');
+      g.interactables.removeMesaBeaconForGuardian(enemy);
+    }
+    g.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
+    const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0x44ff88;
+    if (this._killBurstsThisFrame < 4) {
+      g.particles.burst(killResult.pos.x, killResult.pos.z, color, 8);
+      this._killBurstsThisFrame++;
+    }
+    if (!this._frameKillSound) {
+      g.audio.kill();
+      this._frameKillSound = true;
+    }
+  }
+
+  _applyAoEDamage(x, z, radius, damage, element, sourceEnemy, maxTargets) {
+    const g = this.game;
+    const horde = this._inHordeCombat();
+    const nearby = g.enemies.getNearby(x, z, radius, this._procScratch);
+    const limit = horde ? Math.min(maxTargets, COMBAT_AOE_PROC_MAX_TARGETS) : nearby.length;
+    let hits = 0;
+
+    for (let i = 0; i < nearby.length; i++) {
+      if (hits >= limit) break;
+      const e2 = nearby[i].enemy;
+      if (!e2.alive || e2 === sourceEnemy) continue;
+      hits++;
+      const result = g.enemies.damageEnemy(e2, damage, element);
+      if (result) {
+        this._resolveKill(result, e2, element);
+      } else if (!horde && this._dmgNumbersThisFrame < this._dmgNumberCap()) {
+        this.handleCombatHit(damage, null, element, e2, { skipProcs: true });
+      }
+    }
   }
 
   handleCombatHit(damage, killResult, element, enemy, opts = {}) {
     const g = this.game;
     const { skipProcs = false, isCrit = false } = opts;
+    const horde = this._inHordeCombat();
     const critHit = isCrit || damage > g.player.damage * g.player.getComboMult() * (g.player.getCritMultiplier() - 0.05);
-    if (enemy) {
+    const showFx = enemy && this._dmgNumbersThisFrame < this._dmgNumberCap()
+      && (!skipProcs || isCrit || killResult || !horde);
+
+    if (showFx) {
       g.particles.damageNumber(enemy.x, enemy.z, damage, critHit);
-      if (critHit && damage >= 1) {
+      this._dmgNumbersThisFrame++;
+      if (isCrit && damage >= 1 && !horde && !this._frameHitStop) {
         g.applyHitStop();
         g.cameraController.addShake(0.28);
+        this._frameHitStop = true;
       }
     }
-    g.audio.hit();
+    if (!this._frameHitSound && (!horde || !skipProcs || killResult)) {
+      g.audio.hit();
+      this._frameHitSound = true;
+    }
 
     if (!skipProcs && enemy) {
-      this._applyHitProcs(damage, enemy, critHit);
+      this._applyHitProcs(damage, enemy, isCrit);
     }
 
     if (killResult) {
-      g.player.addKill();
-      const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
-      const xpValue = killResult.xp * xpMult;
-      const overflow = g.gems.spawn(
-        killResult.pos.x, killResult.pos.z, xpValue,
-        g.player.position.x, g.player.position.z
-      );
-      if (overflow > 0) {
-        const levels = g.player.addXp(overflow);
-        if (levels > 0) g.queueLevelUp(levels);
-      }
-      if (g.player.coinMult > 0) {
-        g.runCoins += Math.max(1, Math.floor(g.player.coinMult * 10));
-      }
-      g.quests.track('kills');
-      if (enemy?.type === 'elite' && !killResult.isBoss) {
-        g.quests.track('elites');
-      }
-      if (killResult.isBoss) {
-        g._runBosses++;
-        g.quests.track('bosses');
-        if (enemy?.isMesaGuardian) {
-          g.quests.track('guardians');
-          g.interactables.removeMesaBeaconForGuardian(enemy);
-        }
-        g.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
-      }
-      const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0x44ff88;
-      g.particles.burst(killResult.pos.x, killResult.pos.z, color);
-      g.audio.kill();
+      this._resolveKill(killResult, enemy, element);
     }
     if (g.player.lifesteal > 0) {
       g.player.heal(damage * g.player.lifesteal);
@@ -82,24 +244,38 @@ export class CombatController {
 
     if (g.player.explodeChance > 0 && runRandom() < g.player.explodeChance) {
       const explodeDmg = damage * 0.65;
-      const nearby = g.enemies.getNearby(ex, ez, 4);
-      for (const { enemy: e2 } of nearby) {
-        if (!e2.alive || e2 === enemy) continue;
-        const result = g.enemies.damageEnemy(e2, explodeDmg, null);
-        this.handleCombatHit(explodeDmg, result, null, e2, { skipProcs: true });
+      this._applyAoEDamage(ex, ez, 4, explodeDmg, null, enemy, COMBAT_AOE_PROC_MAX_TARGETS);
+      if (this._killBurstsThisFrame < 4) {
+        g.particles.burst(ex, ez, 0xff8844, 5);
+        this._killBurstsThisFrame++;
       }
-      g.particles.burst(ex, ez, 0xff8844);
     }
 
     if (isCrit && g.player.critSplash > 0 && runRandom() < g.player.critSplash) {
-      const splashDmg = damage * 0.5;
-      const nearby = g.enemies.getNearby(ex, ez, 3.5);
-      for (const { enemy: e2 } of nearby) {
-        if (!e2.alive || e2 === enemy) continue;
-        const result = g.enemies.damageEnemy(e2, splashDmg, null);
-        this.handleCombatHit(splashDmg, result, null, e2, { skipProcs: true });
-      }
+      this._applyAoEDamage(ex, ez, 3.5, damage * 0.5, null, enemy, COMBAT_AOE_PROC_MAX_TARGETS);
     }
+  }
+
+  /** Pick up to `count` nearest entries without sorting the full list. */
+  _pickNearestTargets(nearby, count) {
+    const targets = [];
+    const used = new Set();
+    for (let n = 0; n < count; n++) {
+      let best = null;
+      let bestDist = Infinity;
+      for (let i = 0; i < nearby.length; i++) {
+        const entry = nearby[i];
+        if (used.has(entry.enemy)) continue;
+        if (entry.dist < bestDist) {
+          bestDist = entry.dist;
+          best = entry;
+        }
+      }
+      if (!best) break;
+      used.add(best.enemy);
+      targets.push(best.enemy);
+    }
+    return targets;
   }
 
   /** Player auto-attack when attack timer is ready. */
@@ -107,11 +283,17 @@ export class CombatController {
     const g = this.game;
     if (!g.player.canAttack()) return;
 
-    const nearby = g.enemies.getNearby(g.player.position.x, g.player.position.z, 20);
+    const nearby = g.enemies.getNearby(
+      g.player.position.x,
+      g.player.position.z,
+      20,
+      this._targetScratch
+    );
     if (nearby.length === 0) return;
 
-    const sorted = nearby.slice().sort((a, b) => a.dist - b.dist);
-    const primary = sorted[0]?.enemy;
+    const targets = this._pickNearestTargets(nearby, g.player.projectileCount);
+    const primary = targets[0] ?? nearby[0]?.enemy;
+    if (!primary) return;
     const baseDmg = g.player.computeDamageForEnemy(primary);
     const isCrit = runRandom() < g.player.critChance;
     const finalDmg = isCrit ? baseDmg * g.player.getCritMultiplier() : baseDmg;
@@ -122,11 +304,6 @@ export class CombatController {
     const py = g.player.getProjectileY();
     const pz = g.player.position.z;
     const projSpeed = g.player.projectileSpeed * (1 + g.player.projectileSpeedMult);
-    const targets = [];
-    for (let i = 0; i < g.player.projectileCount; i++) {
-      const pick = i < sorted.length ? sorted[i] : sorted[0];
-      targets.push(pick.enemy);
-    }
     g.projectiles.fireVolley(
       px, py, pz, targets,
       projSpeed, finalDmg,

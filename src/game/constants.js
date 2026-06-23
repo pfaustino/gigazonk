@@ -42,6 +42,12 @@ export const PLAYER_BASE = {
 /** Hard cap on crit chance (75%). Crit damage has no cap. */
 export const CRIT_CHANCE_CAP = 0.75;
 
+/** Level N→N+1 XP = floor(XP_LEVEL_BASE * XP_LEVEL_GROWTH^(N-1)). Tune with XP_PICKUP_MULT. */
+export const XP_LEVEL_BASE = 48;
+export const XP_LEVEL_GROWTH = 1.172;
+/** Scales kill/gem/chest XP before player xpMult (horde density runs hot otherwise). */
+export const XP_PICKUP_MULT = 0.88;
+
 import { runRandomInt } from '../lib/runRandom.js';
 import { ENEMY_TYPES, GRUNT_COLORS } from './gameData.js';
 
@@ -73,6 +79,26 @@ export const ENEMY_DESPAWN_DISTANCE = 58;
 export const ENEMY_DESPAWN_BATCH = 24;
 /** Full terrain physics only within this radius. */
 export const ENEMY_NEAR_RADIUS = 42;
+/** Min center distance = (scaleA + scaleB) * this (enemy–enemy personal space). */
+export const ENEMY_SEPARATION_SCALE = 0.55;
+/** Neighbor query radius multiplier on enemy scale. */
+export const ENEMY_SEPARATION_QUERY = 1.75;
+/** Overlap resolved per separation pass (0–1). */
+export const ENEMY_SEPARATION_STRENGTH = 0.9;
+/** Cap separation push per enemy per pass (world units). */
+export const ENEMY_SEPARATION_MAX_PUSH = 1.4;
+/** Separation passes per frame (grid rebuilt between passes). */
+export const ENEMY_SEPARATION_PASSES = 1;
+/** Above this alive count, use one separation pass to save CPU. */
+export const ENEMY_SEPARATION_HEAVY_COUNT = 180;
+/** Only separate enemies within this radius of the player (horde pile zone). */
+export const ENEMY_SEPARATION_PLAYER_RADIUS = 28;
+/** Horde size above which grunt HP bars are hidden (boss/elite still show). */
+export const ENEMY_HP_BAR_HORDE_LIMIT = 32;
+/** Batch kill FX / quest checks above this alive count (explode + pierce lag fix). */
+export const COMBAT_HORDE_FX_LIMIT = 28;
+/** Max explode/splash targets per proc during horde combat. */
+export const COMBAT_AOE_PROC_MAX_TARGETS = 14;
 export const MAX_PROJECTILES = 200;
 export const MAX_GEMS = 1200;
 
@@ -81,7 +107,7 @@ export const BOSS_SPAWN_INTERVAL = 120;
 export const BOSS_TELEGRAPH_SECONDS = 3;
 export const HIT_STOP_CRIT_SECONDS = 0.045;
 export const BASE_SPAWN_GROUP_SIZE = 3;
-export const GROUP_CLUSTER_RADIUS = 3.5;
+export const GROUP_CLUSTER_RADIUS = 4.5;
 export const MAX_SPAWN_GROUP_SIZE = 7;
 export const MAX_GIGA_GROUP_SIZE = 28;
 /** Mesa guardians scale to this many hits of current effective damage when engaged. */

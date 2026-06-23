@@ -3,7 +3,7 @@ import { getEnemyHpBarWorldY } from './constants.js';
 import { runRandom } from '../lib/runRandom.js';
 
 const BURST_POOL_SIZE = 96;
-const HP_BAR_THROTTLE_ENEMY_COUNT = 150;
+const HP_BAR_THROTTLE_ENEMY_COUNT = 32;
 
 export class ParticleSystem {
   constructor(scene) {

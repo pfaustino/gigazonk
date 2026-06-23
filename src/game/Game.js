@@ -41,6 +41,41 @@ export class Game {
     this.quests.assignNewQuests();
     this.upgrades = new UpgradeSystem();
 
+    this.state = 'title';
+    this.elapsed = 0;
+    this.paused = false;
+    this.modalPause = false;
+    this.menuPause = false;
+    this.inRift = false;
+    this.bossTimer = 0;
+    this.bossCount = 0;
+    this.gigaSpawnTimer = 0;
+    this.pendingGigaSpawn = false;
+    this.gigaSpawnSurvivalTimer = 0;
+    this.runCoins = 0;
+    this.coinsAlreadyBanked = 0;
+    this.currentBiome = null;
+    this.pendingAction = null;
+    this.pendingLevelUps = 0;
+    this._gameOverActive = false;
+    this.runSeed = 0;
+    this._devFlags = parseDevFlags();
+    this._pendingRunSeed = this._devFlags.seed;
+    this._devPendingBiome = this._devFlags.biome;
+    this.village = null;
+    this.arena = null;
+
+    if (this._devFlags.coins) {
+      saveData.addCoins(this._devFlags.coins);
+    }
+
+    canvas.addEventListener('click', () => this.audio.resume());
+    window.addEventListener('resize', () => this.onResize());
+    this.ui.showTitle((action) => this.handleTitleAction(action));
+    if (saveData.loadFailed) {
+      this.ui.toast('Save reset — previous progress file was corrupt', 'warning');
+    }
+
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -87,39 +122,6 @@ export class Game {
     this.combat = new CombatController(this);
     this.metrics = new GameMetrics();
 
-    this.state = 'title';
-    this.elapsed = 0;
-    this.paused = false;
-    this.modalPause = false;
-    this.menuPause = false;
-    this.inRift = false;
-    this.bossTimer = 0;
-    this.bossCount = 0;
-    this.gigaSpawnTimer = 0;
-    this.pendingGigaSpawn = false;
-    this.gigaSpawnSurvivalTimer = 0;
-    this.runCoins = 0;
-    this.coinsAlreadyBanked = 0;
-    this.currentBiome = null;
-    this.pendingAction = null;
-    this.pendingLevelUps = 0;
-    this._gameOverActive = false;
-    this.runSeed = 0;
-    this._devFlags = parseDevFlags();
-    this._pendingRunSeed = this._devFlags.seed;
-    this._devPendingBiome = this._devFlags.biome;
-
-    if (this._devFlags.coins) {
-      saveData.addCoins(this._devFlags.coins);
-    }
-
-    canvas.addEventListener('click', () => this.audio.resume());
-
-    window.addEventListener('resize', () => this.onResize());
-    this.ui.showTitle((action) => this.handleTitleAction(action));
-    if (saveData.loadFailed) {
-      this.ui.toast('Save reset — previous progress file was corrupt', 'warning');
-    }
     this.timer = new THREE.Timer();
     this.timer.connect(document);
     this.audio.applySettings(saveData.data.settings);
@@ -128,13 +130,16 @@ export class Game {
       if (this.state === 'title') this.audio.playMusic('title');
     });
 
-    this.village = new Village(this.scene);
-    this.arena = new Arena(this.scene);
-
     if (import.meta.env.DEV || this._devFlags.dev) {
       this.devPanel = new DevPanel(this);
     }
     this.animate();
+  }
+
+  _ensureWorldScenes() {
+    if (this.village && this.arena) return;
+    this.village = new Village(this.scene);
+    this.arena = new Arena(this.scene);
   }
 
   setShadowFrustum(halfExtent) {
@@ -204,6 +209,7 @@ export class Game {
   }
 
   enterVillage() {
+    this._ensureWorldScenes();
     this._gameOverActive = false;
     saveData.data.runSnapshot = null;
     saveData.save();
@@ -225,6 +231,7 @@ export class Game {
   }
 
   startArena() {
+    this._ensureWorldScenes();
     saveData.data.runSnapshot = null;
     this.state = 'arena';
     this.village.setVisible(false);
@@ -337,6 +344,7 @@ export class Game {
   }
 
   onResize() {
+    if (!this.renderer || !this.camera) return;
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -406,6 +414,7 @@ export class Game {
 
   leaveArenaForVillage() {
     if (this.state !== 'arena') return;
+    this._ensureWorldScenes();
 
     this.ui._navCleanup?.();
     this.ui.gameMenu.screen?.remove();
@@ -442,6 +451,7 @@ export class Game {
   }
 
   resumeArenaRun() {
+    this._ensureWorldScenes();
     const snap = saveData.data.runSnapshot;
     if (!snap?.pausedInVillage) return;
 
@@ -531,6 +541,7 @@ export class Game {
   }
 
   startArenaFromSnapshot(snap) {
+    this._ensureWorldScenes();
     this.state = 'arena';
     this.village.setVisible(false);
     this.arena.setVisible(true);
@@ -559,8 +570,8 @@ export class Game {
     this.paused = false;
     this.ui.removeScreens();
     this.state = 'title';
-    this.village.setVisible(false);
-    this.arena.setVisible(false);
+    this.village?.setVisible(false);
+    this.arena?.setVisible(false);
     this.hideCombat();
     this.player.mesh.visible = false;
     this.setSkyColor(TITLE_SKY);

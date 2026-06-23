@@ -19,16 +19,16 @@
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.0",
     "@typescript-eslint/parser": "^8.62.0",
-    "eslint": "^9.39.1",
+    "eslint": "^10.5.0",
     "gh-pages": "^6.3.0",
-    "globals": "^16.5.0",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.12",
+    "globals": "^17.7.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0",
     "vite-mcp": "^0.2.2",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "three": "^0.184.0"

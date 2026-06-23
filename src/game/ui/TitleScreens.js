@@ -29,6 +29,7 @@ export function showTitle(ui, onAction) {
         <p class="subtitle">Survive. Zonk. Ascend.</p>
         <p class="menu-hint" style="margin-bottom:20px">${CONFIRM_HINT}</p>
         <button class="btn btn-primary" id="btn-play">Play</button>
+        <button class="btn btn-secondary" id="btn-village">Enter Village</button>
         <p class="title-stats">
           Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
         </p>
@@ -36,8 +37,10 @@ export function showTitle(ui, onAction) {
       </div>
     `;
   const play = screen.querySelector('#btn-play');
+  const village = screen.querySelector('#btn-village');
   play.onclick = () => { ui._audio?.ui(); onAction('arena'); };
-  ui._navCleanup = bindMenuList(navCtx(ui), [play]);
+  village.onclick = () => { ui._audio?.ui(); onAction('village'); };
+  ui._navCleanup = bindMenuList(navCtx(ui), [play, village]);
   setGameReady(GAME_READY.TITLE);
 }
 

@@ -1,13 +1,12 @@
 import { RARITIES, UPGRADE_TEMPLATES } from './gameData.js';
 import { formatOfferDesc } from './UpgradeText.js';
 import { runRandom } from '../lib/runRandom.js';
+import { RARITY_FIXED_EFFECT_KEYS } from './upgradeStatSchema.js';
 
 export { RARITIES, UPGRADE_TEMPLATES, formatOfferDesc };
 
-const FIXED_KEYS = new Set(['pierce', 'element', 'doubleJump', 'familiars', 'projectileCount', 'lightningChains']);
-
 function scaleValue(key, value, mult, template) {
-  if (template.fixedEffect && FIXED_KEYS.has(key)) return value;
+  if (template.fixedEffect && RARITY_FIXED_EFFECT_KEYS.has(key)) return value;
   if (key === 'element') return value;
   if (key === 'pierce') return 1;
   if (key === 'lightningChains') return value;

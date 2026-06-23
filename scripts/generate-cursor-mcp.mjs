@@ -47,19 +47,40 @@ if (isWindows) {
   };
 }
 
-const config = {
-  mcpServers: {
-    'cursor-ide-browser': {
-      url: 'https://mcp.cursor.com/browser',
-    },
-    'vite-mcp': {
-      url: 'http://localhost:5173/__mcp',
-    },
-    'chrome-devtools': chromeDevTools,
+const mcpServers = {
+  'cursor-ide-browser': {
+    url: 'https://mcp.cursor.com/browser',
+  },
+  'vite-mcp': {
+    url: 'http://localhost:5173/__mcp',
+  },
+  'chrome-devtools': chromeDevTools,
+  playwright: {
+    command: 'npx',
+    args: ['-y', '@playwright/mcp@latest', '--headless', '--browser=chromium'],
+    cwd: root,
+  },
+  context7: {
+    command: 'npx',
+    args: ['-y', '@upstash/context7-mcp'],
   },
 };
+
+if (process.env.GITHUB_TOKEN) {
+  mcpServers.github = {
+    url: 'https://api.githubcopilot.com/mcp/',
+    headers: {
+      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+    },
+  };
+}
+
+const config = { mcpServers };
 
 const out = path.join(root, '.cursor', 'mcp.json');
 fs.writeFileSync(out, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`Wrote ${out}`);
+if (!process.env.GITHUB_TOKEN) {
+  console.log('Tip: set GITHUB_TOKEN before setup:mcp to enable github MCP server.');
+}
 console.log('Restart Cursor or reload MCP in Settings → MCP.');

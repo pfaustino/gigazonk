@@ -19,6 +19,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-dev-workspace.
 
 Then open `C:\Dev\github-projects\GigaZonk` in Cursor → **Reopen in Container** (optional, needs Docker).
 
+Install recommended extensions (Cursor will prompt, or run `npm run setup:extensions`).
+
+## IDE extensions & editor
+
+Workspace recommendations live in `.vscode/extensions.json`. After clone:
+
+```bash
+npm run setup:extensions
+```
+
+| Layer | Extensions | Purpose |
+|-------|------------|---------|
+| Quality | ESLint, Error Lens, Pretty TS Errors | `--max-warnings 0` inline; ESLint fix on save |
+| Tests | Vitest Explorer, Playwright | Unit `tests/` only; e2e `e2e/` (separate trees) |
+| Git / PR | GitLens, GitHub PR + Actions | Blame, pinned CI workflows, no auto-PR on publish |
+| Game data | JSON Crack, Rainbow CSV, Schema Store | Visualize `data/*.json` balance tables |
+| 3D assets | Super GLB Viewer | Preview `.glb`/`.gltf` in-editor |
+| HUD / CSS | HTML CSS Support, CSS Peek | UI templates → `src/style.css` |
+| Docs / wiki | Markdown All in One, markdownlint, Code Spell Checker | ADRs + `wiki/` before sync |
+| Dev UX | Vite (no auto-start), EditorConfig, Todo Tree, Import Cost | No double dev servers; Three.js import hints |
+
+**Config files:** `.vscode/settings.json` (extension tuning), `.vscode/tasks.json` (`check`, `dev`, e2e), `.editorconfig`. Key defaults: Vitest excludes `e2e/`; Vite extension does not auto-start; spell-check skips `dist/` and `wiki/`; markdown TOC updates on save for long docs.
+
 ## Dev URL flags
 
 | Flag | Effect |
@@ -37,10 +60,24 @@ With `npm run dev`, vite-mcp exposes browser tools at `http://localhost:5173/__m
 After clone or `npm install` on **`C:\Dev`**:
 
 ```bash
-npm run setup:mcp    # LOCALAPPDATA launcher + .cursor/mcp.json
+npm run setup:mcp         # chrome-devtools launcher + .cursor/mcp.json
+npm run setup:extensions  # install .vscode/extensions.json (Cursor or code CLI)
 ```
 
+Regenerate MCP after dependency updates. Optional: set `GITHUB_TOKEN` in the environment before `setup:mcp` to enable the GitHub MCP server.
+
+| MCP server | Role |
+|------------|------|
+| `cursor-ide-browser` | Agent click-through in Cursor tab |
+| `vite-mcp` | Dev console + localStorage (`npm run dev`) |
+| `chrome-devtools` | Network, perf traces, source-mapped stacks |
+| `playwright` | Agent browser automation via `@playwright/mcp` |
+| `context7` | Up-to-date library docs (Three.js, Vite, Playwright) |
+| `github` | Issues/PRs (when `GITHUB_TOKEN` set at setup) |
+
 Reload MCP in Cursor Settings. In dev container, port 5173 is forwarded to the host.
+
+**Three.js e2e:** dev exposes `window.PLAYWRIGHT_THREE.scene` (`src/main.js`). Import `test`/`expect` from `e2e/helpers/playwrightThree.ts` for scene-aware specs (`@timjen/playwright-three`).
 
 **Stage source to Google Drive after ship:**
 
@@ -134,7 +171,8 @@ npm run deploy           # gh-pages manual
 - Project rules: `.cursor/rules/`
 - Project skill: `.cursor/skills/gigazonk-development/`
 - Personal skills: `~/.cursor/skills/web-game-development/`, `game-balance-tuning/`, `game-ship-release/`
-- MCP: `.cursor/mcp.json` (browser + vite-mcp in dev); add PixelLab in user global `~/.cursor/mcp.json`
+- MCP: `.cursor/mcp.json` — run `npm run setup:mcp`; add PixelLab in user global `~/.cursor/mcp.json`
+- Extensions: `.vscode/extensions.json` — run `npm run setup:extensions`
 
 ## Performance budget
 

@@ -5,7 +5,8 @@ import {
   UPGRADE_TEMPLATES,
   buildUpgradeOffer,
   getTemplateId,
-} from './Awards.js';
+} from './UpgradeOffers.js';
+import { isUpgradeTemplateCapped } from './upgradeStatSchema.js';
 import { runRandom } from '../lib/runRandom.js';
 import { assert } from '../lib/assert.js';
 
@@ -661,19 +662,9 @@ export class UpgradeSystem {
   }
 
   _isCapped(templateId, player) {
-    if (!player) return false;
     const template = UPGRADE_TEMPLATES.find(t => t.id === templateId);
     if (!template) return false;
-    const e = template.baseEffect;
-    if (templateId === 'double_jump' && player.maxAirJumps >= 5) return true;
-    if (templateId === 'proj_pierce' && player.projectilePierce >= 5) return true;
-    if (e.evasion && player.evasion >= 0.75) return true;
-    if (e.armor && player.armor >= 0.5) return true;
-    if (e.critChance && player.critChance >= CRIT_CHANCE_CAP) return true;
-    if (e.poisonChance && player.poisonChance >= 1) return true;
-    if (e.explodeChance && player.explodeChance >= 1) return true;
-    if (e.damagePerKill && player.killDamageBonus >= 0.1) return true;
-    return false;
+    return isUpgradeTemplateCapped(templateId, template.baseEffect, player);
   }
 
   _isTemplateAvailable(template, player) {

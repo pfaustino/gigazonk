@@ -1,6 +1,6 @@
 ---
 description: Data and balance conventions for constants and game data
-globs: src/game/constants.js,src/game/Awards.js,src/game/SkillTree.js,**/data/**
+globs: src/game/constants.js,src/game/UpgradeOffers.js,src/game/upgradeStatSchema.js,src/game/SkillTree.js,**/data/**
 alwaysApply: false
 ---
 
@@ -9,7 +9,7 @@ alwaysApply: false
 ## Structure
 
 - Enemy types: single `ENEMY_TYPES` map — hp, speed, damage, xp, scale together.
-- Upgrades: templates in `Awards.js`; application logic in `UpgradeSystem.js` only.
+- Upgrades: templates in `data/upgrades.json`; offer rolls in `UpgradeOffers.js`; caps in `upgradeStatSchema.js`; application in `UpgradeSystem.js` / `Player.js`.
 - Skills: `SkillTree.js` defines tree; costs via `getSkillUpgradeCost`.
 
 ## Tuning rules

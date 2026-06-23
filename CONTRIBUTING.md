@@ -7,9 +7,11 @@ Thanks for your interest in GigaZonk.
 ```bash
 npm install
 npm run dev
+npm run setup:extensions   # recommended IDE extensions
+npm run setup:mcp            # Cursor MCP (host)
 ```
 
-See `DEV.md` for URL flags, MCP, and manual test scripts.
+See `DEV.md` for URL flags, MCP, extensions, and manual test scripts.
 
 ## Quality gate
 

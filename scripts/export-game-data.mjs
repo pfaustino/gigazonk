@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { RARITIES, UPGRADE_TEMPLATES } from '../src/game/Awards.js';
+import { RARITIES, UPGRADE_TEMPLATES } from '../src/game/UpgradeOffers.js';
 
 const enemies = {
   gruntColors: [

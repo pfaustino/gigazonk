@@ -84,7 +84,7 @@ export const MAX_GIGA_GROUP_SIZE = 28;
 /** Mesa guardians scale to this many hits of current effective damage when engaged. */
 export const MESA_GUARDIAN_HP_HITS = 5;
 
-// Level-up awards live in Awards.js (UPGRADE_TEMPLATES + rarity tiers).
+// Level-up offers live in UpgradeOffers.js + data/upgrades.json (UPGRADE_TEMPLATES + rarity tiers).
 
 export const ZONK_DOME_CAMP_RADIUS = 20;
 export const ZONK_DOME_CAMP_TIME = 15;

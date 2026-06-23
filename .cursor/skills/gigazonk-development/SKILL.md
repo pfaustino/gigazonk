@@ -12,7 +12,7 @@ description: >-
 
 - Vite 8, Three.js, vanilla JS (tsconfig present — prefer TS for new data modules)
 - Entry: `src/main.js` → `src/game/Game.js`
-- Balance: `src/game/constants.js`, `Awards.js`, `SkillTree.js`, `UpgradeSystem.js`
+- Balance: `src/game/constants.js`, `UpgradeOffers.js`, `upgradeStatSchema.js`, `SkillTree.js`, `UpgradeSystem.js`
 - Save: `SaveData.js` key `gigazonk_save` with migrations
 
 ## Module map
@@ -53,6 +53,10 @@ description: >-
 3. Wire in `Game.js` last (minimal diff)
 4. Update README differentiators table if player-visible
 5. Save migration if meta progression changes
+
+## IDE setup
+
+After clone: `npm run setup:extensions` + `npm run setup:mcp`. Extensions in `.vscode/extensions.json`; MCP regenerates `.cursor/mcp.json` (playwright, context7, chrome-devtools, vite-mcp). Three.js e2e: `window.PLAYWRIGHT_THREE.scene` in dev; import from `e2e/helpers/playwrightThree.ts`.
 
 ## Verification (layered gates)
 

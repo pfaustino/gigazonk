@@ -30,6 +30,22 @@ Browser horde survival roguelike: Vite + Three.js, vanilla JS.
 
 Use Vitest + Playwright Testing sidebar when extensions installed. Full workflow: `.cursor/rules/browser-game-testing.mdc`, extensions: `DEV.md`.
 
+## Publish (user says push / publish / ship)
+
+After merge to `main`, **always** verify and report **both**:
+
+| Host | URL | Workflow |
+|------|-----|----------|
+| GitHub Pages | https://pfaustino.github.io/gigazonk/ | Deploy to GitHub Pages |
+| itch.io | https://pfaustino.itch.io/gigazonk | Deploy to itch.io |
+
+```powershell
+gh run list --branch main --workflow "Deploy to GitHub Pages" --limit 1
+gh run list --branch main --workflow "Deploy to itch.io" --limit 1
+```
+
+Never say “published” if only Pages succeeded — itch.io must be included every time.
+
 ## Do not
 
 - Add per-enemy Mesh in spawn hot paths

@@ -22,7 +22,7 @@ npm run test:e2e:cross
 
 During development on UI flows, agents use **`test:e2e:headed`** or **`:ui`** (stage 2) before the headless pre-push commands above.
 
-**Deploy:** Merges to `main` auto-publish GitHub Pages and itch.io (`deploy-pages.yml`, `deploy-itch.yml`). Do not deploy from PR branches. itch requires `BUTLER_API_KEY` in GitHub Environment **itch** (ADR 0005).
+**Deploy (always both hosts):** Merges to `main` auto-publish **GitHub Pages** and **itch.io** (`deploy-pages.yml`, `deploy-itch.yml`). When reporting a publish/ship to the user, include **both URLs** and confirm both workflow runs succeeded. Do not deploy from PR branches. itch requires `BUTLER_API_KEY` in GitHub Environment **itch** (ADR 0005).
 
 Lint uses `--max-warnings 0`.
 

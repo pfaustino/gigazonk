@@ -40,8 +40,11 @@ index.html → main.js
                        ├── ParticleSystem.js
                        ├── CombatController.js
                        ├── RunSnapshot.js
+                       ├── AchievementSystem.js, DailyChallenge.js, Tutorial.js, TouchControls.js
+                       ├── InstancedRockField.js (arena rocks)
                        ├── UpgradeText.js
                        ├── ui/MenuNavigation.js, TitleScreens.js, HudScreens.js, LevelUpScreen.js
+                       ├── ui/RunSummaryScreen.js, TutorialOverlay.js
                        └── lib/ RunRng, assert, ErrorReporter, parseDevFlags
 ```
 
@@ -82,9 +85,9 @@ Arena combat uses seeded `runRandom()` for loot, spawns, upgrades; static visual
 | `UpgradeOffers.js` | Rarity scaling, offer rolls (`buildUpgradeOffer`) |
 | `upgradeStatSchema.js` | Effect keys → player caps (shared by offers + UpgradeSystem) |
 | `UpgradeSystem.js` | Run upgrades, preview math, synergy nova |
-| `UI.js` | All DOM screens: title, HUD, level-up, shop, quests |
+| `UI.js` | All DOM screens: title, HUD, level-up, run summary, tutorial, shop, quests |
 | `GameMenu.js` | Pause / settings overlay |
-| `SaveData.js` | Schema version, migrations, `runSnapshot` |
+| `SaveData.js` | Schema version, migrations, achievements, tutorial, daily challenge, `runSnapshot` |
 | `Arena.js` | Ground, biomes, rocks, mesa generation |
 | `Village.js` | Hub scene props |
 | `TerrainFeatures.js` | Mesas, ramps, height queries, loot clearance |
@@ -102,14 +105,14 @@ Arena combat uses seeded `runRandom()` for loot, spawns, upgrades; static visual
 ## Data flow
 
 ```
-data/enemies.json, data/upgrades.json, data/quests.json, data/skills.json
+data/enemies.json, data/upgrades.json, data/quests.json, data/skills.json, data/achievements.json
         ↓
 gameData.ts → constants.js / UpgradeOffers.js / SkillTree.js
         ↓
 EnemyManager, UpgradeSystem, Interactables
 
 SaveData ←→ localStorage gigazonk_save
-  ├── meta: coins, skills, characters, settings
+  ├── meta: coins, skills, characters, achievements, tutorial, daily challenge, settings
   └── runSnapshot: player, elapsed, runSeed, rngState, managers state
 
 URL flags (?seed, ?dev, ?biome) → parseDevFlags.ts → Game init
@@ -134,6 +137,7 @@ URL flags (?seed, ?dev, ?biome) → parseDevFlags.ts → Game init
 | Mesa height spatial index | `MesaHeightIndex.js`, `Arena.js`, `TerrainFeatures.js` |
 | Particle burst pooling + HP bar throttling | `Particles.js` |
 | Instanced mesh dirty batching | `EnemyManager.js`, `ProjectileManager.js` |
+| Instanced arena scatter rocks | `InstancedRockField.js`, `Arena.js` |
 
 ### Boot & e2e readiness
 
@@ -142,7 +146,7 @@ Progressive init keeps the title DOM responsive on slow browsers (CI Firefox):
 | Mechanism | Module |
 |-----------|--------|
 | Title before WebGL + managers | `Game.js` constructor |
-| Lazy `_ensureVillage()` / `_ensureArena()` | `Game.js` |
+| Lazy `_ensureVillage()` / `_ensureArena()` / `_ensureCombatManagers()` | `Game.js` |
 | Arena field scatter deferred after HUD | `Game.js` `_deferArenaFieldSetup()` |
 | `<html data-game-ready>` phases | `src/lib/gameReady.js`, title/HUD/village UI |
 
@@ -162,7 +166,21 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 | `Awards.js` → `UpgradeOffers.js` + `upgradeStatSchema.js` | `UpgradeOffers.js`, `tests/upgradeOffers.test.js` |
 | IDE workflow (extensions, MCP, clean terminal) | `.vscode/`, `.cursor/mcp.json`, `scripts/run-playwright.mjs` |
 
-**Deferred (next phase):** shop / skill-tree e2e, `playwright-three` scene specs, defer combat managers until arena, instanced rocks.
+**Deferred (next phase):** `playwright-three` scene specs, full mobile playtest pass.
+
+### Phase D (ship plan) — implemented
+
+| Item | Module |
+|------|--------|
+| All four characters playable | `constants.js` |
+| End-of-run summary + achievements | `ui/RunSummaryScreen.js`, `AchievementSystem.js`, `data/achievements.json` |
+| First-run tutorial overlay | `Tutorial.js`, `ui/TutorialOverlay.js` |
+| Daily challenge (+50 coins / 3 min) | `DailyChallenge.js`, `ui/TitleScreens.js` |
+| Reputation village unlocks (NPCs + landmarks) | `Village.js`, `constants.js` |
+| Biome-weighted enemy spawns (`frostling`, `ember`) | `EnemyManager.js`, `data/enemies.json` |
+| Touch controls overlay | `TouchControls.js`, `Input.js` |
+| Defer combat managers until arena/village enter | `Game.js` `_ensureCombatManagers()` |
+| Skill tree / quest board / pause-resume e2e | `e2e/smoke.spec.ts`, `window.__gigazonkGame` dev hook |
 
 ### IDE & agent workflow
 
@@ -172,7 +190,7 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 | Workspace editor + extension tuning | `.vscode/settings.json`, `.vscode/tasks.json`, `.editorconfig` |
 | Dev container extensions | `.devcontainer/devcontainer.json` |
 | MCP servers | `.cursor/mcp.json` — `npm run setup:mcp` (browser, vite-mcp, chrome-devtools, playwright, context7) |
-| Three.js e2e hook | `window.PLAYWRIGHT_THREE` in dev (`src/main.js`) |
+| Three.js e2e hook | `window.PLAYWRIGHT_THREE`, `window.__gigazonkGame` in dev (`src/main.js`) |
 | Scene-aware Playwright | `@timjen/playwright-three`, `e2e/helpers/playwrightThree.ts` |
 
 ## Build & deploy

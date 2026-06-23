@@ -1,0 +1,14 @@
+[
+  { "id": "first_run", "name": "First Steps", "desc": "Complete your first arena run", "icon": "🦊", "coins": 10 },
+  { "id": "slayer_100", "name": "Horde Breaker", "desc": "Slay 100 enemies in one run", "icon": "⚔️", "coins": 25 },
+  { "id": "slayer_500", "name": "Zonk Annihilator", "desc": "Slay 500 enemies in one run", "icon": "💀", "coins": 50 },
+  { "id": "survive_5", "name": "Still Standing", "desc": "Survive 5 minutes in the arena", "icon": "⏱️", "coins": 30 },
+  { "id": "survive_10", "name": "Iron Zonka", "desc": "Survive 10 minutes in the arena", "icon": "🛡️", "coins": 60 },
+  { "id": "boss_first", "name": "Lord Slayer", "desc": "Defeat a Zonk Lord", "icon": "👑", "coins": 40 },
+  { "id": "rift_runner", "name": "Rift Diver", "desc": "Enter a Zonk Rift", "icon": "🌀", "coins": 20 },
+  { "id": "nova_tri", "name": "Tri-Zonk Master", "desc": "Trigger Tri-Zonk Nova", "icon": "✨", "coins": 35 },
+  { "id": "combo_20", "name": "Combo King", "desc": "Reach a 20 kill combo", "icon": "🔥", "coins": 25 },
+  { "id": "quest_10", "name": "Quest Hopper", "desc": "Complete 10 quests total", "icon": "📜", "coins": 40 },
+  { "id": "skill_first", "name": "Trainee", "desc": "Buy your first skill tree upgrade", "icon": "📚", "coins": 15 },
+  { "id": "daily_done", "name": "Daily Devotee", "desc": "Complete a daily challenge", "icon": "📅", "coins": 20 }
+]

@@ -21,6 +21,7 @@ if (import.meta.env.DEV) {
     exportText: () => ErrorReporter.exportText(),
     exportJson: () => ErrorReporter.exportJson(),
   };
+  window.__gigazonkGame = gameRef;
   window.PLAYWRIGHT_THREE = {
     get scene() {
       return gameRef?.scene ?? null;

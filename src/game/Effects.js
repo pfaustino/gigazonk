@@ -163,6 +163,7 @@ export class SynergyNova {
     if (!hasAll) return;
 
     this.cooldown = 10;
+    this.onNova?.();
     this.visualNova(player.position);
 
     const nearby = enemyManager.getNearby(player.position.x, player.position.z, 12);

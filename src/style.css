@@ -336,6 +336,209 @@ html, body {
   font-weight: 600;
 }
 
+.quest-item--active {
+  color: #f0e8ff;
+  background: rgba(107, 79, 212, 0.15);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-left: 3px solid #f7c948;
+}
+
+.title-daily {
+  font-size: 13px;
+  color: #a89fd4;
+  margin-top: 8px;
+}
+
+/* Run summary */
+.run-summary-screen {
+  padding: 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.run-summary-title {
+  font-size: 36px;
+  color: #f7c948;
+  margin-bottom: 8px;
+}
+
+.run-summary-sub {
+  color: #aaa;
+  margin-bottom: 20px;
+}
+
+.run-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.run-summary-stat {
+  background: rgba(107, 79, 212, 0.12);
+  border: 1px solid rgba(107, 79, 212, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.run-summary-stat span {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.run-summary-stat strong {
+  color: #f0e8ff;
+  font-size: 16px;
+}
+
+.run-summary-build h3,
+.run-summary-new h3 {
+  font-size: 14px;
+  color: #a89fd4;
+  margin-bottom: 8px;
+}
+
+.run-summary-buffs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.run-summary-buff {
+  background: rgba(247, 201, 72, 0.15);
+  border: 1px solid rgba(247, 201, 72, 0.4);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.run-summary-muted {
+  color: #666;
+  font-size: 12px;
+}
+
+.run-summary-achievement {
+  padding: 6px 0;
+  color: #4ade80;
+  font-size: 13px;
+}
+
+.run-summary-daily {
+  color: #f7c948;
+  margin: 12px 0;
+  font-weight: 600;
+}
+
+.run-summary-hint {
+  margin: 16px 0;
+}
+
+/* Tutorial overlay */
+.tutorial-overlay {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: 360px;
+  width: calc(100% - 32px);
+}
+
+.tutorial-overlay.hidden {
+  display: none;
+}
+
+.tutorial-card {
+  background: rgba(24, 18, 36, 0.95);
+  border: 2px solid #6b4fd4;
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.tutorial-card h3 {
+  color: #f7c948;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.tutorial-card p {
+  color: #ccc;
+  font-size: 14px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+/* Touch controls */
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.touch-controls.hidden {
+  display: none;
+}
+
+.touch-stick {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(107, 79, 212, 0.25);
+  border: 2px solid rgba(247, 201, 72, 0.5);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: 50%;
+  background: rgba(247, 201, 72, 0.6);
+}
+
+.touch-actions {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.touch-btn {
+  min-width: 72px;
+  padding: 10px 16px;
+  background: rgba(24, 18, 36, 0.85);
+  border: 2px solid #6b4fd4;
+  border-radius: 8px;
+  color: #f0e8ff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.touch-btn:active {
+  background: rgba(107, 79, 212, 0.4);
+}
+
 /* Screens */
 .screen {
   position: absolute;

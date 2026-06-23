@@ -23,6 +23,7 @@ export class Input {
       wheel: 0,
     };
     this._stickMove = { x: 0, z: 0 };
+    this._touchMove = { x: 0, z: 0 };
     this._gpPrev = null;
     this._menuStickTimers = { up: 0, down: 0, left: 0, right: 0 };
 
@@ -101,6 +102,8 @@ export class Input {
       this.pointer.wheel = 0;
       this._stickMove.x = 0;
       this._stickMove.z = 0;
+      this._touchMove.x = 0;
+      this._touchMove.z = 0;
       this._gpPrev = null;
       this._menuStickTimers = { up: 0, down: 0, left: 0, right: 0 };
       this.releaseCameraLook();
@@ -131,6 +134,8 @@ export class Input {
     if (!enabled) {
       this._stickMove.x = 0;
       this._stickMove.z = 0;
+      this._touchMove.x = 0;
+      this._touchMove.z = 0;
       this.keys.KeyF = false;
       this.keys.Space = false;
       this.keys.KeyQ = false;
@@ -161,6 +166,17 @@ export class Input {
     if (!allowed) this.releaseCameraLook();
   }
 
+  setTouchMove(x, z) {
+    this._touchMove.x = x;
+    this._touchMove.z = z;
+  }
+
+  touchTap(action) {
+    if (action === 'dodge') this.justPressed.KeyQ = true;
+    if (action === 'magnet') this.justPressed.Space = true;
+    if (action === 'interact') this.justPressed.KeyF = true;
+  }
+
   isDown(code) { return !!this.keys[code]; }
   wasPressed(code) {
     const v = !!this.justPressed[code];
@@ -185,6 +201,13 @@ export class Input {
     if (gx !== 0 || gz !== 0) {
       x += gx;
       z += gz;
+    }
+
+    const tx = this._touchMove.x;
+    const tz = this._touchMove.z;
+    if (tx !== 0 || tz !== 0) {
+      x += tx;
+      z += tz;
     }
 
     const len = Math.hypot(x, z);

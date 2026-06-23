@@ -22,12 +22,23 @@ import { ErrorReporter } from '../lib/ErrorReporter.js';
 import { DevPanel } from '../dev/DevPanel.js';
 import { RunRng } from '../lib/RunRng.js';
 import { setActiveRunRng, getActiveRunRng, runRandom } from '../lib/runRandom.js';
-import { CombatController } from './CombatController.js';
+import { TouchControls } from './TouchControls.js';
+import { checkRunAchievements } from './AchievementSystem.js';
+import { tryCompleteDailyChallenge, syncDailyChallengeDay } from './DailyChallenge.js';
+import {
+  shouldShowTutorial,
+  getCurrentTutorialStep,
+  getTutorialStepIndex,
+  advanceTutorialStep,
+  isTutorialComplete,
+} from './Tutorial.js';
+import { getActiveBuffs } from './UpgradeSystem.js';
 import { GameMetrics } from './GameMetrics.js';
 import {
   captureRunSnapshot,
   restoreArenaFromSnapshot as applyRunSnapshot,
 } from './RunSnapshot.js';
+import { CombatController } from './CombatController.js';
 
 export class Game {
   constructor(canvas) {
@@ -95,20 +106,36 @@ export class Game {
     this.setupLights();
 
     this.player = new Player(this.scene);
-    this.enemies = new EnemyManager(this.scene);
-    this.projectiles = new ProjectileManager(this.scene);
-    this.gems = new GemManager(this.scene);
-    this.interactables = new Interactables(this.scene);
-    this.familiars = new FamiliarManager(this.scene);
-    this.fireTrail = new FireTrailManager(this.scene);
-    this.zonkDomes = new ZonkDomeManager(this.scene);
-    this.rifts = new RiftManager(this.scene);
-    this.synergy = new SynergyNova(this.scene);
-    this.particles = new ParticleSystem(this.scene);
+    this._combatReady = false;
+    this.enemies = null;
+    this.projectiles = null;
+    this.gems = null;
+    this.interactables = null;
+    this.familiars = null;
+    this.fireTrail = null;
+    this.zonkDomes = null;
+    this.rifts = null;
+    this.synergy = null;
+    this.particles = null;
+    this.combat = null;
+    this._runBosses = 0;
+    this._runRiftsEntered = 0;
+    this._runMaxCombo = 0;
+    this._runNova = false;
+    this._tutorialShownStep = -1;
+    this._wasInRift = false;
+    this._tutorialMoveDist = 0;
+    this._tutorialFlags = { move: false, dodge: false, magnet: false, levelup: false, rift: false };
 
-    this.player._onDodge = () => this.audio.dodge();
+    this.player._onDodge = () => {
+      this.audio.dodge();
+      this._tutorialFlags.dodge = true;
+    };
     this.player._onJump = () => this.audio.dodge();
-    this.player._onMagnet = () => this.audio.magnet();
+    this.player._onMagnet = () => {
+      this.audio.magnet();
+      this._tutorialFlags.magnet = true;
+    };
     this.player._onHurt = () => this.audio.hurt();
     this.player._onDamageTaken = (amount) => {
       this._floatHurtAcc += amount;
@@ -120,8 +147,9 @@ export class Game {
     this._floatHurtTimer = 0;
     this._floatHealTimer = 0;
 
-    this.combat = new CombatController(this);
+    this.combat = null;
     this.metrics = new GameMetrics();
+    this.touchControls = new TouchControls(this.input);
 
     this.timer = new THREE.Timer();
     this.timer.connect(document);
@@ -135,6 +163,26 @@ export class Game {
       this.devPanel = new DevPanel(this);
     }
     this.animate();
+  }
+
+  _ensureCombatManagers() {
+    if (this._combatReady) return;
+    this.enemies = new EnemyManager(this.scene);
+    this.projectiles = new ProjectileManager(this.scene);
+    this.gems = new GemManager(this.scene);
+    this.interactables = new Interactables(this.scene);
+    this.familiars = new FamiliarManager(this.scene);
+    this.fireTrail = new FireTrailManager(this.scene);
+    this.zonkDomes = new ZonkDomeManager(this.scene);
+    this.rifts = new RiftManager(this.scene);
+    this.synergy = new SynergyNova(this.scene);
+    this.particles = new ParticleSystem(this.scene);
+    this.combat = new CombatController(this);
+    this.synergy.onNova = () => {
+      this._runNova = true;
+      saveData.recordRunStats({ novaTriggered: true });
+    };
+    this._combatReady = true;
   }
 
   _ensureVillage() {
@@ -212,6 +260,7 @@ export class Game {
   }
 
   _runManagers() {
+    if (!this._combatReady) return [];
     return [
       this.enemies,
       this.projectiles,
@@ -296,12 +345,15 @@ export class Game {
   }
 
   enterVillage() {
+    this._ensureCombatManagers();
     this._ensureVillage();
+    this.village.refreshForReputation();
     this._gameOverActive = false;
     saveData.data.runSnapshot = null;
     saveData.save();
     this.transitionTo('village');
     this.hideCombat();
+    this.touchControls.setVisible(false);
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
     this.player.position.set(0, 0, 5);
@@ -309,12 +361,14 @@ export class Game {
     this.cameraController.reset();
     this.cameraController.apply(this.camera, this.player.position, this.player.getViewY());
     this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+    syncDailyChallengeDay();
     this.quests.assignNewQuests();
     this.audio.playMusic('village');
     this.clearRunRng();
   }
 
   startArena() {
+    this._ensureCombatManagers();
     this._ensureArena();
     saveData.data.runSnapshot = null;
     this.transitionTo('arena');
@@ -323,6 +377,7 @@ export class Game {
     this.ui.clear();
     this.ui.buildHUD();
     this._applyBiome(this._resolveStartBiome());
+    this.enemies.setBiome(this.currentBiome?.id ?? 'grass');
     this._deferArenaFieldSetup(true);
     this.player.position.set(0, 0, 0);
     this.player.mesh.visible = true;
@@ -330,6 +385,11 @@ export class Game {
     saveData.data.totalRuns++;
     saveData.save();
     this.ui.toast(`Entering ${this.currentBiome.name}`, 'synergy');
+    if (shouldShowTutorial()) {
+      this._tutorialShownStep = getTutorialStepIndex();
+      this.ui.showTutorial(() => advanceTutorialStep());
+    }
+    this.touchControls.setVisible(true);
     this.audio.playMusic('arena');
   }
 
@@ -373,6 +433,14 @@ export class Game {
     this.runCoins = 0;
     this.coinsAlreadyBanked = 0;
     this.pendingLevelUps = 0;
+    this._runBosses = 0;
+    this._runRiftsEntered = 0;
+    this._runMaxCombo = 0;
+    this._runNova = false;
+    this._wasInRift = false;
+    this._tutorialMoveDist = 0;
+    this._tutorialFlags = { move: false, dodge: false, magnet: false, levelup: false, rift: false };
+    this._tutorialShownStep = getCurrentTutorialStep() ? getTutorialStepIndex() : -1;
     this.initRunRng();
     this.ui.dismissLevelUp();
     this.player.characterId = saveData.data.selectedCharacter;
@@ -478,6 +546,7 @@ export class Game {
 
     this.transitionTo('village');
     this.hideCombat();
+    this.touchControls.setVisible(false);
     this.player.position.set(0, 0, 5);
     this.player.mesh.visible = true;
     this.cameraController.reset();
@@ -566,6 +635,7 @@ export class Game {
   }
 
   startArenaFromSnapshot(snap) {
+    this._ensureCombatManagers();
     this._ensureArena();
     this.transitionTo('arena');
     this.resetRun();
@@ -577,6 +647,7 @@ export class Game {
     this.cameraController.reset();
     this.restoreArenaFromSnapshot(snap);
     this.populateMesaEncounters();
+    this.touchControls.setVisible(true);
     this.audio.playMusic('arena');
   }
 
@@ -623,6 +694,36 @@ export class Game {
     this.enemies.spawnBoss(bx, bz, this.player.getEffectiveDamage());
     this.audio.boss();
     this.ui.toast(`⚠️ ZONK LORD #${this.bossCount} APPROACHES!`, 'synergy');
+  }
+
+  _checkTutorial() {
+    if (isTutorialComplete()) return;
+    const step = getCurrentTutorialStep();
+    if (!step) return;
+    const idx = getTutorialStepIndex();
+    if (idx <= this._tutorialShownStep) return;
+
+    let ready = false;
+    switch (step.id) {
+      case 'dodge':
+        ready = this._tutorialFlags.move || this._tutorialMoveDist > 8;
+        break;
+      case 'magnet':
+        ready = this._tutorialFlags.dodge;
+        break;
+      case 'levelup':
+        ready = this._tutorialFlags.magnet;
+        break;
+      case 'rift':
+        ready = this._tutorialFlags.levelup;
+        break;
+      default:
+        break;
+    }
+    if (!ready) return;
+
+    this._tutorialShownStep = idx;
+    this.ui.showTutorial(() => advanceTutorialStep());
   }
 
   _flushPlayerFloatNumbers(dt) {
@@ -680,9 +781,18 @@ export class Game {
     this.arena.update(dt, this.elapsed);
     this.player.update(dt, this.input, this.arena, this.cameraController.yaw);
 
+    const moveDist = Math.hypot(this.player.velocity.x, this.player.velocity.z) * dt;
+    if (moveDist > 0.01) {
+      this._tutorialMoveDist += moveDist;
+      if (this._tutorialMoveDist > 3) this._tutorialFlags.move = true;
+    }
+    if (this.player.combo > this._runMaxCombo) this._runMaxCombo = this.player.combo;
+
     const wasInRift = this.inRift;
     this.inRift = this.rifts.isPlayerInside(this.player.position.x, this.player.position.z);
     if (this.inRift && !wasInRift) {
+      this._runRiftsEntered++;
+      this._tutorialFlags.rift = true;
       this.quests.track('rifts');
       this.ui.toast('⚡ Entered Zonk Rift — 2x XP, 3x danger!', 'synergy');
     }
@@ -820,6 +930,7 @@ export class Game {
 
     this._flushPlayerFloatNumbers(dt);
     this.particles.update(dt, this.camera, this.renderer, this.enemies.enemies);
+    this._checkTutorial();
 
     this.zonkDomes.update(dt, this.player, this.arena, this.elapsed, {
       onWarn: () => {
@@ -879,6 +990,16 @@ export class Game {
           this.ui.showSkillTree(() => {
             this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
           });
+        } else if (npc.id === 'merchant') {
+          this.ui.toast(
+            `Bonk Merchant: "You've got ${saveData.data.zonkCoins} coins — Coach Zonk upgrades your build!"`,
+            'synergy'
+          );
+        } else if (npc.id === 'shrine') {
+          this.ui.toast(
+            `Ascension Shrine: ${saveData.data.reputation} reputation — landmarks unlock as you grow.`,
+            'synergy'
+          );
         } else if (npc.id === 'portal') {
           if (saveData.data.runSnapshot?.pausedInVillage) {
             this.ui.showArenaPortalChoice(
@@ -957,6 +1078,7 @@ export class Game {
           if (this.upgrades.checkSynergy(this.player)) {
             this.ui.toast(`🔥 Synergy unlocked: ${SYNERGY_NAME}!`, 'synergy');
           }
+          this._tutorialFlags.levelup = true;
         } finally {
           this.modalPause = false;
           this.paused = false;
@@ -982,17 +1104,45 @@ export class Game {
     this.modalPause = true;
     this.paused = true;
     this.input.releaseCameraLook();
+    this.touchControls.setVisible(false);
+    this.ui.hideTutorial();
     const coins = this.bankRunCoins();
     saveData.data.runSnapshot = null;
     saveData.data.totalKills += this.player.kills;
     if (this.elapsed > saveData.data.bestTime) saveData.data.bestTime = this.elapsed;
-    saveData.save();
 
-    this.ui.showGameOver({
+    const dailyBonus = tryCompleteDailyChallenge(this.elapsed);
+    const runStats = {
+      kills: this.player.kills,
+      time: this.elapsed,
+      bosses: this._runBosses,
+      rifts: this._runRiftsEntered,
+      novaTriggered: this._runNova,
+      maxCombo: this._runMaxCombo,
+      totalRuns: saveData.data.totalRuns,
+      completedQuests: saveData.data.completedQuests.length,
+      dailyCompleted: dailyBonus > 0,
+    };
+    const newAchievements = checkRunAchievements(runStats);
+    saveData.recordRunStats({
+      bosses: Math.max(saveData.data.runStats.bosses, this._runBosses),
+      rifts: Math.max(saveData.data.runStats.rifts, this._runRiftsEntered),
+      maxCombo: Math.max(saveData.data.runStats.maxCombo, this._runMaxCombo),
+      novaTriggered: saveData.data.runStats.novaTriggered || this._runNova,
+    });
+
+    this.ui.showRunSummary({
       time: this.elapsed,
       level: this.player.level,
       kills: this.player.kills,
       coins,
+      bosses: this._runBosses,
+      maxCombo: this._runMaxCombo,
+      biome: this.currentBiome?.name,
+      bestTime: saveData.data.bestTime,
+      buffs: getActiveBuffs(this.player),
+      newAchievements,
+      dailyBonus,
     }, (action) => {
       this.ui.removeScreens();
       if (action === 'retry') {

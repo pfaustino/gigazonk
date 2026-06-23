@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VILLAGE_SIZE, VILLAGE_NPCS } from './constants.js';
+import { VILLAGE_SIZE, VILLAGE_NPCS, VILLAGE_LANDMARKS } from './constants.js';
 import { saveData } from './SaveData.js';
 import { createGrassField, createPathStrip } from './TerrainVisuals.js';
 import { GROUND_WALL_HEIGHT, resolveCircleAabb } from './TerrainFeatures.js';
@@ -10,12 +10,20 @@ export class Village {
     this.halfSize = VILLAGE_SIZE / 2;
     this.npcs = [];
     this.obstacles = [];
+    this.landmarkMeshes = [];
     this.group = new THREE.Group();
     scene.add(this.group);
     this.build();
   }
 
   build() {
+    while (this.group.children.length) this.group.remove(this.group.children[0]);
+    this.npcs = [];
+    this.obstacles = [];
+    this.landmarkMeshes = [];
+
+    const rep = saveData.data.reputation;
+
     const grass = createGrassField(VILLAGE_SIZE, 24);
     this.group.add(grass);
     this.grassMesh = grass;
@@ -24,20 +32,44 @@ export class Village {
     this.group.add(path);
     this.pathMesh = path;
 
-    const rep = saveData.data.reputation;
     const buildingCount = 3 + Math.floor(rep / 20);
     for (let i = 0; i < buildingCount; i++) {
-      this.addBuilding(
-        (Math.random() - 0.5) * VILLAGE_SIZE * 0.6,
-        (Math.random() - 0.5) * VILLAGE_SIZE * 0.6
-      );
+      const angle = (i / buildingCount) * Math.PI * 2 + 0.3;
+      const dist = 12 + (i % 3) * 4;
+      this.addBuilding(Math.cos(angle) * dist, Math.sin(angle) * dist);
+    }
+
+    for (const landmark of VILLAGE_LANDMARKS) {
+      if (rep >= landmark.minRep) this.addLandmark(landmark);
     }
 
     for (const npc of VILLAGE_NPCS) {
-      this.addNPC(npc);
+      if ((npc.minRep ?? 0) <= rep) this.addNPC(npc);
     }
 
     this.addDecorations();
+  }
+
+  addLandmark(def) {
+    const geo = new THREE.CylinderGeometry(0.8, 1.1, 3.5, 6);
+    const mat = new THREE.MeshLambertMaterial({ color: def.color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(def.pos[0], 1.75, def.pos[2]);
+    mesh.castShadow = true;
+    this.group.add(mesh);
+    this.landmarkMeshes.push({ ...def, mesh });
+    this.obstacles.push({
+      type: 'circle',
+      x: def.pos[0],
+      z: def.pos[2],
+      radius: 1.2,
+      blockBelowY: 3.8,
+    });
+  }
+
+  /** Rebuild props when reputation changes (call on village enter). */
+  refreshForReputation() {
+    this.build();
   }
 
   addBuilding(x, z) {

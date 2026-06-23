@@ -84,8 +84,6 @@ export class Game {
     this._floatHurtTimer = 0;
     this._floatHealTimer = 0;
 
-    this.village = new Village(this.scene);
-    this.arena = new Arena(this.scene);
     this.combat = new CombatController(this);
     this.metrics = new GameMetrics();
 
@@ -129,6 +127,10 @@ export class Game {
     this.audio.loadMusicManifest().then(() => {
       if (this.state === 'title') this.audio.playMusic('title');
     });
+
+    this.village = new Village(this.scene);
+    this.arena = new Arena(this.scene);
+
     if (import.meta.env.DEV || this._devFlags.dev) {
       this.devPanel = new DevPanel(this);
     }

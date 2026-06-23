@@ -4,7 +4,18 @@ const PORT = 5173;
 const baseURL = `http://localhost:${PORT}`;
 
 const crossBrowsers = [
-  { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+  {
+    name: 'firefox',
+    use: {
+      ...devices['Desktop Firefox'],
+      launchOptions: {
+        firefoxUserPrefs: {
+          'webgl.force-enabled': true,
+          'webgl.disabled': false,
+        },
+      },
+    },
+  },
   { name: 'webkit', use: { ...devices['Desktop Safari'] } },
 ];
 

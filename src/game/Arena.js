@@ -22,6 +22,8 @@ import {
   sampleGroundHeight,
   tintFeatureMeshes,
 } from './TerrainFeatures.js';
+import { ObstacleGrid } from './ObstacleGrid.js';
+import { MesaHeightIndex } from './MesaHeightIndex.js';
 
 function tintTerrainMaterial(material, color) {
   material.color.setHex(color);
@@ -144,6 +146,8 @@ export class Arena {
 
     const features = generateArenaFeatures();
     this.mesas = features.mesas;
+    this.mesaHeightIndex = new MesaHeightIndex(32);
+    this.mesaHeightIndex.rebuild(this.mesas);
     this.featureMeshes = buildFeatureMeshes(this.group, features.featureMeshes, 0x666666);
     this._loadTerrainTextures();
 
@@ -196,6 +200,9 @@ export class Arena {
     this.border.rotation.x = -Math.PI / 2;
     this.border.position.y = 0.1;
     this.group.add(this.border);
+
+    this.obstacleGrid = new ObstacleGrid(24);
+    this.obstacleGrid.rebuild(this.obstacles);
   }
 
   setBiome(biome) {
@@ -233,7 +240,7 @@ export class Arena {
   }
 
   getGroundHeight(x, z) {
-    return sampleGroundHeight(x, z, this.mesas);
+    return sampleGroundHeight(x, z, this.mesas, this.mesaHeightIndex);
   }
 
   canTraverse(fromX, fromZ, toX, toZ, jumping = false) {
@@ -248,7 +255,8 @@ export class Arena {
     let px = x;
     let pz = z;
     for (let pass = 0; pass < 4; pass++) {
-      for (const obs of this.obstacles) {
+      const nearby = this.obstacleGrid.query(px, pz, radius + 3);
+      for (const obs of nearby) {
         if (obs.type === 'circle') {
           const blockY = obs.blockBelowY ?? obs.radius * 1.1 + 0.15;
           if (entityY >= blockY - 0.35) continue;
@@ -281,7 +289,8 @@ export class Arena {
   }
 
   isProjectileBlocked(x, z, radius, projectileY) {
-    for (const obs of this.obstacles) {
+    const nearby = this.obstacleGrid.query(x, z, radius + 2);
+    for (const obs of nearby) {
       if (obs.type === 'circle') {
         const blockY = obs.blockBelowY ?? obs.radius * 1.1 + 0.15;
         if (projectileY >= blockY - 0.35) continue;

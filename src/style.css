@@ -890,6 +890,45 @@ html, body {
   line-height: 1.6;
 }
 
+/* FPS + runtime metrics (arena / village) */
+.game-metrics {
+  position: absolute;
+  bottom: 108px;
+  right: 16px;
+  min-width: 118px;
+  padding: 8px 10px;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(8, 6, 18, 0.72);
+  border: 1px solid rgba(107, 79, 212, 0.45);
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.game-metrics.hidden {
+  display: none;
+}
+
+.game-metrics-row[data-tier='good'] {
+  color: #7dffb2;
+}
+
+.game-metrics-row[data-tier='ok'] {
+  color: #f7c948;
+}
+
+.game-metrics-row[data-tier='low'] {
+  color: #ff7b7b;
+}
+
+.game-metrics-combat {
+  color: rgba(168, 159, 212, 0.95);
+  font-size: 10px;
+}
+
 /* Reward strip — earned upgrades & loot this run */
 .reward-strip {
   position: absolute;

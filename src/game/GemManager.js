@@ -57,11 +57,27 @@ export class GemManager {
       }
     }
     if (!farthest) return;
-    farthest.alive = false;
-    this.freeSlots.push(farthest.slot);
+    this._retireGem(farthest);
+  }
+
+  _retireGem(g) {
+    if (!g.alive) return;
+    g.alive = false;
+    this.freeSlots.push(g.slot);
     dummy.scale.set(0, 0, 0);
     dummy.updateMatrix();
-    this.mesh.setMatrixAt(farthest.slot, dummy.matrix);
+    this.mesh.setMatrixAt(g.slot, dummy.matrix);
+  }
+
+  _compactDead() {
+    let w = 0;
+    for (let r = 0; r < this.gems.length; r++) {
+      if (this.gems[r].alive) {
+        if (w !== r) this.gems[w] = this.gems[r];
+        w++;
+      }
+    }
+    this.gems.length = w;
   }
 
   updateInstance(g) {
@@ -101,16 +117,21 @@ export class GemManager {
       if (dist < 1.2) {
         collectedXp += g.value;
         collectedGems++;
-        g.alive = false;
-        this.freeSlots.push(g.slot);
-        dummy.scale.set(0, 0, 0);
-        dummy.updateMatrix();
-        this.mesh.setMatrixAt(g.slot, dummy.matrix);
+        this._retireGem(g);
       } else {
         this.updateInstance(g);
       }
     }
+    this._compactDead();
     this.mesh.instanceMatrix.needsUpdate = true;
     return { xp: collectedXp, gems: collectedGems };
+  }
+
+  get aliveCount() {
+    let n = 0;
+    for (const g of this.gems) {
+      if (g.alive) n++;
+    }
+    return n;
   }
 }

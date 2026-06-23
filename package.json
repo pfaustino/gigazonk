@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:itch": "vite build --base=./",
+    "check:itch": "npm run lint && npm run typecheck && npm run test && npm run build:itch",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist",
     "lint": "eslint src tests e2e --max-warnings 0",

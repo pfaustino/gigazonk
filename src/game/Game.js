@@ -14,14 +14,20 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, PLAYER_BASE, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
 import { ErrorReporter } from '../lib/ErrorReporter.js';
 import { DevPanel } from '../dev/DevPanel.js';
 import { RunRng } from '../lib/RunRng.js';
-import { setActiveRunRng, getActiveRunRng, runRandom, runRandomInt } from '../lib/runRandom.js';
+import { setActiveRunRng, getActiveRunRng, runRandom } from '../lib/runRandom.js';
+import { CombatController } from './CombatController.js';
+import { GameMetrics } from './GameMetrics.js';
+import {
+  captureRunSnapshot,
+  restoreArenaFromSnapshot as applyRunSnapshot,
+} from './RunSnapshot.js';
 
 export class Game {
   constructor(canvas) {
@@ -80,6 +86,8 @@ export class Game {
 
     this.village = new Village(this.scene);
     this.arena = new Arena(this.scene);
+    this.combat = new CombatController(this);
+    this.metrics = new GameMetrics();
 
     this.state = 'title';
     this.elapsed = 0;
@@ -513,86 +521,11 @@ export class Game {
   }
 
   captureRunSnapshot() {
-    const p = this.player;
-    return {
-      state: this.state,
-      elapsed: this.elapsed,
-      runCoins: this.runCoins,
-      coinsAlreadyBanked: this.coinsAlreadyBanked,
-      bossTimer: this.bossTimer,
-      bossCount: this.bossCount,
-      inRift: this.inRift,
-      gigaSpawnTimer: this.gigaSpawnTimer,
-      pendingGigaSpawn: this.pendingGigaSpawn,
-      gigaSpawnSurvivalTimer: this.gigaSpawnSurvivalTimer,
-      pausedInVillage: false,
-      characterId: p.characterId,
-      player: {
-        hp: p.hp,
-        maxHp: p.maxHp,
-        level: p.level,
-        xp: p.xp,
-        xpToNext: p.xpToNext,
-        kills: p.kills,
-        damage: p.damage,
-        speed: p.speed,
-        attackRate: p.attackRate,
-        projectileCount: p.projectileCount,
-        projectilePierce: p.projectilePierce,
-        projectileSpeed: p.projectileSpeed,
-        projectileSpeedMult: p.projectileSpeedMult,
-        area: p.area,
-        critChance: p.critChance,
-        critDamageMult: p.critDamageMult,
-        lifesteal: p.lifesteal,
-        thorns: p.thorns,
-        familiars: p.familiars,
-        pickupRadius: p.pickupRadius,
-        magnetRadius: p.magnetRadius,
-        maxAirJumps: p.maxAirJumps,
-        hpRegen: p.hpRegen,
-        coinMult: p.coinMult,
-        armor: p.armor,
-        evasion: p.evasion,
-        fireTrailLevel: p.fireTrailLevel,
-        elements: [...p.elements],
-        lightningChains: p.lightningChains ?? 3,
-        x: p.position.x,
-        z: p.position.z,
-      },
-      biomeId: this.currentBiome?.id,
-      runSeed: this.runSeed,
-      rngState: getActiveRunRng()?.getState(),
-    };
+    return captureRunSnapshot(this);
   }
 
   restoreArenaFromSnapshot(snap) {
-    this.elapsed = snap.elapsed;
-    this.runCoins = snap.runCoins;
-    this.coinsAlreadyBanked = snap.coinsAlreadyBanked ?? 0;
-    this.bossTimer = snap.bossTimer;
-    this.bossCount = snap.bossCount;
-    this.inRift = snap.inRift;
-    this.gigaSpawnTimer = snap.gigaSpawnTimer ?? 0;
-    this.pendingGigaSpawn = snap.pendingGigaSpawn ?? false;
-    this.gigaSpawnSurvivalTimer = snap.gigaSpawnSurvivalTimer ?? 0;
-    if (snap.runSeed != null) {
-      this.runSeed = snap.runSeed;
-      if (snap.rngState != null) {
-        setActiveRunRng(RunRng.fromState(snap.runSeed, snap.rngState));
-      } else {
-        setActiveRunRng(new RunRng(snap.runSeed));
-      }
-    }
-    this.applyPlayerSnapshot(snap);
-    if (snap.biomeId) {
-      const biome = BIOMES.find(b => b.id === snap.biomeId);
-      if (biome) {
-        this.currentBiome = biome;
-        this.arena.setBiome(biome);
-        this.setSkyColor(biome.sky);
-      }
-    }
+    applyRunSnapshot(this, snap);
   }
 
   startArenaFromSnapshot(snap) {
@@ -611,43 +544,6 @@ export class Game {
     this.restoreArenaFromSnapshot(snap);
     this.populateMesaEncounters();
     this.audio.playMusic('arena');
-  }
-
-  applyPlayerSnapshot(snap) {
-    const p = snap.player;
-    this.player.characterId = snap.characterId;
-    this.player.reset();
-    this.player.hp = p.hp;
-    this.player.maxHp = p.maxHp;
-    this.player.level = p.level;
-    this.player.xp = p.xp;
-    this.player.xpToNext = p.xpToNext;
-    this.player.kills = p.kills;
-    this.player.damage = p.damage;
-    this.player.speed = p.speed;
-    this.player.attackRate = p.attackRate;
-    this.player.projectileCount = p.projectileCount;
-    this.player.projectilePierce = p.projectilePierce ?? 0;
-    this.player.projectileSpeed = p.projectileSpeed;
-    this.player.projectileSpeedMult = p.projectileSpeedMult ?? 0;
-    this.player.area = p.area;
-    this.player.critChance = p.critChance;
-    this.player.critDamageMult = p.critDamageMult ?? PLAYER_BASE.critDamageMult;
-    this.player.lifesteal = p.lifesteal;
-    this.player.thorns = p.thorns;
-    this.player.familiars = p.familiars;
-    this.player.pickupRadius = p.pickupRadius;
-    this.player.magnetRadius = p.magnetRadius ?? PLAYER_BASE.magnetRadius;
-    this.player.maxAirJumps = p.maxAirJumps ?? 0;
-    this.player.hpRegen = p.hpRegen ?? 0;
-    this.player.coinMult = p.coinMult ?? 0;
-    this.player.armor = p.armor ?? 0;
-    this.player.evasion = p.evasion ?? 0;
-    this.player.fireTrailLevel = p.fireTrailLevel ?? 0;
-    this.player.airJumpsUsed = 0;
-    this.player.elements = new Set(p.elements);
-    this.player.lightningChains = p.lightningChains ?? 3;
-    this.player.position.set(p.x, 0, p.z);
   }
 
   returnToTitle() {
@@ -677,88 +573,7 @@ export class Game {
   }
 
   handleCombatHit(damage, killResult, element, enemy, opts = {}) {
-    const { skipProcs = false, isCrit = false } = opts;
-    const critHit = isCrit || damage > this.player.damage * this.player.getComboMult() * (this.player.getCritMultiplier() - 0.05);
-    if (enemy) {
-      this.particles.damageNumber(enemy.x, enemy.z, damage, critHit);
-    }
-    this.audio.hit();
-
-    if (!skipProcs && enemy) {
-      this._applyHitProcs(damage, enemy, critHit);
-    }
-
-    if (killResult) {
-      this.player.addKill();
-      const xpMult = (this.inRift ? 2 : 1) * (1 + this.player.killXpMult);
-      const xpValue = killResult.xp * xpMult;
-      const overflow = this.gems.spawn(
-        killResult.pos.x, killResult.pos.z, xpValue,
-        this.player.position.x, this.player.position.z
-      );
-      if (overflow > 0) {
-        const levels = this.player.addXp(overflow);
-        if (levels > 0) this.queueLevelUp(levels);
-      }
-      if (this.player.coinMult > 0) {
-        this.runCoins += Math.max(1, Math.floor(this.player.coinMult * 10));
-      }
-      this.quests.track('kills');
-      if (enemy?.type === 'elite' && !killResult.isBoss) {
-        this.quests.track('elites');
-      }
-      if (killResult.isBoss) {
-        this.quests.track('bosses');
-        if (enemy?.isMesaGuardian) {
-          this.quests.track('guardians');
-          this.interactables.removeMesaBeaconForGuardian(enemy);
-        }
-        this.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
-      }
-      const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0x44ff88;
-      this.particles.burst(killResult.pos.x, killResult.pos.z, color);
-      this.audio.kill();
-    }
-    if (this.player.lifesteal > 0) {
-      this.player.heal(damage * this.player.lifesteal);
-    }
-  }
-
-  _applyHitProcs(damage, enemy, isCrit) {
-    const alive = enemy.alive;
-    const ex = enemy.x;
-    const ez = enemy.z;
-
-    if (alive && this.player.poisonChance > 0 && runRandom() < this.player.poisonChance) {
-      enemy.burnTimer = Math.max(enemy.burnTimer, 3);
-    }
-
-    if (alive && this.player.bonkChance > 0 && runRandom() < this.player.bonkChance) {
-      const bonkDmg = damage * 19;
-      const result = this.enemies.damageEnemy(enemy, bonkDmg, null);
-      this.handleCombatHit(bonkDmg, result, null, enemy, { skipProcs: true, isCrit: true });
-    }
-
-    if (this.player.explodeChance > 0 && runRandom() < this.player.explodeChance) {
-      const explodeDmg = damage * 0.65;
-      const nearby = this.enemies.getNearby(ex, ez, 4);
-      for (const { enemy: e2 } of nearby) {
-        if (!e2.alive || e2 === enemy) continue;
-        const result = this.enemies.damageEnemy(e2, explodeDmg, null);
-        this.handleCombatHit(explodeDmg, result, null, e2, { skipProcs: true });
-      }
-      this.particles.burst(ex, ez, 0xff8844);
-    }
-
-    if (isCrit && this.player.critSplash > 0 && runRandom() < this.player.critSplash) {
-      const splashDmg = damage * 0.5;
-      const nearby = this.enemies.getNearby(ex, ez, 3.5);
-      for (const { enemy: e2 } of nearby) {
-        if (!e2.alive || e2 === enemy) continue;
-        const result = this.enemies.damageEnemy(e2, splashDmg, null);
-        this.handleCombatHit(splashDmg, result, null, e2, { skipProcs: true });
-      }
-    }
+    this.combat.handleCombatHit(damage, killResult, element, enemy, opts);
   }
 
   spawnBoss() {
@@ -876,38 +691,7 @@ export class Game {
     this.enemies.setThreatDamage(this.player.getEffectiveDamage());
     this.enemies.update(dt, this.player.position, this.arena);
 
-    if (this.player.canAttack()) {
-      const nearby = this.enemies.getNearby(this.player.position.x, this.player.position.z, 20);
-      if (nearby.length > 0) {
-        const sorted = nearby.slice().sort((a, b) => a.dist - b.dist);
-        const primary = sorted[0]?.enemy;
-        const baseDmg = this.player.computeDamageForEnemy(primary);
-        const isCrit = runRandom() < this.player.critChance;
-        const finalDmg = isCrit ? baseDmg * this.player.getCritMultiplier() : baseDmg;
-        const element = this.player.elements.size > 0
-          ? [...this.player.elements][runRandomInt(this.player.elements.size)]
-          : null;
-        const px = this.player.position.x;
-        const py = this.player.getProjectileY();
-        const pz = this.player.position.z;
-        const projSpeed = this.player.projectileSpeed * (1 + this.player.projectileSpeedMult);
-        const targets = [];
-        for (let i = 0; i < this.player.projectileCount; i++) {
-          const pick = i < sorted.length ? sorted[i] : sorted[0];
-          targets.push(pick.enemy);
-        }
-        this.projectiles.fireVolley(
-          px, py, pz, targets,
-          projSpeed, finalDmg,
-          this.player.area, element,
-          this.player.projectilePierce,
-          isCrit,
-          this.player.lightningChains
-        );
-        this.player.resetAttackTimer();
-        this.audio.shoot();
-      }
-    }
+    this.combat.tryAutoFire();
 
     this.projectiles.update(dt, this.enemies, this.arena, (dmg, result, el, enemy, isCrit) =>
       this.handleCombatHit(dmg, result, el, enemy, { isCrit })
@@ -1227,6 +1011,25 @@ export class Game {
 
     this.input.endFrame();
     this.renderer.render(this.scene, this.camera);
+
+    this.metrics.tick(dt);
+    this.ui.updateMetrics(this.getUiMetrics());
+  }
+
+  getUiMetrics() {
+    const inGameplay = this.state === 'arena' || this.state === 'village';
+    const snapshot = {
+      visible: inGameplay,
+      fps: this.metrics.fps,
+      frameMs: this.metrics.frameMs,
+      combat: this.state === 'arena',
+    };
+    if (this.state === 'arena') {
+      snapshot.enemies = this.enemies.aliveCount;
+      snapshot.projectiles = this.projectiles.aliveCount;
+      snapshot.gems = this.gems.aliveCount;
+    }
+    return snapshot;
   }
 
   getErrorContext() {

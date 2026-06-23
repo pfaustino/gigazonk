@@ -451,9 +451,10 @@ export function generateArenaFeatures() {
   return { mesas, obstacles, featureMeshes };
 }
 
-export function sampleGroundHeight(x, z, mesas) {
+export function sampleGroundHeight(x, z, mesas, mesaIndex = null) {
+  const candidates = mesaIndex ? mesaIndex.query(x, z) : mesas;
   let h = 0;
-  for (const mesa of mesas) {
+  for (const mesa of candidates) {
     h = Math.max(h, sampleMesaHeight(x, z, mesa));
   }
   return h;

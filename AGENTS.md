@@ -17,10 +17,17 @@ Browser horde survival roguelike: Vite + Three.js, vanilla JS.
 | `src/game/SaveData.js` | Persistence + migrations |
 | `src/game/EnemyManager.js` | Instanced horde |
 
-## Commands
+## Commands (layered gates)
 
-- `npm run dev` — development
-- `npm run build` — verify before suggesting merge
+| Stage | Command |
+|-------|---------|
+| 1 — Quality | `npm run check` |
+| 2 — Show e2e | `npm run test:e2e:headed` or `test:e2e:ui` |
+| 3 — CI smoke | `npm run test:e2e` |
+| 4 — Cross-browser | `npm run test:e2e:cross` |
+| Dev | `npm run dev` |
+
+Full workflow: `.cursor/rules/browser-game-testing.mdc`.
 
 ## Do not
 

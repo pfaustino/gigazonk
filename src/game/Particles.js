@@ -2,12 +2,25 @@ import * as THREE from 'three';
 import { getEnemyHpBarWorldY } from './constants.js';
 import { runRandom } from '../lib/runRandom.js';
 
+const BURST_POOL_SIZE = 96;
+const HP_BAR_THROTTLE_ENEMY_COUNT = 150;
+
 export class ParticleSystem {
   constructor(scene) {
     this.scene = scene;
     this.particles = [];
     this.group = new THREE.Group();
     scene.add(this.group);
+
+    this._burstGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+    this._burstPool = [];
+    for (let i = 0; i < BURST_POOL_SIZE; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
+      const mesh = new THREE.Mesh(this._burstGeo, mat);
+      mesh.visible = false;
+      this.group.add(mesh);
+      this._burstPool.push({ mesh, active: false });
+    }
 
     this.dmgLayer = document.createElement('div');
     this.dmgLayer.id = 'damage-numbers';
@@ -21,6 +34,8 @@ export class ParticleSystem {
     document.getElementById('ui-layer')?.appendChild(this.hpBarLayer);
     this.enemyHpBars = new Map();
     this._hpVec = new THREE.Vector3();
+    this._dmgVec = new THREE.Vector3();
+    this._hpBarFrame = 0;
   }
 
   ensureOverlayLayers() {
@@ -32,9 +47,8 @@ export class ParticleSystem {
 
   reset() {
     for (const p of this.particles) {
-      this.group.remove(p.mesh);
-      p.mesh.geometry?.dispose();
-      p.mesh.material?.dispose();
+      p.mesh.visible = false;
+      p.active = false;
     }
     this.particles = [];
     this.damageNumbers = [];
@@ -43,17 +57,35 @@ export class ParticleSystem {
     if (this.hpBarLayer) this.hpBarLayer.innerHTML = '';
   }
 
+  _acquireBurst(color) {
+    for (const slot of this._burstPool) {
+      if (!slot.active) {
+        slot.active = true;
+        slot.mesh.material.color.setHex(color);
+        slot.mesh.material.opacity = 1;
+        slot.mesh.visible = true;
+        return slot;
+      }
+    }
+    return null;
+  }
+
+  _releaseBurst(slot) {
+    slot.active = false;
+    slot.mesh.visible = false;
+  }
+
   burst(x, z, color = 0xf7c948, count = 8) {
     for (let i = 0; i < count; i++) {
-      const geo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
-      const mat = new THREE.MeshBasicMaterial({ color, transparent: true });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(x, 1, z);
-      this.group.add(mesh);
+      const slot = this._acquireBurst(color);
+      if (!slot) break;
+
       const angle = (i / count) * Math.PI * 2;
       const speed = 3 + runRandom() * 4;
+      slot.mesh.position.set(x, 1, z);
       this.particles.push({
-        mesh,
+        mesh: slot.mesh,
+        pool: slot,
         vx: Math.cos(angle) * speed,
         vy: 2 + runRandom() * 3,
         vz: Math.sin(angle) * speed,
@@ -176,16 +208,14 @@ export class ParticleSystem {
       p.mesh.position.z += p.vz * dt;
       p.mesh.material.opacity = Math.max(0, p.life * 2);
       if (p.life <= 0) {
-        this.group.remove(p.mesh);
-        p.mesh.geometry.dispose();
-        p.mesh.material.dispose();
+        this._releaseBurst(p.pool);
         this.particles.splice(i, 1);
       }
     }
 
     const canvas = renderer.domElement;
     const rect = canvas.getBoundingClientRect();
-    const vec = new THREE.Vector3();
+    const vec = this._dmgVec;
 
     for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
       const dn = this.damageNumbers[i];
@@ -206,11 +236,19 @@ export class ParticleSystem {
       dn.el.style.transform = `translate(-50%,-50%) scale(${1 + (0.7 - dn.life) * 0.3})`;
     }
 
-    this.updateEnemyHpBars(enemies, camera, renderer);
+    this._hpBarFrame = (this._hpBarFrame + 1) % 2;
+    const throttleHpBars = enemies.length > HP_BAR_THROTTLE_ENEMY_COUNT && this._hpBarFrame === 1;
+    if (!throttleHpBars) {
+      this.updateEnemyHpBars(enemies, camera, renderer);
+    }
   }
 
   destroy() {
     this.reset();
+    this._burstGeo.dispose();
+    for (const slot of this._burstPool) {
+      slot.mesh.material.dispose();
+    }
     this.dmgLayer?.remove();
     this.hpBarLayer?.remove();
   }

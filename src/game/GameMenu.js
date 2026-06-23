@@ -2,9 +2,15 @@ import { saveData } from './SaveData.js';
 import { DIFFICULTIES, LANGUAGES } from './settings.js';
 import { GAME_VERSION } from './constants.js';
 import { renderHostedDonateButton, clearDonateButton } from './PayPalDonate.js';
+import {
+  CONFIRM_HINT,
+  bindGridNavigation,
+  bindMenuList,
+  bindSettingsNav,
+  createScreen,
+} from './ui/MenuNavigation.js';
 
 const MENU_HINT = '↑ ↓ or W S / Left stick to navigate | Enter, Space, A, or F to select | Esc back';
-const CONFIRM_HINT = 'Enter, Space, or F to confirm';
 
 const CONTROLS_TEXT = `
 WASD — Move forward/back/strafe (camera-relative)
@@ -34,7 +40,7 @@ export class GameMenu {
     this.handlers = handlers;
     this.ui._navCleanup?.();
     this.ui._navCleanup = null;
-    this.screen = this.ui._screen();
+    this.screen = createScreen(this.ui.layer);
     this.screen.classList.add('menu-screen');
     this.renderMain();
   }
@@ -63,10 +69,15 @@ export class GameMenu {
     return ordered;
   }
 
+  _navCtx() {
+    return { layer: this.ui.layer, audio: this.ui._audio };
+  }
+
   _bindPanelNav(buttons) {
     this.ui._navCleanup?.();
     const backBtn = buttons.find((b) => b.id === 'menu-back');
-    this.ui._navCleanup = this.ui._bindMenuList(
+    this.ui._navCleanup = bindMenuList(
+      this._navCtx(),
       buttons,
       () => (backBtn ? backBtn.click() : this.renderMain()),
     );
@@ -154,7 +165,7 @@ export class GameMenu {
     };
 
     if (columns > 1) {
-      this.ui._navCleanup = this.ui._bindGridNavigation({
+      this.ui._navCleanup = bindGridNavigation(this._navCtx(), {
         cards: buttons,
         columns,
         focusClass: 'focused',
@@ -164,7 +175,7 @@ export class GameMenu {
     } else {
       const navButtons = [...buttons];
       if (backBtn) navButtons.push(backBtn);
-      this.ui._navCleanup = this.ui._bindMenuList(navButtons, onCancel);
+      this.ui._navCleanup = bindMenuList(this._navCtx(), navButtons, onCancel);
     }
   }
 
@@ -220,7 +231,7 @@ export class GameMenu {
       this.renderMain();
     };
 
-    this.ui._navCleanup = this.ui._bindSettingsNav([
+    this.ui._navCleanup = bindSettingsNav(this._navCtx(), [
       {
         el: sfxRow,
         onActivate: () => { sfx.checked = !sfx.checked; },
@@ -307,7 +318,7 @@ export class GameMenu {
       this.renderMain();
     };
 
-    this.ui._navCleanup = this.ui._bindSettingsNav([
+    this.ui._navCleanup = bindSettingsNav(this._navCtx(), [
       {
         el: invertRow,
         onActivate: () => {

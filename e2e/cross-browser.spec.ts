@@ -6,26 +6,21 @@ import {
   readReporterErrors,
   summarizeReport,
 } from './helpers/browserErrors.js';
+import { gotoClean } from './helpers/navigation.js';
+import { startQuickArena } from './helpers/gameFlow.js';
 
 /** Errors that degrade a feature but do not crash the game loop. */
 const RECOVERABLE_REPORTER_CODES = new Set(['AUDIO_INIT', 'AUDIO_TRACK']);
 
-async function gotoClean(page: import('@playwright/test').Page, path = '/') {
-  await page.goto(path);
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.waitForSelector('#game-canvas');
-}
-
 test.describe('cross-browser error sweep', () => {
+  test.describe.configure({ timeout: 90_000 });
+
   test('title and play flow stay clean', async ({ page, browserName }) => {
     const report = attachBrowserErrorCollectors(page);
     await gotoClean(page, '/?dev=1');
 
     await expect(page.getByRole('heading', { name: 'GigaZonk' })).toBeVisible();
-    await page.locator('#btn-play').click();
-    await page.locator('#btn-confirm').click();
-    await expect(page.locator('#hp-bar')).toBeVisible({ timeout: 20_000 });
+    await startQuickArena(page);
 
     const reporterErrors = await readReporterErrors(page);
     const criticalReporter = (reporterErrors as Array<{ code?: string }>).filter(

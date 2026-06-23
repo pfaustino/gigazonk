@@ -10,6 +10,7 @@ We document significant technical decisions using lightweight ADRs ([Michael Nyg
 | [0002](0002-instanced-enemy-horde.md) | InstancedMesh horde rendering | Accepted |
 | [0003](0003-seeded-run-rng.md) | Seeded PRNG for reproducible runs | Accepted |
 | [0004](0004-github-pages-deploy.md) | GitHub Pages deployment path | Accepted |
+| [0005](0005-itch-io-deploy.md) | itch.io HTML5 deployment | Accepted |
 
 ## When to write an ADR
 

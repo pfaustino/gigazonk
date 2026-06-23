@@ -5,6 +5,15 @@
     },
     "vite-mcp": {
       "url": "http://localhost:5173/__mcp"
+    },
+    "chrome-devtools": {
+      "command": "C:\\Users\\pfaus\\AppData\\Local\\cursor-mcp\\chrome-devtools-gigazonk.cmd",
+      "args": [
+        "--slim",
+        "--headless",
+        "--no-usage-statistics"
+      ],
+      "cwd": "C:\\Dev\\github-projects\\GigaZonk"
     }
   }
 }

@@ -1,5 +1,7 @@
 import enemiesJson from '../../data/enemies.json';
 import upgradesJson from '../../data/upgrades.json';
+import questsJson from '../../data/quests.json';
+import skillsJson from '../../data/skills.json';
 
 export interface EnemyTypeDef {
   hpHits: number;
@@ -30,6 +32,34 @@ export interface UpgradeTemplate {
   fixedEffect?: boolean;
 }
 
+export interface QuestDef {
+  id: string;
+  desc: string;
+  target: number;
+  type: string;
+  reward: number;
+}
+
+export interface SkillBranchDef {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export interface SkillDef {
+  id: string;
+  name: string;
+  icon: string;
+  branch: string;
+  tier: number;
+  desc: string;
+  requires: string[];
+  baseCost: number;
+  costStep: number;
+  perLevel: Record<string, number>;
+}
+
 function parseHexColor(value: string): number {
   return parseInt(value.replace('#', ''), 16);
 }
@@ -48,3 +78,6 @@ export const GRUNT_COLORS: number[] = enemiesJson.gruntColors.map(parseHexColor)
 export const ENEMY_TYPES: Record<string, EnemyTypeDef> = parseEnemyTypes(enemiesJson.types);
 export const RARITIES: Record<string, RarityDef> = upgradesJson.rarities as Record<string, RarityDef>;
 export const UPGRADE_TEMPLATES: UpgradeTemplate[] = upgradesJson.templates as UpgradeTemplate[];
+export const QUESTS: QuestDef[] = questsJson as QuestDef[];
+export const SKILL_BRANCHES: SkillBranchDef[] = skillsJson.branches as SkillBranchDef[];
+export const SKILL_TREE: SkillDef[] = skillsJson.tree as SkillDef[];

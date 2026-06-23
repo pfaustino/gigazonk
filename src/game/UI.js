@@ -1,4 +1,4 @@
-import { CHARACTERS, QUESTS, SYNERGY_ELEMENTS, GAME_VERSION } from './constants.js';
+import { QUESTS, SYNERGY_ELEMENTS } from './constants.js';
 import { saveData } from './SaveData.js';
 import {
   SKILL_BRANCHES,
@@ -8,10 +8,18 @@ import {
   isSkillUnlocked,
 } from './SkillTree.js';
 import { GameMenu } from './GameMenu.js';
-import { getUpgradePreview, getActiveBuffs, formatBuffTooltip, getBuffTargetsFromStats, getUpgradeBuffHighlights, buffDisplayRank, RARITIES } from './UpgradeSystem.js';
+import { getActiveBuffs, formatBuffTooltip, getBuffTargetsFromStats, buffDisplayRank, RARITIES } from './UpgradeSystem.js';
+import {
+  CONFIRM_HINT,
+  bindGridNavigation,
+  bindMenuList,
+  bindSettingsNav,
+  createScreen,
+} from './ui/MenuNavigation.js';
+import { showTitle as renderTitle, showCharacterSelect as renderCharacterSelect } from './ui/TitleScreens.js';
+import { showLevelUp as renderLevelUp } from './ui/LevelUpScreen.js';
+import { buildHUD as renderHUD } from './ui/HudScreens.js';
 
-const CONFIRM_KEYS = ['Enter', 'NumpadEnter', 'Space', 'KeyF'];
-const CONFIRM_HINT = 'Enter, Space, or F to confirm';
 const REWARD_SHOWCASE_HOLD_MS = 2000;
 const REWARD_FLY_MS = 700;
 const BUFF_FLY_MS = 550;
@@ -28,6 +36,53 @@ export class UI {
     this._rewardQueue = [];
     this._rewardShowcaseActive = false;
     this.levelUpActive = false;
+    this._ensureMetricsOverlay();
+  }
+
+  _ensureMetricsOverlay() {
+    if (this._metricsEl) return;
+    const el = document.createElement('div');
+    el.id = 'game-metrics';
+    el.className = 'game-metrics hidden';
+    el.setAttribute('aria-live', 'polite');
+    el.innerHTML = `
+      <div class="game-metrics-row" id="metrics-fps">— FPS</div>
+      <div class="game-metrics-row" id="metrics-frame">— ms</div>
+      <div class="game-metrics-row game-metrics-combat hidden" id="metrics-enemies">Enemies —</div>
+      <div class="game-metrics-row game-metrics-combat hidden" id="metrics-projectiles">Projectiles —</div>
+      <div class="game-metrics-row game-metrics-combat hidden" id="metrics-gems">Gems —</div>
+    `;
+    this.layer.appendChild(el);
+    this._metricsEl = el;
+  }
+
+  /** @param {{ visible?: boolean, fps?: number, frameMs?: number, combat?: boolean, enemies?: number, projectiles?: number, gems?: number }} m */
+  updateMetrics(m = {}) {
+    this._ensureMetricsOverlay();
+    const visible = m.visible !== false;
+    this._metricsEl.classList.toggle('hidden', !visible);
+    if (!visible) return;
+
+    const fpsEl = document.getElementById('metrics-fps');
+    const frameEl = document.getElementById('metrics-frame');
+    if (fpsEl) {
+      fpsEl.textContent = `${m.fps ?? 0} FPS`;
+      fpsEl.dataset.tier = m.fps >= 55 ? 'good' : m.fps >= 40 ? 'ok' : 'low';
+    }
+    if (frameEl) frameEl.textContent = `${(m.frameMs ?? 0).toFixed(1)} ms`;
+
+    const combat = !!m.combat;
+    this._metricsEl.querySelectorAll('.game-metrics-combat').forEach((row) => {
+      row.classList.toggle('hidden', !combat);
+    });
+    if (combat) {
+      const enemiesEl = document.getElementById('metrics-enemies');
+      const projEl = document.getElementById('metrics-projectiles');
+      const gemsEl = document.getElementById('metrics-gems');
+      if (enemiesEl) enemiesEl.textContent = `Enemies ${m.enemies ?? 0}`;
+      if (projEl) projEl.textContent = `Projectiles ${m.projectiles ?? 0}`;
+      if (gemsEl) gemsEl.textContent = `Gems ${m.gems ?? 0}`;
+    }
   }
 
   isLevelUpOpen() {
@@ -53,160 +108,19 @@ export class UI {
 
   clear() {
     for (const child of [...this.layer.children]) {
-      if (child.id === 'damage-numbers' || child.id === 'enemy-hp-bars') continue;
+      if (child.id === 'damage-numbers' || child.id === 'enemy-hp-bars' || child.id === 'game-metrics') continue;
       child.remove();
     }
   }
 
   showTitle(onAction) {
-    this._navCleanup?.();
-    this._navCleanup = null;
-    this.clear();
-    const screen = this._screen();
-    screen.classList.add('title-screen');
-    const heroSrc = `${import.meta.env.BASE_URL}images/title-hero.png`;
-    screen.innerHTML = `
-      <div class="title-hero" aria-hidden="true">
-        <img class="title-hero-img" src="${heroSrc}" alt="" />
-        <div class="title-hero-scrim"></div>
-      </div>
-      <div class="title-content">
-        <h1>GigaZonk</h1>
-        <p class="subtitle">Survive. Zonk. Ascend.</p>
-        <p class="menu-hint" style="margin-bottom:20px">${CONFIRM_HINT}</p>
-        <button class="btn btn-primary" id="btn-play">Play</button>
-        <p class="title-stats">
-          Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
-        </p>
-        <p class="title-version">v${GAME_VERSION}</p>
-      </div>
-    `;
-    const play = screen.querySelector('#btn-play');
-    play.onclick = () => { this._audio?.ui(); onAction('arena'); };
-    this._navCleanup = this._bindMenuList([play]);
+    renderTitle(this, onAction);
   }
 
   setAudio(audio) { this._audio = audio; }
 
   showCharacterSelect(onSelect, onBack) {
-    this._navCleanup?.();
-    this._navCleanup = null;
-    this.clear();
-    const screen = this._screen();
-    const cards = CHARACTERS.map(char => {
-      const playable = char.playable !== false;
-      const unlocked = playable && saveData.data.unlockedCharacters.includes(char.id);
-      const selected = playable && saveData.data.selectedCharacter === char.id;
-      const cardClass = !playable ? 'disabled' : (unlocked ? '' : 'locked');
-      const status = !playable
-        ? 'Coming soon'
-        : (unlocked ? (selected ? 'SELECTED' : 'Click to select') : `🔒 ${char.unlockCost} coins`);
-      return `
-        <div class="char-card ${cardClass} ${selected ? 'selected' : ''}" data-id="${char.id}" data-playable="${playable ? '1' : '0'}">
-          <div class="char-icon">${char.icon}</div>
-          <h4>${char.name}</h4>
-          <p>${char.desc}</p>
-          <div class="char-status">${status}</div>
-        </div>
-      `;
-    }).join('');
-
-    screen.innerHTML = `
-      <h2 style="color:#f7c948;margin-bottom:8px">Choose Your Zonker</h2>
-      <p style="color:#888;margin-bottom:8px">🪙 ${saveData.data.zonkCoins} Zonk Coins</p>
-      <p style="color:#666;font-size:12px;margin-bottom:16px">↑ ↓ ← → or WASD to select | ${CONFIRM_HINT}</p>
-      <div class="char-grid">${cards}</div>
-      <button class="btn btn-primary" id="btn-confirm" style="margin-top:20px">Continue</button>
-      <button class="btn btn-secondary" id="btn-back">Back</button>
-    `;
-
-    const cardEls = [...screen.querySelectorAll('.char-card')];
-
-    const refreshSelection = () => {
-      cardEls.forEach((el) => {
-        const id = el.dataset.id;
-        const char = CHARACTERS.find((c) => c.id === id);
-        const playable = char?.playable !== false;
-        const unlocked = playable && saveData.data.unlockedCharacters.includes(id);
-        const selected = playable && saveData.data.selectedCharacter === id;
-        el.classList.toggle('selected', selected);
-        const status = el.querySelector('.char-status');
-        if (status) {
-          status.textContent = !playable
-            ? 'Coming soon'
-            : (unlocked
-              ? (selected ? 'SELECTED' : 'Click to select')
-              : `🔒 ${char?.unlockCost ?? 0} coins`);
-        }
-      });
-    };
-
-    const selectCard = (el) => {
-      const id = el.dataset.id;
-      const char = CHARACTERS.find(c => c.id === id);
-      if (!char || char.playable === false) {
-        this.toast('Coming soon!');
-        return;
-      }
-      const unlocked = saveData.data.unlockedCharacters.includes(id);
-      if (unlocked) {
-        saveData.data.selectedCharacter = id;
-        saveData.save();
-        this._audio?.ui();
-        refreshSelection();
-      } else if (char && saveData.spendCoins(char.unlockCost)) {
-        saveData.unlockCharacter(id);
-        saveData.data.selectedCharacter = id;
-        saveData.save();
-        this._audio?.quest();
-        this.toast(`Unlocked ${char.name}!`);
-        refreshSelection();
-      } else {
-        this.toast('Not enough coins!');
-      }
-    };
-
-    const continueGame = () => {
-      this._navCleanup?.();
-      this._navCleanup = null;
-      this._audio?.ui();
-      onSelect(saveData.data.selectedCharacter);
-    };
-
-    const goBack = () => {
-      this._navCleanup?.();
-      this._navCleanup = null;
-      this._audio?.ui();
-      onBack();
-    };
-
-    cardEls.forEach((el) => { el.onclick = () => selectCard(el); });
-    screen.querySelector('#btn-confirm').onclick = continueGame;
-    screen.querySelector('#btn-back').onclick = goBack;
-
-    let initialIndex = cardEls.findIndex(el => el.dataset.id === saveData.data.selectedCharacter);
-    if (initialIndex < 0 || cardEls[initialIndex]?.dataset.playable !== '1') {
-      initialIndex = cardEls.findIndex((el) => el.dataset.playable === '1');
-    }
-    if (initialIndex < 0) initialIndex = 0;
-
-    this._navCleanup = this._bindGridNavigation({
-      cards: cardEls,
-      columns: 2,
-      focusClass: 'focused',
-      initialIndex,
-      onFocusChange: (index) => {
-        const el = cardEls[index];
-        if (el.dataset.playable !== '1') return;
-        if (saveData.data.unlockedCharacters.includes(el.dataset.id)) {
-          saveData.data.selectedCharacter = el.dataset.id;
-          saveData.save();
-          refreshSelection();
-        }
-      },
-      onConfirm: () => continueGame(),
-      onCancel: goBack,
-    });
+    renderCharacterSelect(this, onSelect, onBack);
   }
 
   showQuestBoard(questSystem, onClose) {
@@ -294,88 +208,7 @@ export class UI {
   }
 
   buildHUD() {
-    const hud = document.createElement('div');
-    hud.id = 'hud';
-    hud.className = 'hud';
-    hud.innerHTML = `
-      <div class="hud-left">
-        <div class="stat-bar">
-          <label>Health</label>
-          <div class="bar-track"><div class="bar-fill hp" id="hp-bar"></div></div>
-        </div>
-        <div class="stat-bar">
-          <label>Experience</label>
-          <div class="bar-track"><div class="bar-fill xp" id="xp-bar"></div></div>
-        </div>
-        <div class="stat-bar">
-          <label>Combo</label>
-          <div class="bar-track"><div class="bar-fill combo" id="combo-bar"></div></div>
-        </div>
-        <div class="hud-stat" id="level-stat">Level 1</div>
-        <div class="hud-stat" id="run-coins-stat" style="color:#f7c948">Run 🪙 0</div>
-        <div class="hud-stat" id="time-stat">0:00</div>
-        <div class="hud-stat" id="wave-stat">Wave 1</div>
-        <div class="hud-stat" id="enemy-stat">Enemies: 0</div>
-        <div class="hud-stat" id="biome-stat" style="color:#a89fd4"></div>
-      </div>
-    `;
-
-    const hudRight = document.createElement('div');
-    hudRight.className = 'hud-right-stack';
-
-    const buffBar = document.createElement('div');
-    buffBar.className = 'buff-bar';
-    buffBar.id = 'buff-bar';
-    buffBar.innerHTML = `
-      <h3>Buffs</h3>
-      <div class="buff-bar-track" id="buff-bar-track">
-        <span class="buff-empty">None yet</span>
-      </div>
-      <div id="buff-tooltip" class="buff-tooltip hidden" role="tooltip"></div>
-    `;
-    this._bindBuffTooltips(buffBar);
-
-    const quests = document.createElement('div');
-    quests.className = 'quest-panel';
-    quests.id = 'quest-panel';
-    quests.innerHTML = '<h3>Quests</h3><div id="quest-list"></div>';
-
-    hudRight.append(buffBar, quests);
-
-    const synergy = document.createElement('div');
-    synergy.className = 'synergy-bar';
-    synergy.id = 'synergy-bar';
-    SYNERGY_ELEMENTS.forEach(e => {
-      const slot = document.createElement('div');
-      slot.className = 'synergy-slot';
-      slot.id = `syn-${e}`;
-      slot.textContent = e === 'fire' ? '🔥' : e === 'ice' ? '❄️' : '⚡';
-      synergy.appendChild(slot);
-    });
-
-    const prompt = document.createElement('div');
-    prompt.className = 'interact-prompt hidden';
-    prompt.id = 'interact-prompt';
-    prompt.textContent = '[F] Interact';
-
-    const toasts = document.createElement('div');
-    toasts.className = 'toast-container';
-    toasts.id = 'toasts';
-
-    const hint = document.createElement('div');
-    hint.className = 'controls-hint';
-    hint.innerHTML = 'WASD / Left stick | RMB / Right stick camera | L3 Sprint | LB Dodge | RT Jump | LT Interact | D-pad Zoom | Start Menu';
-
-    const rewardStrip = document.createElement('div');
-    rewardStrip.className = 'reward-strip';
-    rewardStrip.id = 'reward-strip';
-    rewardStrip.innerHTML = '<div class="reward-strip-track" id="reward-strip-track"></div>';
-
-    this.runRewards = [];
-    this._rewardSeq = 0;
-    this._rewardQueue = [];
-    this._rewardShowcaseActive = false;
-    this.layer.append(hud, hudRight, synergy, prompt, toasts, rewardStrip, hint);
+    renderHUD(this);
   }
 
   _rarityBadgeHTML(rarity) {
@@ -840,102 +673,7 @@ export class UI {
   }
 
   showLevelUp(choices, player, onPick) {
-    if (!choices?.length) return false;
-
-    this.dismissLevelUp();
-    this.dismissRewardFlyers();
-    this.renderBuffBar(player);
-
-    const container = document.getElementById('game-container') || this.layer;
-    const screen = document.createElement('div');
-    screen.id = 'levelup-overlay';
-    screen.className = 'screen levelup-screen';
-    screen.innerHTML = `
-      <div class="levelup-buff-panel">
-        <div class="buff-bar levelup-buff-bar" id="levelup-buff-bar">
-          <h3>Buffs</h3>
-          <p class="levelup-buff-hint">Run buffs — gold chips change with the selected card</p>
-          <div class="buff-bar-track" id="levelup-buff-bar-track">
-            <span class="buff-empty">None yet</span>
-          </div>
-          <div id="levelup-buff-tooltip" class="buff-tooltip hidden" role="tooltip"></div>
-        </div>
-      </div>
-      <div class="levelup-body">
-        <h2 style="font-size:36px;color:#f7c948">LEVEL UP!</h2>
-        <p style="color:#888;margin-bottom:8px">Choose your Zonk upgrade</p>
-        <p style="color:#666;font-size:12px;margin-bottom:8px">← → or A D to select | ${CONFIRM_HINT}</p>
-        <div class="levelup-grid" id="upgrade-grid"></div>
-      </div>
-    `;
-    const grid = screen.querySelector('#upgrade-grid');
-    const levelupBuffBar = screen.querySelector('#levelup-buff-bar');
-    container.appendChild(screen);
-    this.renderBuffBar(player, { trackId: 'levelup-buff-bar-track', tooltipId: 'levelup-buff-tooltip' });
-    this._bindBuffTooltips(levelupBuffBar, { tooltipId: 'levelup-buff-tooltip' });
-
-    const previewUpgradeBuffs = (upgrade) => {
-      const highlights = getUpgradeBuffHighlights(player, upgrade);
-      const track = document.getElementById('levelup-buff-bar-track');
-      if (track) {
-        track.dataset.highlightSig = highlights.map((h) => `${h.id}|${h.delta}`).join(';;');
-      }
-      this.applyBuffBarHighlights('levelup-buff-bar-track', highlights, {
-        tooltipId: 'levelup-buff-tooltip',
-      });
-    };
-
-    const cards = choices.map((upgrade) => {
-      const preview = getUpgradePreview(player, upgrade);
-      const statsHtml = preview.map((row) => `
-        <div class="upgrade-stat">
-          <span class="upgrade-stat-label">${row.label}</span>
-          <span class="upgrade-stat-values">
-            <span class="before">${row.before}</span>
-            <span class="arrow">→</span>
-            <span class="after">${row.after}</span>
-          </span>
-        </div>
-      `).join('');
-
-      const card = document.createElement('div');
-      card.className = `upgrade-card rarity-${upgrade.rarity || 'common'}`;
-      card.innerHTML = `
-        ${this._rarityBadgeHTML(upgrade.rarity)}
-        <div class="icon">${upgrade.icon}</div>
-        <h4>${upgrade.name}</h4>
-        <p>${upgrade.desc}</p>
-        ${statsHtml ? `<div class="upgrade-stats">${statsHtml}</div>` : ''}
-      `;
-      card.addEventListener('mouseenter', () => previewUpgradeBuffs(upgrade));
-      grid.appendChild(card);
-      return card;
-    });
-
-    const confirm = (upgrade) => {
-      this.dismissLevelUp();
-      onPick(upgrade);
-    };
-
-    cards.forEach((card, i) => {
-      card.onclick = () => confirm(choices[i]);
-    });
-
-    try {
-      this.levelUpActive = true;
-      this._navCleanup = this._bindGridNavigation({
-        cards,
-        columns: Math.min(3, cards.length),
-        focusClass: 'focused',
-        onFocusChange: (idx) => previewUpgradeBuffs(choices[idx]),
-        onConfirm: (idx) => confirm(choices[idx]),
-      });
-      previewUpgradeBuffs(choices[0]);
-      return true;
-    } catch (err) {
-      this.dismissLevelUp();
-      throw err;
-    }
+    return renderLevelUp(this, choices, player, onPick);
   }
 
   showGameOver(stats, onAction) {
@@ -1102,244 +840,24 @@ export class UI {
     this.layer.append(hint, prompt);
   }
 
+  _navCtx() {
+    return { layer: this.layer, audio: this._audio };
+  }
+
   _screen() {
-    const screen = document.createElement('div');
-    screen.className = 'screen';
-    this.layer.appendChild(screen);
-    return screen;
+    return createScreen(this.layer);
   }
 
-  _createNavPointerGuard() {
-    let mouseNavActive = true;
-    const layer = this.layer;
-    const enableMouse = () => {
-      mouseNavActive = true;
-      layer.classList.remove('keyboard-nav-active');
-    };
-    document.addEventListener('mousemove', enableMouse, { passive: true, capture: true });
-    return {
-      onKeyboardUse() {
-        mouseNavActive = false;
-        layer.classList.add('keyboard-nav-active');
-      },
-      allowMouseNav() { return mouseNavActive; },
-      dispose() {
-        document.removeEventListener('mousemove', enableMouse, { capture: true });
-        layer.classList.remove('keyboard-nav-active');
-      },
-    };
-  }
-
-  _guardPointerClicks(elements, pointer) {
-    const blockClick = (e) => {
-      if (!e.isTrusted) return;
-      if (!pointer.allowMouseNav()) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    elements.forEach((el) => el.addEventListener('click', blockClick, true));
-    return () => elements.forEach((el) => el.removeEventListener('click', blockClick, true));
-  }
-
-  _bindGridNavigation({
-    cards,
-    columns = cards.length,
-    focusClass = 'selected',
-    initialIndex = 0,
-    onFocusChange = null,
-    onConfirm,
-    onCancel = null,
-  }) {
-    if (!cards.length) return () => {};
-
-    const pointer = this._createNavPointerGuard();
-    const unguardClicks = this._guardPointerClicks(cards, pointer);
-    let index = Math.min(initialIndex, cards.length - 1);
-
-    const updateFocus = () => {
-      cards.forEach((card, i) => card.classList.toggle(focusClass, i === index));
-      onFocusChange?.(index, cards[index]);
-    };
-
-    const onKeyDown = (e) => {
-      const prev = index;
-      const col = index % columns;
-      const row = Math.floor(index / columns);
-      const rows = Math.ceil(cards.length / columns);
-
-      if (['ArrowRight', 'KeyD'].includes(e.code)) {
-        index = (index + 1) % cards.length;
-      } else if (['ArrowLeft', 'KeyA'].includes(e.code)) {
-        index = (index - 1 + cards.length) % cards.length;
-      } else if (['ArrowDown', 'KeyS'].includes(e.code)) {
-        const nextRow = row + 1;
-        if (nextRow < rows) index = Math.min(nextRow * columns + col, cards.length - 1);
-      } else if (['ArrowUp', 'KeyW'].includes(e.code)) {
-        const prevRow = row - 1;
-        if (prevRow >= 0) index = prevRow * columns + col;
-      } else if (CONFIRM_KEYS.includes(e.code)) {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        onConfirm(index);
-        return;
-      } else if (onCancel && e.code === 'Escape') {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        onCancel();
-        return;
-      } else {
-        return;
-      }
-
-      e.preventDefault();
-      pointer.onKeyboardUse();
-      if (index !== prev) {
-        this._audio?.ui();
-        updateFocus();
-      }
-    };
-
-    cards.forEach((card, i) => {
-      card.addEventListener('mouseenter', () => {
-        if (!pointer.allowMouseNav()) return;
-        index = i;
-        updateFocus();
-      });
-    });
-
-    updateFocus();
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      unguardClicks();
-      pointer.dispose();
-    };
+  _bindGridNavigation(opts) {
+    return bindGridNavigation(this._navCtx(), opts);
   }
 
   _bindMenuList(buttons, onCancel, initialIndex = 0) {
-    if (!buttons.length) return () => {};
-
-    const pointer = this._createNavPointerGuard();
-    const unguardClicks = this._guardPointerClicks(buttons, pointer);
-    let index = Math.min(Math.max(0, initialIndex), buttons.length - 1);
-    const updateFocus = () => {
-      buttons.forEach((btn, i) => btn.classList.toggle('focused', i === index));
-    };
-    updateFocus();
-
-    const onKeyDown = (e) => {
-      const prev = index;
-      if (['ArrowDown', 'KeyS'].includes(e.code)) {
-        index = (index + 1) % buttons.length;
-      } else if (['ArrowUp', 'KeyW'].includes(e.code)) {
-        index = (index - 1 + buttons.length) % buttons.length;
-      } else if (CONFIRM_KEYS.includes(e.code)) {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        buttons[index].click();
-        return;
-      } else if (e.code === 'Escape') {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        onCancel?.();
-        return;
-      } else {
-        return;
-      }
-
-      e.preventDefault();
-      pointer.onKeyboardUse();
-      if (index !== prev) {
-        this._audio?.ui();
-        updateFocus();
-      }
-    };
-
-    buttons.forEach((btn, i) => {
-      btn.addEventListener('mouseenter', () => {
-        if (!pointer.allowMouseNav()) return;
-        index = i;
-        updateFocus();
-      });
-    });
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      unguardClicks();
-      pointer.dispose();
-    };
+    return bindMenuList(this._navCtx(), buttons, onCancel, initialIndex);
   }
 
   _bindSettingsNav(items, onCancel) {
-    if (!items.length) return () => {};
-
-    const pointer = this._createNavPointerGuard();
-    const unguardClicks = this._guardPointerClicks(items.map((item) => item.el), pointer);
-    let index = 0;
-    const updateFocus = () => {
-      items.forEach((item, i) => item.el.classList.toggle('focused', i === index));
-    };
-    updateFocus();
-
-    const onKeyDown = (e) => {
-      const prev = index;
-      const item = items[index];
-
-      if (['ArrowDown', 'KeyS'].includes(e.code)) {
-        index = (index + 1) % items.length;
-      } else if (['ArrowUp', 'KeyW'].includes(e.code)) {
-        index = (index - 1 + items.length) % items.length;
-      } else if (['ArrowLeft', 'KeyA'].includes(e.code) && item.onLeft) {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        item.onLeft();
-        this._audio?.ui();
-        return;
-      } else if (['ArrowRight', 'KeyD'].includes(e.code) && item.onRight) {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        item.onRight();
-        this._audio?.ui();
-        return;
-      } else if (CONFIRM_KEYS.includes(e.code)) {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        if (item.onActivate) item.onActivate();
-        else item.el.click?.();
-        return;
-      } else if (e.code === 'Escape') {
-        e.preventDefault();
-        pointer.onKeyboardUse();
-        onCancel?.();
-        return;
-      } else {
-        return;
-      }
-
-      e.preventDefault();
-      pointer.onKeyboardUse();
-      if (index !== prev) {
-        this._audio?.ui();
-        updateFocus();
-      }
-    };
-
-    items.forEach((item, i) => {
-      item.el.addEventListener('mouseenter', () => {
-        if (!pointer.allowMouseNav()) return;
-        index = i;
-        updateFocus();
-      });
-    });
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      unguardClicks();
-      pointer.dispose();
-    };
+    return bindSettingsNav(this._navCtx(), items, onCancel);
   }
 
   removeScreens() {

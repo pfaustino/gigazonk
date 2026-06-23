@@ -7,11 +7,24 @@ alwaysApply: true
 
 ## Before push
 
+Run the **layered gates** (see `browser-game-testing.mdc`):
+
 ```powershell
 npm run check
+npm run test:e2e
 ```
 
-Lint uses `--max-warnings 0`. Zero ESLint errors and zero warnings before push.
+For UI, navigation, browser, or e2e changes — also:
+
+```powershell
+npm run test:e2e:cross
+```
+
+During development on UI flows, agents use **`test:e2e:headed`** or **`:ui`** (stage 2) before the headless pre-push commands above.
+
+**Deploy:** Merges to `main` auto-publish GitHub Pages and itch.io (`deploy-pages.yml`, `deploy-itch.yml`). Do not deploy from PR branches. itch requires `BUTLER_API_KEY` in GitHub Environment **itch** (ADR 0005).
+
+Lint uses `--max-warnings 0`.
 
 ## Architecture + wiki
 

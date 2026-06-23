@@ -5,10 +5,12 @@ import { runRandomInt } from '../lib/runRandom.js';
 export class QuestSystem {
   constructor() {
     this.progress = {};
+    this._needsCompletionCheck = false;
     this.resetRun();
   }
 
   resetRun() {
+    this._needsCompletionCheck = false;
     this.progress = {
       kills: 0,
       chests: 0,
@@ -45,7 +47,13 @@ export class QuestSystem {
 
   track(type, amount = 1) {
     this.progress[type] = (this.progress[type] || 0) + amount;
-    this.checkCompletions();
+    this._needsCompletionCheck = true;
+  }
+
+  flushCompletions() {
+    if (!this._needsCompletionCheck) return null;
+    this._needsCompletionCheck = false;
+    return this.checkCompletions();
   }
 
   checkCompletions() {

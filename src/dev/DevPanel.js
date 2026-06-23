@@ -15,12 +15,27 @@ export class DevPanel {
         <div class="dev-panel-row"><span>Seed</span><code id="dev-seed"></code></div>
         <div class="dev-panel-row"><span>RNG</span><code id="dev-rng"></code></div>
         <div class="dev-panel-actions">
+          <span class="dev-panel-section-label">Arena</span>
           <button type="button" data-cmd="skip300">+5 min</button>
           <button type="button" data-cmd="skip600">+10 min</button>
           <button type="button" data-cmd="spawn50">Spawn 50</button>
           <button type="button" data-cmd="boss">Boss</button>
-          <button type="button" data-cmd="coins100">+100 coins</button>
+          <button type="button" data-cmd="clear">Clear horde</button>
           <button type="button" data-cmd="level">Level up</button>
+          <button type="button" data-cmd="fillxp">Fill XP</button>
+        </div>
+        <div class="dev-panel-actions">
+          <span class="dev-panel-section-label">Cheats</span>
+          <button type="button" data-cmd="god" data-toggle="god">God mode</button>
+          <button type="button" data-cmd="mega" data-toggle="mega">Mega dmg</button>
+          <button type="button" data-cmd="heal">Full heal</button>
+        </div>
+        <div class="dev-panel-actions">
+          <span class="dev-panel-section-label">Meta</span>
+          <button type="button" data-cmd="coins100">+100 coins</button>
+          <button type="button" data-cmd="rep50">+50 rep</button>
+          <button type="button" data-cmd="unlockchars">Unlock chars</button>
+          <button type="button" data-cmd="resettutorial">Reset tutorial</button>
           <button type="button" data-cmd="exportErrors">Export errors</button>
         </div>
         <div class="dev-panel-biomes" id="dev-biomes"></div>
@@ -40,20 +55,31 @@ export class DevPanel {
       this.toggle.classList.toggle('open', open);
     });
 
-    this.root.querySelector('.dev-panel-actions').addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-cmd]');
-      if (!btn) return;
-      this.runCommand(btn.dataset.cmd);
+    this.root.querySelectorAll('.dev-panel-actions').forEach((group) => {
+      group.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-cmd]');
+        if (!btn) return;
+        this.runCommand(btn.dataset.cmd);
+        this.syncToggleButtons();
+      });
     });
 
     this._renderBiomes();
+    this.syncToggleButtons();
     this._tick = () => this.refresh();
     requestAnimationFrame(this._tick);
+  }
+
+  syncToggleButtons() {
+    const { player } = this.game;
+    this.root.querySelector('[data-toggle="god"]')?.classList.toggle('dev-active', !!player?.devGodMode);
+    this.root.querySelector('[data-toggle="mega"]')?.classList.toggle('dev-active', !!player?.devMegaDamage);
   }
 
   refresh() {
     if (this.seedEl) this.seedEl.textContent = String(this.game.runSeed ?? '—');
     if (this.rngEl) this.rngEl.textContent = String(getActiveRunRng()?.getState() ?? '—');
+    this.syncToggleButtons();
     requestAnimationFrame(this._tick);
   }
 
@@ -82,11 +108,35 @@ export class DevPanel {
       case 'boss':
         this.game.devSpawnBoss();
         break;
+      case 'clear':
+        this.game.devClearHorde();
+        break;
       case 'coins100':
         this.game.devAddMetaCoins(100);
         break;
       case 'level':
         this.game.devForceLevelUp();
+        break;
+      case 'fillxp':
+        this.game.devFillXp();
+        break;
+      case 'god':
+        this.game.devToggleGodMode();
+        break;
+      case 'mega':
+        this.game.devToggleMegaDamage();
+        break;
+      case 'heal':
+        this.game.devFullHeal();
+        break;
+      case 'rep50':
+        this.game.devAddReputation(50);
+        break;
+      case 'unlockchars':
+        this.game.devUnlockAllCharacters();
+        break;
+      case 'resettutorial':
+        this.game.devResetTutorial();
         break;
       case 'exportErrors':
         this.game.devExportErrors();

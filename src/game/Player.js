@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP } from './constants.js';
+import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP, XP_LEVEL_BASE, XP_LEVEL_GROWTH, XP_PICKUP_MULT } from './constants.js';
 import { saveData } from './SaveData.js';
 import { applySkillBonusesToPlayer } from './SkillTree.js';
 import { buildPlayerVisual } from './EntityVisuals.js';
@@ -107,6 +107,8 @@ export class Player {
     this.position.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
     this.invincible = 0;
+    this.devGodMode = false;
+    this.devMegaDamage = false;
     this._skillXpMult = 0;
 
     applySkillBonusesToPlayer(this, m, saveData.data.skillLevels);
@@ -160,7 +162,7 @@ export class Player {
   }
 
   xpForLevel(lvl) {
-    return Math.floor(18 * Math.pow(1.14, lvl - 1));
+    return Math.floor(XP_LEVEL_BASE * Math.pow(XP_LEVEL_GROWTH, lvl - 1));
   }
 
   get xpMult() {
@@ -386,6 +388,7 @@ export class Player {
   }
 
   takeDamage(amount, opts = {}) {
+    if (this.devGodMode) return false;
     if (!opts.forced) {
       if (this.invincible > 0) return false;
       if (this.evasion > 0 && runRandom() < this.evasion) return false;
@@ -424,8 +427,9 @@ export class Player {
     if (healed > 0) this._onHeal?.(healed);
   }
 
-  addXp(amount) {
-    this.xp += Math.floor(amount * this.xpMult);
+  addXp(amount, opts = {}) {
+    const pickup = opts.ignorePickupMult ? 1 : XP_PICKUP_MULT;
+    this.xp += Math.floor(amount * pickup * this.xpMult);
     let levelsGained = 0;
     while (this.xp >= this.xpToNext) {
       this.xp -= this.xpToNext;
@@ -562,6 +566,7 @@ export class Player {
       }
     }
     if (this.killDamageBonus > 0) dmg *= (1 + this.killDamageBonus);
+    if (this.devMegaDamage) dmg *= 25;
     return dmg;
   }
 

@@ -14,7 +14,7 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -791,6 +791,7 @@ export class Game {
     if (this.paused) return;
 
     this.elapsed += dt;
+    this.combat.beginFrame();
     this.quests.update(dt, this.player, {
       wave: this.arena.getWave(this.elapsed),
       runCoins: this.runCoins,
@@ -878,8 +879,8 @@ export class Game {
 
     this.combat.tryAutoFire();
 
-    this.projectiles.update(dt, this.enemies, this.arena, (dmg, result, el, enemy, isCrit) =>
-      this.handleCombatHit(dmg, result, el, enemy, { isCrit })
+    this.projectiles.update(dt, this.enemies, this.arena, (dmg, result, el, enemy, isCrit, opts = {}) =>
+      this.handleCombatHit(dmg, result, el, enemy, { isCrit, ...opts })
     );
 
     const { xp, gems } = this.gems.update(dt, this.player);
@@ -915,6 +916,9 @@ export class Game {
       }
       this.handleCombatHit(dmg, result, el, null);
     });
+
+    this.enemies.flushInstances();
+    this.combat.flushHordeCombat();
 
     const contactDmg = this.enemies.checkPlayerCollision(
       this.player.position.x, this.player.position.z, 0.8, diffMult
@@ -967,7 +971,7 @@ export class Game {
       this.ui.showInteractPrompt(false);
     }
 
-    const questComplete = this.quests.checkCompletions();
+    const questComplete = this.quests.flushCompletions();
     if (questComplete) {
       this.audio.quest();
       this.ui.toast(`Quest complete! +${questComplete.reward} coins`, 'synergy');
@@ -1336,8 +1340,9 @@ export class Game {
 
   devForceLevelUp() {
     if (this.state !== 'arena') return;
-    const levels = this.player.addXp(this.player.xpToNext);
+    const levels = this.player.addXp(this.player.xpToNext, { ignorePickupMult: true });
     if (levels > 0) this.queueLevelUp(levels);
+    this.flushPendingLevelUp();
     this.ui.toast('Dev: forced level up', 'synergy');
   }
 
@@ -1358,5 +1363,63 @@ export class Game {
       console.log(text);
       this.ui.toast('Errors printed to console', 'warning');
     }
+  }
+
+  devToggleGodMode() {
+    this.player.devGodMode = !this.player.devGodMode;
+    this.ui.toast(this.player.devGodMode ? 'Dev: God mode ON' : 'Dev: God mode OFF', 'synergy');
+  }
+
+  devToggleMegaDamage() {
+    this.player.devMegaDamage = !this.player.devMegaDamage;
+    this.ui.toast(this.player.devMegaDamage ? 'Dev: Mega damage ON' : 'Dev: Mega damage OFF', 'synergy');
+  }
+
+  devFullHeal() {
+    if (this.state !== 'arena') return;
+    this.player.heal(this.player.maxHp);
+    this.ui.toast('Dev: full heal', 'synergy');
+  }
+
+  devClearHorde() {
+    if (this.state !== 'arena') return;
+    let cleared = 0;
+    for (const enemy of this.enemies.enemies) {
+      if (!enemy.alive) continue;
+      this.enemies._despawnEnemy(enemy);
+      cleared++;
+    }
+    this.ui.toast(`Dev: cleared ${cleared} enemies`, 'synergy');
+  }
+
+  devFillXp() {
+    if (this.state !== 'arena') return;
+    const levels = this.player.addXp(this.player.xpToNext * 3, { ignorePickupMult: true });
+    if (levels > 0) this.queueLevelUp(levels);
+    this.flushPendingLevelUp();
+    this.ui.toast(levels > 0 ? `Dev: +${levels} level(s)` : 'Dev: XP filled', 'synergy');
+  }
+
+  devAddReputation(amount = 50) {
+    saveData.addReputation(amount);
+    if (this.state === 'village') {
+      this.village.refreshForReputation();
+      this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+    }
+    this.ui.toast(`Dev: +${amount} reputation`, 'synergy');
+  }
+
+  devUnlockAllCharacters() {
+    for (const char of CHARACTERS) {
+      if (char.playable !== false) saveData.unlockCharacter(char.id);
+    }
+    this.ui.toast('Dev: all characters unlocked', 'synergy');
+  }
+
+  devResetTutorial() {
+    saveData.data.tutorialStep = 0;
+    saveData.data.tutorialComplete = false;
+    saveData.save();
+    this.ui.toast('Dev: tutorial reset', 'synergy');
   }
 }

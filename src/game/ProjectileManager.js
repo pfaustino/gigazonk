@@ -24,12 +24,14 @@ export class ProjectileManager {
 
     this.projectiles = [];
     this.freeSlots = [];
+    this._nearbyScratch = [];
     for (let i = MAX_PROJECTILES - 1; i >= 0; i--) this.freeSlots.push(i);
   }
 
   reset() {
     this.projectiles = [];
     this.freeSlots = [];
+    this._nearbyScratch = this._nearbyScratch ?? [];
     for (let i = MAX_PROJECTILES - 1; i >= 0; i--) this.freeSlots.push(i);
     this.mesh.count = 0;
   }
@@ -87,7 +89,7 @@ export class ProjectileManager {
       const enemy = p.targetEnemy;
       return [{ enemy, dist: Math.hypot(enemy.x - p.px, enemy.z - p.pz) }];
     }
-    return enemyManager.getNearby(p.px, p.pz, p.area + 0.8);
+    return enemyManager.getNearby(p.px, p.pz, p.area + 0.8, this._nearbyScratch);
   }
 
   updateInstance(p) {
@@ -136,12 +138,13 @@ export class ProjectileManager {
       for (const { enemy } of nearby) {
         if (!enemy.alive || p.hitEnemies.has(enemy)) continue;
         if (Math.hypot(enemy.x - p.px, enemy.z - p.pz) < p.area + enemy.scale * 0.4) {
+          const allowProcs = p.hitEnemies.size === 0;
           p.hitEnemies.add(enemy);
           if (p.targetEnemy === enemy) p.targetEnemy = null;
           const hitX = enemy.x;
           const hitZ = enemy.z;
           const result = enemyManager.damageEnemy(enemy, p.damage, p.element);
-          onHit(p.damage, result, p.element, enemy, p.isCrit);
+          onHit(p.damage, result, p.element, enemy, p.isCrit, { skipProcs: !allowProcs });
 
           if (p.element === 'lightning') {
             this.chainLightning(
@@ -181,7 +184,7 @@ export class ProjectileManager {
 
   chainLightning(fromX, fromZ, damage, enemyManager, onHit, chainsLeft, hitSet) {
     if (chainsLeft <= 0) return;
-    const nearby = enemyManager.getNearby(fromX, fromZ, 7);
+    const nearby = enemyManager.getNearby(fromX, fromZ, 7, this._nearbyScratch);
     let best = null;
     let bestDist = Infinity;
     for (const { enemy, dist } of nearby) {
@@ -191,7 +194,7 @@ export class ProjectileManager {
     if (!best) return;
     hitSet.add(best);
     const result = enemyManager.damageEnemy(best, damage, 'lightning');
-    onHit(damage, result, 'lightning', best);
+    onHit(damage, result, 'lightning', best, false, { skipProcs: true });
     this.chainLightning(best.x, best.z, damage * 0.7, enemyManager, onHit, chainsLeft - 1, hitSet);
   }
 

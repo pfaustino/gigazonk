@@ -14,7 +14,11 @@ export function showRunSummary(ui, stats, onAction) {
   const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
   const best = stats.bestTime > 0 ? `${Math.floor(stats.bestTime / 60)}:${Math.floor(stats.bestTime % 60).toString().padStart(2, '0')}` : '—';
   const buffs = stats.buffs?.length
-    ? stats.buffs.map((b) => `<span class="run-summary-buff">${b.icon} ${b.name}</span>`).join('')
+    ? stats.buffs.map((b) => {
+      const label = b.title ?? b.name ?? b.id;
+      const amt = b.amount != null && b.amount !== '' ? ` ${b.amount}` : '';
+      return `<span class="run-summary-buff">${b.icon} ${label}${amt}</span>`;
+    }).join('')
     : '<span class="run-summary-muted">No upgrades picked</span>';
 
   const achievements = (stats.newAchievements ?? []).map(

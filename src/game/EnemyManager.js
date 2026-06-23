@@ -13,6 +13,14 @@ import {
   MAX_GIGA_GROUP_SIZE,
   MESA_GUARDIAN_HP_HITS,
   ENEMY_MESH_LIFT,
+  ENEMY_SEPARATION_SCALE,
+  ENEMY_SEPARATION_QUERY,
+  ENEMY_SEPARATION_STRENGTH,
+  ENEMY_SEPARATION_MAX_PUSH,
+  ENEMY_SEPARATION_PASSES,
+  ENEMY_SEPARATION_HEAVY_COUNT,
+  ENEMY_SEPARATION_PLAYER_RADIUS,
+  ENEMY_HP_BAR_HORDE_LIMIT,
   pickGruntColor,
   BIOME_ENEMY_WEIGHTS,
 } from './constants.js';
@@ -43,6 +51,9 @@ export class EnemyManager {
     this.meshes = {};
     this.freeSlots = {};
     this._dirtyMeshes = new Set();
+    this._nearbyScratch = [];
+    this._instanceTick = 0;
+    this._animPhase = 0;
 
     for (const type of Object.keys(ENEMY_TYPES)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
@@ -94,6 +105,10 @@ export class EnemyManager {
     this._dirtyMeshes.clear();
   }
 
+  flushInstances() {
+    this._flushInstances();
+  }
+
   setThreatDamage(dmg) {
     this._threatDmg = Math.max(1, dmg);
   }
@@ -135,11 +150,17 @@ export class EnemyManager {
       feetY: null,
       airborne: false,
       verticalVel: 0,
+      _meshDirty: true,
+      _colorDirty: true,
     };
     this.enemies.push(enemy);
     this.count++;
     this.updateInstance(enemy);
     return enemy;
+  }
+
+  _markMeshDirty(enemy) {
+    enemy._meshDirty = true;
   }
 
   updateInstance(enemy) {
@@ -154,13 +175,17 @@ export class EnemyManager {
     } else {
       dummy.position.set(enemy.x, ENEMY_MESH_LIFT * enemy.scale + (enemy.groundY || 0), enemy.z);
       dummy.scale.set(enemy.scale, enemy.scale, enemy.scale);
-      dummy.rotation.y = Date.now() * 0.003 + enemy.slot;
+      dummy.rotation.y = this._animPhase + enemy.slot;
     }
     dummy.updateMatrix();
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
-    mesh.setColorAt(enemy.slot, _color.setHex(enemy.color));
+    if (enemy._colorDirty) {
+      mesh.setColorAt(enemy.slot, _color.setHex(enemy.color));
+      enemy._colorDirty = false;
+    }
     mesh.count = Math.max(mesh.count, enemy.slot + 1);
     this._markDirty(mesh);
+    enemy._meshDirty = false;
   }
 
   rebuildGrid() {
@@ -185,8 +210,9 @@ export class EnemyManager {
     }
   }
 
-  getNearby(x, z, radius) {
-    const results = [];
+  getNearby(x, z, radius, out = null) {
+    const results = out ?? [];
+    results.length = 0;
     const r = Math.ceil(radius / this.spatialCell);
     const cx = Math.floor(x / this.spatialCell);
     const cz = Math.floor(z / this.spatialCell);
@@ -256,9 +282,61 @@ export class EnemyManager {
 
     enemy.x = lastX;
     enemy.z = lastZ;
+    this._markMeshDirty(enemy);
+  }
+
+  _applyEnemySeparation(enemy, terrain, useTerrain) {
+    const queryR = enemy.scale * ENEMY_SEPARATION_QUERY;
+    const nearby = this.getNearby(enemy.x, enemy.z, queryR, this._nearbyScratch);
+    if (nearby.length === 0) return;
+
+    let pushX = 0;
+    let pushZ = 0;
+    for (let i = 0; i < nearby.length; i++) {
+      const other = nearby[i].enemy;
+      if (other === enemy || !other.alive) continue;
+
+      const dx = enemy.x - other.x;
+      const dz = enemy.z - other.z;
+      const dist = Math.hypot(dx, dz);
+      const minDist = (enemy.scale + other.scale) * ENEMY_SEPARATION_SCALE;
+      if (dist >= minDist) continue;
+
+      if (dist < 0.001) {
+        const angle = (enemy.slot * 2.399963 + enemy.x * 0.31 + enemy.z * 0.17) % (Math.PI * 2);
+        pushX += Math.cos(angle) * minDist;
+        pushZ += Math.sin(angle) * minDist;
+        continue;
+      }
+
+      const overlap = (minDist - dist) / dist;
+      pushX += dx * overlap;
+      pushZ += dz * overlap;
+    }
+
+    if (pushX === 0 && pushZ === 0) return;
+
+    let mag = Math.hypot(pushX, pushZ);
+    if (mag > ENEMY_SEPARATION_MAX_PUSH) {
+      pushX = (pushX / mag) * ENEMY_SEPARATION_MAX_PUSH;
+      pushZ = (pushZ / mag) * ENEMY_SEPARATION_MAX_PUSH;
+    }
+
+    pushX *= ENEMY_SEPARATION_STRENGTH;
+    pushZ *= ENEMY_SEPARATION_STRENGTH;
+
+    const newX = enemy.x + pushX;
+    const newZ = enemy.z + pushZ;
+    if (useTerrain && terrain && !this._canEnemyStep(enemy, enemy.x, enemy.z, newX, newZ, terrain)) {
+      return;
+    }
+    enemy.x = newX;
+    enemy.z = newZ;
+    this._markMeshDirty(enemy);
   }
 
   _updateEnemyVertical(enemy, terrain, dt) {
+    const prevY = enemy.groundY;
     const terrainY = terrain?.getGroundHeight?.(enemy.x, enemy.z) ?? 0;
     if (enemy.feetY == null) enemy.feetY = terrainY;
 
@@ -278,6 +356,9 @@ export class EnemyManager {
     }
 
     enemy.groundY = enemy.feetY;
+    if (Math.abs((enemy.groundY ?? 0) - (prevY ?? 0)) > 0.02) {
+      this._markMeshDirty(enemy);
+    }
   }
 
   _despawnEnemy(enemy) {
@@ -314,8 +395,9 @@ export class EnemyManager {
   }
 
   update(dt, playerPos, terrain = null) {
-    this.rebuildGrid();
     this._cullDistant(playerPos);
+    this._instanceTick++;
+    this._animPhase = this._instanceTick * 0.05;
 
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -353,8 +435,29 @@ export class EnemyManager {
         } else {
           e.x += moveX;
           e.z += moveZ;
+          this._markMeshDirty(e);
         }
       }
+    }
+
+    this.rebuildGrid();
+    const sepPasses = this.count > ENEMY_SEPARATION_HEAVY_COUNT ? 1 : ENEMY_SEPARATION_PASSES;
+    for (let pass = 0; pass < sepPasses; pass++) {
+      if (pass > 0) this.rebuildGrid();
+      for (const e of this.enemies) {
+        if (!e.alive) continue;
+        const playerDist = Math.hypot(playerPos.x - e.x, playerPos.z - e.z);
+        if (playerDist > ENEMY_SEPARATION_PLAYER_RADIUS) continue;
+        const near = playerDist <= ENEMY_NEAR_RADIUS;
+        this._applyEnemySeparation(e, terrain, near);
+      }
+    }
+
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+
+      const dist = Math.hypot(playerPos.x - e.x, playerPos.z - e.z);
+      const near = dist <= ENEMY_NEAR_RADIUS;
 
       if (near && terrain?.resolveObstacleCollision) {
         const prevX = e.x;
@@ -367,6 +470,7 @@ export class EnemyManager {
         ) {
           e.x = resolved.x;
           e.z = resolved.z;
+          this._markMeshDirty(e);
         }
       }
 
@@ -380,8 +484,12 @@ export class EnemyManager {
         e.verticalVel = 0;
       }
 
-      this.updateInstance(e);
+      const needsAnim = (e.slot + this._instanceTick) & 3 === 0;
+      if (e._meshDirty || needsAnim) {
+        this.updateInstance(e);
+      }
     }
+    this.rebuildGrid();
     this._flushInstances();
   }
 
@@ -400,14 +508,14 @@ export class EnemyManager {
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
     this._markDirty(mesh);
     this.freeSlots[enemy.type].push(enemy.slot);
-    this._flushInstances();
     return { xp, pos, isBoss: enemy.isBoss };
   }
 
   damageEnemy(enemy, amount, element) {
     if (!enemy.alive || amount <= 0) return null;
     if (enemy.isMesaGuardian) this._applyMesaGuardianHp(enemy);
-    enemy.hpBarVisible = true;
+    const showHpBar = enemy.isBoss || enemy.type === 'elite' || this.count < ENEMY_HP_BAR_HORDE_LIMIT;
+    if (showHpBar) enemy.hpBarVisible = true;
     enemy.hp -= amount;
     if (element === 'fire') enemy.burnTimer = 3;
     if (element === 'ice') enemy.slowTimer = 2;

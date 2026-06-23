@@ -74,12 +74,12 @@ Same order as CI; use **headed/ui** while iterating on UI:
 - Boot readiness: `src/lib/gameReady.js` (`title`, `arena-hud`, `village`); lazy `_ensureVillage()` / `_ensureArena()` in `Game.js`.
 - CI cross-browser: Xvfb + headed Firefox/WebKit (WebGL on Linux). See `.cursor/rules/browser-game-testing.mdc`.
 - Player-visible bug or new flow → add spec + run stage 2.
-- Green smoke ≠ full game QA (village, shop, level-up not in e2e yet).
+- Green smoke ≠ full game QA (shop, skill tree, save/resume mid-run not in e2e yet).
 - Details: `.cursor/rules/browser-game-testing.mdc`.
 
-## Dev tooling (target)
+## Dev tooling
 
-`DEV.md` cheat keys; `?dev=1` panel — not yet fully implemented; add via `src/dev/` when building test tools.
+`?dev=1` panel (`src/dev/DevPanel.js`): skip time, spawn horde/boss, force level-up, biome override, error export. Wired in Vite dev and via URL flag.
 
 ## Deploy
 

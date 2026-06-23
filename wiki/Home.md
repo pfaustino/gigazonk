@@ -148,22 +148,28 @@ Progressive init keeps the title DOM responsive on slow browsers (CI Firefox):
 
 E2e helpers wait on `data-game-ready` (`e2e/helpers/gameReady.ts`). CI cross-browser uses **Xvfb + headed Firefox/WebKit** (`.github/workflows/ci.yml`).
 
-### Phase C (polish) — in progress
+### Phase C (polish) — implemented
 
-| Item | Status |
+Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
+
+| Item | Module |
 |------|--------|
 | `transitionTo()` + `_applySceneMode()` scene routing | `Game.js` |
 | `resetRunManagers()` combat manager registry | `Game.js` |
-| Title **Enter Village** button (DEV smoke path) | `ui/TitleScreens.js` |
-| Village e2e (`startVillage` helper) | `e2e/` |
-| `Awards.js` → `UpgradeOffers.js` + `upgradeStatSchema.js` | done |
+| Title **Enter Village** button | `ui/TitleScreens.js` |
+| Village e2e (`startVillage`) | `e2e/helpers/gameFlow.ts` |
+| Level-up e2e (`startArenaAndPickLevelUp`) | `e2e/helpers/gameFlow.ts` |
+| `Awards.js` → `UpgradeOffers.js` + `upgradeStatSchema.js` | `UpgradeOffers.js`, `tests/upgradeOffers.test.js` |
+| IDE workflow (extensions, MCP, clean terminal) | `.vscode/`, `.cursor/mcp.json`, `scripts/run-playwright.mjs` |
+
+**Deferred (next phase):** shop / skill-tree e2e, `playwright-three` scene specs, defer combat managers until arena, instanced rocks.
 
 ### IDE & agent workflow
 
 | Mechanism | Location |
 |-----------|----------|
 | Extension recommendations | `.vscode/extensions.json` — `npm run setup:extensions` |
-| Workspace editor settings | `.vscode/settings.json`, `.editorconfig` |
+| Workspace editor + extension tuning | `.vscode/settings.json`, `.vscode/tasks.json`, `.editorconfig` |
 | Dev container extensions | `.devcontainer/devcontainer.json` |
 | MCP servers | `.cursor/mcp.json` — `npm run setup:mcp` (browser, vite-mcp, chrome-devtools, playwright, context7) |
 | Three.js e2e hook | `window.PLAYWRIGHT_THREE` in dev (`src/main.js`) |

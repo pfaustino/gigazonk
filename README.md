@@ -6,7 +6,9 @@ A browser-based 3D horde survival roguelike inspired by Megabonk — survive wav
 
 **Live demo:** [https://pfaustino.github.io/gigazonk/](https://pfaustino.github.io/gigazonk/)
 
-Pushes to `main` auto-deploy via GitHub Actions. To publish manually:
+**itch.io:** [https://pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk)
+
+Pushes to `main` auto-deploy to GitHub Pages and itch.io via GitHub Actions. To publish Pages manually:
 
 ```bash
 npm run deploy

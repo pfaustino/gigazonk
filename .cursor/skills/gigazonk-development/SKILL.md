@@ -77,6 +77,8 @@ Same order as CI; use **headed/ui** while iterating on UI:
 
 ## Deploy
 
-- Live: GitHub Pages `/gigazonk/` base in production build
-- `npm run build:itch` for relative paths
-- `npm run deploy` manual gh-pages
+- **GitHub Pages:** [pfaustino.github.io/gigazonk](https://pfaustino.github.io/gigazonk/) — `deploy-pages.yml` on `main`, `base: '/gigazonk/'`
+- **itch.io:** [pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk) — `deploy-itch.yml` on `main`, `npm run build:itch`, butler `pfaustino/gigazonk:html5`
+- Local itch gate: `npm run check:itch` (never commit `BUTLER_API_KEY`)
+- Manual Pages: `npm run deploy`
+- Manual itch re-push: GitHub Actions → **Deploy to itch.io** → Run workflow

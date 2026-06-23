@@ -91,5 +91,15 @@ Workflows use least privilege:
 - CI: `contents: read`
 - CodeQL: `contents: read`, `security-events: write`
 - Pages deploy: `pages: write`, `id-token: write`
+- itch deploy: `contents: read`; secret `BUTLER_API_KEY` in Environment **itch**
 
 Never store secrets in repos. Use GitHub Environments for deploy secrets if needed.
+
+### GigaZonk itch.io (one-time)
+
+1. Project: [pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk) (HTML5)
+2. itch.io → **API keys** → create key
+3. GitHub **gigazonk** → Settings → Environments → **itch** → secret `BUTLER_API_KEY`
+4. Merge to `main` or run workflow **Deploy to itch.io**
+
+See `docs/adr/0005-itch-io-deploy.md`.

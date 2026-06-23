@@ -16,6 +16,7 @@ alwaysApply: true
 - Push branch → `gh pr create` (or GitHub UI).
 - **Pre-PR local gate:** `npm run check && npm run test:e2e && npm run test:e2e:cross` when gameplay, UI, or e2e changed (`browser-game-testing.mdc`).
 - Wait for CI before merge — jobs: `quality`, `e2e`, `e2e-cross` (same order as local gates).
+- After merge to `main`, **Pages** and **itch.io** deploy automatically (`deploy-pages.yml`, `deploy-itch.yml` → `pfaustino/gigazonk:html5`). Agents do not run butler locally unless the user asks.
 - Do not merge blind reruns — read failed job logs first; for e2e failures check Playwright trace and `test-results/browser-errors/`.
 - Agent does not push to `main` unless the user explicitly asks.
 

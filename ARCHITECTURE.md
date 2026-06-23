@@ -139,11 +139,14 @@ URL flags (?seed, ?dev, ?biome) → parseDevFlags.ts → Game init
 |---------|--------|
 | `npm run dev` | Vite `:5173`, vite-mcp dev |
 | `npm run build` | `dist/` base `/gigazonk/` |
-| `npm run build:itch` | Relative base |
-| `npm run check` | lint + tsc + vitest + build |
+| `npm run build:itch` | Relative base (`./`) for itch.io |
+| `npm run check:itch` | lint + tsc + vitest + itch build (CI itch deploy gate) |
+| `npm run check` | lint + tsc + vitest + Pages build |
 | `npm run test:e2e` | Playwright smoke |
 
-CI: `.github/workflows/ci.yml` — `quality` (lint/tsc/vitest/build), `e2e` (Chromium smoke), `e2e-cross` (Chromium + Firefox + WebKit).
+CI: `.github/workflows/ci.yml` — `quality`, `e2e`, `e2e-cross` on PRs.
+
+Deploy on `main`: `deploy-pages.yml` (GitHub Pages), `deploy-itch.yml` (butler → `pfaustino/gigazonk:html5`). Secret `BUTLER_API_KEY` in GitHub Environment **itch**. See ADR 0005.
 
 ## Documentation map
 

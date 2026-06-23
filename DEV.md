@@ -119,10 +119,13 @@ localStorage.removeItem('gigazonk_save');
 ## Build & deploy
 
 ```bash
-npm run build          # GitHub Pages (/gigazonk/)
+npm run build            # GitHub Pages (/gigazonk/)
 npm run build:itch       # itch.io (relative paths)
+npm run check:itch       # lint + test + itch build (same gate as CI deploy)
 npm run deploy           # gh-pages manual
 ```
+
+**Auto deploy on `main`:** GitHub Pages (`deploy-pages.yml`) + itch.io (`deploy-itch.yml` → [pfaustino/gigazonk](https://pfaustino.itch.io/gigazonk)). Requires `BUTLER_API_KEY` in GitHub Environment **itch** — see ADR 0005.
 
 ## AI / Cursor
 

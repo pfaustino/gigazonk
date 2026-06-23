@@ -81,10 +81,19 @@ Same order as CI; use **headed/ui** while iterating on UI:
 
 `?dev=1` panel (`src/dev/DevPanel.js`): skip time, spawn horde/boss, force level-up, biome override, error export. Wired in Vite dev and via URL flag.
 
-## Deploy
+## Deploy (dual host — always both)
 
-- **GitHub Pages:** [pfaustino.github.io/gigazonk](https://pfaustino.github.io/gigazonk/) — `deploy-pages.yml` on `main`, `base: '/gigazonk/'`
-- **itch.io:** [pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk) — `deploy-itch.yml` on `main`, `npm run build:itch`, butler `pfaustino/gigazonk:html5`
-- Local itch gate: `npm run check:itch` (never commit `BUTLER_API_KEY`)
-- Manual Pages: `npm run deploy`
-- Manual itch re-push: GitHub Actions → **Deploy to itch.io** → Run workflow
+**Publish = Pages + itch.io.** Never report ship complete without both.
+
+| Host | Live URL | CI workflow | Build |
+|------|----------|-------------|-------|
+| GitHub Pages | [pfaustino.github.io/gigazonk](https://pfaustino.github.io/gigazonk/) | `deploy-pages.yml` | `npm run build` (`base: '/gigazonk/'`) |
+| itch.io | [pfaustino.itch.io/gigazonk](https://pfaustino.itch.io/gigazonk) | `deploy-itch.yml` | `npm run build:itch` (`base: './'`) |
+
+Post-merge agent checklist:
+
+1. `gh pr merge …` (or confirm merge)
+2. Wait for / verify **both** deploy workflows on `main`
+3. Reply with **both** play links
+
+Local gates: `npm run check:itch` before itch-related changes. Never commit `BUTLER_API_KEY`. Manual re-push: Actions → **Deploy to itch.io**. ADR 0005.

@@ -16,7 +16,18 @@ alwaysApply: true
 - Push branch → `gh pr create` (or GitHub UI).
 - **Pre-PR local gate:** `npm run check && npm run test:e2e && npm run test:e2e:cross` when gameplay, UI, or e2e changed (`browser-game-testing.mdc`).
 - Wait for CI before merge — jobs: `quality`, `e2e`, `e2e-cross` (same order as local gates).
-- After merge to `main`, **Pages** and **itch.io** deploy automatically (`deploy-pages.yml`, `deploy-itch.yml` → `pfaustino/gigazonk:html5`). Agents do not run butler locally unless the user asks.
+- After merge to `main`, **both** hosts deploy automatically — always verify **and report both** when the user asks to publish:
+  - **GitHub Pages:** `deploy-pages.yml` → https://pfaustino.github.io/gigazonk/
+  - **itch.io:** `deploy-itch.yml` → https://pfaustino.itch.io/gigazonk (`pfaustino/gigazonk:html5`)
+- Post-merge publish check (run both):
+
+```powershell
+gh run list --branch main --workflow "Deploy to GitHub Pages" --limit 1
+gh run list --branch main --workflow "Deploy to itch.io" --limit 1
+```
+
+- If either deploy failed, read logs and fix or re-run the failed workflow — do not tell the user “published” until **Pages and itch.io** are green.
+- Agents do not run butler locally unless the user asks. Manual itch re-push: Actions → **Deploy to itch.io** → Run workflow.
 - Do not merge blind reruns — read failed job logs first; for e2e failures check Playwright trace and `test-results/browser-errors/`.
 - Agent does not push to `main` unless the user explicitly asks.
 

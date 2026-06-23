@@ -21,10 +21,17 @@ export const DEFAULT_SAVE = {
   completedQuests: [],
   discoveredQuests: ['kill_50', 'chests_3', 'survive_5'],
   selectedCharacter: 'fox',
-  unlockedCharacters: ['fox'],
+  unlockedCharacters: ['fox', 'knight'],
+  unlockedAchievements: [],
+  tutorialStep: 0,
+  tutorialComplete: false,
+  dailyChallengeDay: 0,
+  dailyChallengeCompleted: false,
+  runStats: { bosses: 0, rifts: 0, novaTriggered: false, maxCombo: 0 },
   settings: { ...DEFAULT_SETTINGS },
   runSnapshot: null,
   savedAt: null,
+  saveVersion: '0.2.0',
 };
 
 function migrateDiscoveredQuests(parsed) {
@@ -53,7 +60,16 @@ export function hydrateSave(parsed) {
     activeQuests: (parsed.activeQuests ?? DEFAULT_SAVE.activeQuests)
       .filter((id) => QUESTS.some((q) => q.id === id)),
     discoveredQuests: migrateDiscoveredQuests(parsed),
-    unlockedCharacters: parsed.unlockedCharacters || DEFAULT_SAVE.unlockedCharacters,
+    unlockedCharacters: parsed.unlockedCharacters?.length
+      ? parsed.unlockedCharacters
+      : DEFAULT_SAVE.unlockedCharacters,
+    unlockedAchievements: parsed.unlockedAchievements ?? DEFAULT_SAVE.unlockedAchievements,
+    tutorialStep: parsed.tutorialStep ?? DEFAULT_SAVE.tutorialStep,
+    tutorialComplete: parsed.tutorialComplete ?? DEFAULT_SAVE.tutorialComplete,
+    dailyChallengeDay: parsed.dailyChallengeDay ?? DEFAULT_SAVE.dailyChallengeDay,
+    dailyChallengeCompleted: parsed.dailyChallengeCompleted ?? DEFAULT_SAVE.dailyChallengeCompleted,
+    runStats: { ...DEFAULT_SAVE.runStats, ...parsed.runStats },
+    saveVersion: parsed.saveVersion ?? DEFAULT_SAVE.saveVersion,
     selectedCharacter: isCharacterPlayable(parsed.selectedCharacter)
       ? (parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter)
       : DEFAULT_PLAYABLE_CHARACTER,
@@ -128,6 +144,11 @@ export class SaveData {
     this.data.skillLevels[skillId] = level + 1;
     this.save();
     return true;
+  }
+
+  recordRunStats(partial) {
+    this.data.runStats = { ...this.data.runStats, ...partial };
+    this.save();
   }
 
   completeQuest(id) {

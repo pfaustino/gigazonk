@@ -1,6 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { gotoClean } from './helpers/navigation.js';
-import { startQuickArena, startVillage, startArenaAndPickLevelUp } from './helpers/gameFlow.js';
+import {
+  startQuickArena,
+  startVillage,
+  startArenaAndPickLevelUp,
+  openSkillTreeViaDev,
+  openQuestBoardViaDev,
+  pauseArenaAndResume,
+} from './helpers/gameFlow.js';
 
 test.describe('GigaZonk smoke', () => {
   test('title screen loads', async ({ page }) => {
@@ -41,5 +48,31 @@ test.describe('GigaZonk smoke', () => {
     await gotoClean(page, '/?seed=42&dev=1');
     await expect(page.getByRole('heading', { name: 'GigaZonk' })).toBeVisible();
     expect(errors).toEqual([]);
+  });
+
+  test('title shows daily challenge label', async ({ page }) => {
+    await gotoClean(page);
+    await expect(page.locator('.title-daily')).toContainText(/Daily:/);
+  });
+
+  test('skill tree opens from village dev hook', async ({ page }) => {
+    await gotoClean(page, '/?dev=1&coins=500');
+    await startVillage(page);
+    await openSkillTreeViaDev(page);
+    await expect(page.locator('.skill-node').first()).toBeVisible();
+  });
+
+  test('quest board opens from dev hook', async ({ page }) => {
+    await gotoClean(page, '/?dev=1');
+    await startVillage(page);
+    await openQuestBoardViaDev(page);
+    await expect(page.locator('.quest-board-scroll')).toBeVisible();
+  });
+
+  test('arena run pauses to village and resumes', async ({ page }) => {
+    await gotoClean(page, '/?dev=1');
+    await startQuickArena(page);
+    await pauseArenaAndResume(page);
+    await expect(page.locator('#time-stat')).toBeVisible();
   });
 });

@@ -47,3 +47,32 @@ export async function startArenaAndPickLevelUp(page: Page) {
   await startQuickArena(page);
   await completeDevLevelUp(page);
 }
+
+/** Open skill tree via dev hook (requires `?dev=1`). */
+export async function openSkillTreeViaDev(page: Page) {
+  await page.evaluate(() => {
+    window.__gigazonkGame?.ui.showSkillTree(() => undefined);
+  });
+  await expect(page.locator('.skill-tree')).toBeVisible({ timeout: 10_000 });
+}
+
+/** Open quest board via dev hook (requires `?dev=1`). */
+export async function openQuestBoardViaDev(page: Page) {
+  await page.evaluate(() => {
+    const game = window.__gigazonkGame;
+    if (game) game.ui.showQuestBoard(game.quests, () => undefined);
+  });
+  await expect(page.getByText("Elder Zonka's Quest Board")).toBeVisible({ timeout: 10_000 });
+}
+
+/** Pause arena run to village and resume (requires `?dev=1`). */
+export async function pauseArenaAndResume(page: Page) {
+  await page.evaluate(() => {
+    window.__gigazonkGame?.leaveArenaForVillage();
+  });
+  await expect(page.getByText('Zonka Village')).toBeVisible({ timeout: 15_000 });
+  await page.evaluate(() => {
+    window.__gigazonkGame?.resumeArenaRun();
+  });
+  await expect(page.locator('#hp-bar')).toBeVisible({ timeout: 20_000 });
+}

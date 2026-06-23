@@ -43,11 +43,13 @@ function eyePair(y, z, spacing, size, rgb = [0, 0, 0]) {
 }
 
 export const ENEMY_MESH_CAPS = {
-  grunt: 350,
-  runner: 200,
-  wisp: 150,
-  brute: 70,
+  grunt: 300,
+  runner: 180,
+  wisp: 130,
+  brute: 60,
   elite: 30,
+  frostling: 100,
+  ember: 100,
 };
 
 export function buildEnemyGeometry(type) {
@@ -88,6 +90,18 @@ export function buildEnemyGeometry(type) {
         part(_box, -0.65, 0.65, 0, 0, 0, 0.3, 0.15, 0.45, 0.15),
         part(_box, 0.65, 0.65, 0, 0, 0, -0.3, 0.15, 0.45, 0.15),
         ...eyePair(1.15, 0.4, 0.12, 0.08),
+      ]);
+    case 'frostling':
+      return mergeParts([
+        part(_sphere, 0, 0.5, 0, 0, 0, 0, 0.32, 0.32, 0.32),
+        part(_cone, 0, 0.15, 0, Math.PI, 0, 0, 0.18, 0.3, 0.18),
+        ...eyePair(0.58, 0.32, 0.08, 0.06, [0.2, 0.4, 0.9]),
+      ]);
+    case 'ember':
+      return mergeParts([
+        part(_sphere, 0, 0.42, 0.05, 0, 0, 0, 0.26, 0.32, 0.38),
+        part(_cone, 0, 0.35, -0.18, 0.5, 0, 0, 0.1, 0.3, 0.1),
+        ...eyePair(0.72, 0.4, 0.07, 0.055),
       ]);
     case 'grunt':
     default:

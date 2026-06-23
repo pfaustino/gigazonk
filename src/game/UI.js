@@ -19,6 +19,9 @@ import {
 import { showTitle as renderTitle, showCharacterSelect as renderCharacterSelect } from './ui/TitleScreens.js';
 import { showLevelUp as renderLevelUp } from './ui/LevelUpScreen.js';
 import { buildHUD as renderHUD } from './ui/HudScreens.js';
+import { showRunSummary as renderRunSummary } from './ui/RunSummaryScreen.js';
+import { showTutorialOverlay, hideTutorialOverlay } from './ui/TutorialOverlay.js';
+import { checkSkillAchievement } from './AchievementSystem.js';
 import { setGameReady, GAME_READY } from '../lib/gameReady.js';
 
 const REWARD_SHOWCASE_HOLD_MS = 2000;
@@ -451,8 +454,8 @@ export class UI {
 
     const list = document.getElementById('quest-list');
     if (list) {
-      list.innerHTML = quests.map(q =>
-        `<div class="quest-item"><span class="progress">${q.current}/${q.target}</span> ${q.desc}</div>`
+      list.innerHTML = quests.map((q, i) =>
+        `<div class="quest-item${i === 0 ? ' quest-item--active' : ''}"><span class="progress">${q.current}/${q.target}</span> ${q.desc}</div>`
       ).join('');
     }
 
@@ -678,24 +681,19 @@ export class UI {
   }
 
   showGameOver(stats, onAction) {
-    this._navCleanup?.();
-    this._navCleanup = null;
-    const screen = this._screen();
-    screen.innerHTML = `
-      <h2 style="font-size:42px;color:#e74c3c">ZONKED OUT</h2>
-      <p style="color:#aaa;margin:16px 0;font-size:16px">
-        Survived ${Math.floor(stats.time)}s | Level ${stats.level} | ${stats.kills} kills
-      </p>
-      <p style="color:#f7c948;margin-bottom:24px">+${stats.coins} Zonk Coins earned</p>
-      <p class="menu-hint" style="margin-bottom:16px">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
-      <button class="btn btn-primary" id="btn-retry">Try Again</button>
-      <button class="btn btn-secondary" id="btn-village">Return to Village</button>
-    `;
-    const retry = screen.querySelector('#btn-retry');
-    const village = screen.querySelector('#btn-village');
-    retry.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onAction('retry'); };
-    village.onclick = () => { this._navCleanup?.(); this._navCleanup = null; onAction('village'); };
-    this._navCleanup = this._bindMenuList([retry, village]);
+    return this.showRunSummary(stats, onAction);
+  }
+
+  showRunSummary(stats, onAction) {
+    return renderRunSummary(this, stats, onAction);
+  }
+
+  showTutorial(onDismiss) {
+    showTutorialOverlay(this, onDismiss);
+  }
+
+  hideTutorial() {
+    hideTutorialOverlay();
   }
 
   showArenaPortalChoice(onResume, onNewRun, onCancel) {
@@ -796,6 +794,7 @@ export class UI {
         if (!skill) return;
         if (saveData.applySkillUpgrade(skill.id)) {
           this.toast(`Upgraded ${skill.name}!`);
+          checkSkillAchievement();
           this.showSkillTree(onClose, {
             scrollTop: skillTreeEl?.scrollTop ?? 0,
             focusSkillId: skill.id,

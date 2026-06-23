@@ -1,5 +1,5 @@
 export const ARENA_SIZE = 1200;
-export const GAME_VERSION = '0.1.9';
+export const GAME_VERSION = '0.2.0';
 
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;
@@ -100,9 +100,18 @@ export const ZONK_DOME_FOLLOWUP_DELAY = 3;
 export const ZONK_DOME_FOLLOWUP_DAMAGE_MULT = 0.65;
 
 export const VILLAGE_NPCS = [
-  { id: 'questgiver', name: 'Elder Zonka', role: 'Quests', pos: [-15, 0, -10], color: 0x6b4fd4 },
-  { id: 'trainer', name: 'Coach Zonk', role: 'Skill Tree', pos: [15, 0, -10], color: 0xf7c948 },
-  { id: 'portal', name: 'Arena Portal', role: 'Enter Arena', pos: [0, 0, 20], color: 0xff6b35 },
+  { id: 'questgiver', name: 'Elder Zonka', role: 'Quests', pos: [-15, 0, -10], color: 0x6b4fd4, minRep: 0 },
+  { id: 'trainer', name: 'Coach Zonk', role: 'Skill Tree', pos: [15, 0, -10], color: 0xf7c948, minRep: 0 },
+  { id: 'portal', name: 'Arena Portal', role: 'Enter Arena', pos: [0, 0, 20], color: 0xff6b35, minRep: 0 },
+  { id: 'merchant', name: 'Bonk Merchant', role: 'Wares', pos: [-12, 0, 12], color: 0x44aa66, minRep: 25 },
+  { id: 'shrine', name: 'Ascension Shrine', role: 'Shrine Lore', pos: [12, 0, 12], color: 0xaa44ff, minRep: 50 },
+];
+
+/** Reputation unlocks — decorative landmarks in Zonka Village. */
+export const VILLAGE_LANDMARKS = [
+  { id: 'well', label: 'Zonk Well', minRep: 10, pos: [-8, 0, 0], color: 0x4488cc },
+  { id: 'banner', label: 'Victory Banner', minRep: 30, pos: [8, 0, -5], color: 0xf7c948 },
+  { id: 'tower', label: 'Watch Tower', minRep: 75, pos: [0, 0, -18], color: 0x8899aa },
 ];
 
 export { QUESTS } from './gameData.js';
@@ -129,7 +138,7 @@ export const CHARACTERS = [
     desc: 'Armored stalwart. High HP, thorn aura, crushing blows.',
     color: 0x8899aa,
     unlockCost: 0,
-    playable: false,
+    playable: true,
     mods: { speedMult: 0.85, hpMult: 1.35, damageMult: 1.2, thorns: 5 },
     startElement: null,
   },
@@ -140,7 +149,7 @@ export const CHARACTERS = [
     desc: 'Elemental savant. Starts with lightning, +crit.',
     color: 0x66ccff,
     unlockCost: 150,
-    playable: false,
+    playable: true,
     mods: { speedMult: 0.95, hpMult: 0.85, critChance: 0.1 },
     startElement: 'lightning',
   },
@@ -151,7 +160,7 @@ export const CHARACTERS = [
     desc: 'Unstoppable fury. Combo bonus doubled, lifesteal.',
     color: 0xcc4444,
     unlockCost: 200,
-    playable: false,
+    playable: true,
     mods: { speedMult: 1.05, hpMult: 1.1, damageMult: 1.15, lifesteal: 0.03, comboMult: 2 },
     startElement: null,
   },
@@ -161,7 +170,7 @@ export const DEFAULT_PLAYABLE_CHARACTER = 'fox';
 
 export function isCharacterPlayable(id) {
   const char = CHARACTERS.find((c) => c.id === id);
-  return char?.playable !== false;
+  return char != null && char.playable !== false;
 }
 
 /** Rock / mesa color per biome — terrain uses the same palette. */
@@ -190,3 +199,11 @@ export const BIOMES = [
   { id: 'frost', name: 'Frost Zonk', ground: 0x5a7080, sky: 0x6a9cb8, accent: 0x3a5870, friction: 7 },
   { id: 'volcanic', name: 'Magma Pits', ground: 0x5a3828, sky: 0xc89878, accent: 0x2a1408, friction: 14 },
 ];
+
+/** Per-biome spawn weights (must sum ~1). Gates by elapsed time still apply in EnemyManager. */
+export const BIOME_ENEMY_WEIGHTS = {
+  grass: { grunt: 0.42, wisp: 0.18, runner: 0.2, brute: 0.12, elite: 0.04, frostling: 0, ember: 0.04 },
+  waste: { grunt: 0.35, wisp: 0.1, runner: 0.22, brute: 0.18, elite: 0.05, frostling: 0, ember: 0.1 },
+  frost: { grunt: 0.2, wisp: 0.15, runner: 0.12, brute: 0.1, elite: 0.03, frostling: 0.35, ember: 0.05 },
+  volcanic: { grunt: 0.18, wisp: 0.08, runner: 0.15, brute: 0.14, elite: 0.08, frostling: 0.05, ember: 0.32 },
+};

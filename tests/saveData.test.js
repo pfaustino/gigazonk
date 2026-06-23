@@ -17,8 +17,20 @@ describe('hydrateSave', () => {
     expect(data.skillLevels.quickstep).toBe(4);
   });
 
-  it('falls back to default character when not playable', () => {
+  it('keeps playable character selection', () => {
     const data = hydrateSave({ selectedCharacter: 'knight' });
+    expect(data.selectedCharacter).toBe('knight');
+  });
+
+  it('falls back to default character when not playable', () => {
+    const data = hydrateSave({ selectedCharacter: 'invalid_char' });
     expect(data.selectedCharacter).toBe('fox');
+  });
+
+  it('merges new save fields from defaults', () => {
+    const data = hydrateSave({ zonkCoins: 10 });
+    expect(data.unlockedAchievements).toEqual([]);
+    expect(data.tutorialComplete).toBe(false);
+    expect(data.dailyChallengeCompleted).toBe(false);
   });
 });

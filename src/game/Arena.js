@@ -2,9 +2,6 @@ import * as THREE from 'three';
 import {
   ARENA_SIZE,
   ARENA_GROUND_SEGMENTS,
-  ARENA_ROCK_COUNT,
-  ARENA_ROCK_MAX_RADIUS,
-  ARENA_ROCK_MIN_RADIUS,
   ARENA_SPAWN_PAD_RADIUS,
   BIOMES,
   getBiomeOuterColor,
@@ -22,6 +19,7 @@ import {
   sampleGroundHeight,
   tintFeatureMeshes,
 } from './TerrainFeatures.js';
+import { InstancedRockField } from './InstancedRockField.js';
 import { ObstacleGrid } from './ObstacleGrid.js';
 import { MesaHeightIndex } from './MesaHeightIndex.js';
 
@@ -39,16 +37,6 @@ function disposeMaterial(material) {
 function setMeshTexturedMaterial(mesh, material) {
   disposeMaterial(mesh.material);
   mesh.material = material;
-}
-
-const _rockBox = new THREE.Box3();
-
-function placeRockOnGround(rock, x, z, mesas) {
-  rock.position.set(x, 0, z);
-  rock.updateMatrixWorld(true);
-  _rockBox.setFromObject(rock);
-  const groundY = sampleGroundHeight(x, z, mesas);
-  rock.position.y = groundY - _rockBox.min.y + 0.02;
 }
 
 export class Arena {
@@ -152,47 +140,9 @@ export class Arena {
     this._loadTerrainTextures();
 
     this.obstacles = [...features.obstacles];
+    this.rockField = new InstancedRockField(this.group, this.mesas, getBiomeRockColor(this.biome));
     this.rocks = [];
-    const minR = ARENA_ROCK_MIN_RADIUS;
-    const maxR = ARENA_ROCK_MAX_RADIUS;
-    const minR2 = minR * minR;
-    const maxR2 = maxR * maxR;
-    for (let i = 0; i < ARENA_ROCK_COUNT; i++) {
-      const isBoulder = Math.random() < 0.2;
-      const radius = isBoulder
-        ? 2.0 + Math.random() * 2.8
-        : 0.5 + Math.random() * 0.8;
-      const rockGeo = new THREE.DodecahedronGeometry(radius, 0);
-      const rockMat = createTerrainLambertMaterial(0x6a6054);
-      const rock = new THREE.Mesh(rockGeo, rockMat);
-      const scaleXZ = 0.85 + Math.random() * 0.3;
-      const scaleY = 0.75 + Math.random() * 0.35;
-      rock.rotation.y = Math.random() * Math.PI * 2;
-      rock.rotation.x = (Math.random() - 0.5) * 0.35;
-      rock.rotation.z = (Math.random() - 0.5) * 0.35;
-      rock.scale.set(scaleXZ, scaleY, scaleXZ);
-      const collisionRadius = radius * scaleXZ;
-
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.sqrt(minR2 + Math.random() * (maxR2 - minR2));
-      const x = Math.cos(angle) * dist;
-      const z = Math.sin(angle) * dist;
-
-      placeRockOnGround(rock, x, z, this.mesas);
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      this.group.add(rock);
-      this.rocks.push(rock);
-      rock.updateMatrixWorld(true);
-      _rockBox.setFromObject(rock);
-      this.obstacles.push({
-        type: 'circle',
-        x,
-        z,
-        radius: collisionRadius,
-        blockBelowY: _rockBox.max.y,
-      });
-    }
+    this.obstacles.push(...this.rockField.obstacles);
 
     const borderGeo = new THREE.RingGeometry(this.halfSize - 1, this.halfSize, 64);
     const borderMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
@@ -208,9 +158,7 @@ export class Arena {
   setBiome(biome) {
     this.biome = biome;
     const rockColor = getBiomeRockColor(biome);
-    for (const rock of this.rocks) {
-      tintTerrainMaterial(rock.material, rockColor);
-    }
+    this.rockField?.setRockColor(rockColor);
     tintFeatureMeshes(this.featureMeshes, rockColor);
     this._applyGroundTextures();
     this._applyTerrainColors(biome);

@@ -14,6 +14,7 @@ import {
   MESA_GUARDIAN_HP_HITS,
   ENEMY_MESH_LIFT,
   pickGruntColor,
+  BIOME_ENEMY_WEIGHTS,
 } from './constants.js';
 import { runRandom, runRandomInt } from '../lib/runRandom.js';
 import { assert } from '../lib/assert.js';
@@ -37,6 +38,7 @@ export class EnemyManager {
     this.spawnTimer = 0;
     this._deadSinceCompact = 0;
     this._threatDmg = 10;
+    this.biomeId = 'grass';
 
     this.meshes = {};
     this.freeSlots = {};
@@ -425,13 +427,32 @@ export class EnemyManager {
     return totalDamage;
   }
 
+  setBiome(biomeId) {
+    this.biomeId = biomeId || 'grass';
+  }
+
   _pickEnemyType(elapsed) {
-    const roll = runRandom();
-    if (elapsed > 180 && roll < 0.03) return 'elite';
-    if (elapsed > 120 && roll < 0.08) return 'brute';
-    if (elapsed > 60 && roll < 0.15) return 'runner';
-    if (elapsed > 30 && roll < 0.25) return 'wisp';
-    return 'grunt';
+    const weights = BIOME_ENEMY_WEIGHTS[this.biomeId] || BIOME_ENEMY_WEIGHTS.grass;
+    const pool = [];
+    for (const [type, weight] of Object.entries(weights)) {
+      if (!weight || !ENEMY_TYPES[type] || !this.freeSlots[type]?.length) continue;
+      if (type === 'elite' && elapsed <= 180) continue;
+      if (type === 'brute' && elapsed <= 120) continue;
+      if (type === 'runner' && elapsed <= 60) continue;
+      if (type === 'wisp' && elapsed <= 30) continue;
+      if (type === 'frostling' && elapsed <= 45) continue;
+      if (type === 'ember' && elapsed <= 45) continue;
+      pool.push({ type, weight });
+    }
+    if (pool.length === 0) return this._resolveType('grunt');
+
+    let roll = runRandom();
+    let total = pool.reduce((s, p) => s + p.weight, 0);
+    for (const entry of pool) {
+      roll -= entry.weight / total;
+      if (roll <= 0) return this._resolveType(entry.type);
+    }
+    return this._resolveType(pool[pool.length - 1].type);
   }
 
   _resolveType(type) {

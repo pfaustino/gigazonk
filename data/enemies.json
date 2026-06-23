@@ -58,6 +58,24 @@
       "color": "#ff44ff",
       "scale": 1.6,
       "hpBarTop": 1.85
+    },
+    "frostling": {
+      "hpHits": 0.9,
+      "speed": 2.8,
+      "damage": 5,
+      "xp": 2,
+      "color": "#88ddff",
+      "scale": 0.55,
+      "hpBarTop": 0.82
+    },
+    "ember": {
+      "hpHits": 1.4,
+      "speed": 3.4,
+      "damage": 11,
+      "xp": 4,
+      "color": "#ff6622",
+      "scale": 0.72,
+      "hpBarTop": 1.05
     }
   }
 }

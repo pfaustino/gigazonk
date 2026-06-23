@@ -43,6 +43,7 @@ export class CombatController {
         g.quests.track('elites');
       }
       if (killResult.isBoss) {
+        g._runBosses++;
         g.quests.track('bosses');
         if (enemy?.isMesaGuardian) {
           g.quests.track('guardians');

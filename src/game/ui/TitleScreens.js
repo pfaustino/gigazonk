@@ -1,5 +1,6 @@
 import { CHARACTERS, GAME_VERSION } from '../constants.js';
 import { saveData } from '../SaveData.js';
+import { getDailyChallengeLabel } from '../DailyChallenge.js';
 import {
   CONFIRM_HINT,
   bindGridNavigation,
@@ -33,6 +34,7 @@ export function showTitle(ui, onAction) {
         <p class="title-stats">
           Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
         </p>
+        <p class="title-daily">${getDailyChallengeLabel()}</p>
         <p class="title-version">v${GAME_VERSION}</p>
       </div>
     `;

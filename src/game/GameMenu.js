@@ -3,18 +3,23 @@ import { DIFFICULTIES, LANGUAGES } from './settings.js';
 import { GAME_VERSION } from './constants.js';
 import { renderHostedDonateButton, clearDonateButton } from './PayPalDonate.js';
 
-const MENU_HINT = '↑ ↓ or W S to navigate | Enter, Space, or F to select | Esc back';
+const MENU_HINT = '↑ ↓ or W S / Left stick to navigate | Enter, Space, A, or F to select | Esc back';
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
 
 const CONTROLS_TEXT = `
 WASD — Move forward/back/strafe (camera-relative)
 Hold LMB — Move forward
-RMB drag — Orbit camera
-Shift — Sprint
-Space — Jump / vault over enemies
-Q — Dodge roll
-F — Interact (chests, NPCs, village portal)
+Left stick — Move (gamepad)
+RMB drag / Right stick — Orbit camera
+Shift / L3 — Sprint
+Space / RT — Jump
+Q / LB — Dodge roll
+F / LT — Interact (chests, NPCs, village portal)
+D-pad Up/Down — Zoom camera (gamepad)
 Mouse wheel — Zoom camera
+A — Confirm menus | B — Back
+D-pad / Left stick — Navigate menus
+Start — Game menu
 Esc — Game menu
 `.trim();
 

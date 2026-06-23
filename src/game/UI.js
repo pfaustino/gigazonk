@@ -8,7 +8,7 @@ import {
   isSkillUnlocked,
 } from './SkillTree.js';
 import { GameMenu } from './GameMenu.js';
-import { getUpgradePreview, getActiveBuffs, formatBuffTooltip, getBuffTargetsFromStats, getUpgradeBuffHighlights, RARITIES } from './UpgradeSystem.js';
+import { getUpgradePreview, getActiveBuffs, formatBuffTooltip, getBuffTargetsFromStats, getUpgradeBuffHighlights, buffDisplayRank, RARITIES } from './UpgradeSystem.js';
 
 const CONFIRM_KEYS = ['Enter', 'NumpadEnter', 'Space', 'KeyF'];
 const CONFIRM_HINT = 'Enter, Space, or F to confirm';
@@ -73,20 +73,17 @@ export class UI {
       <div class="title-content">
         <h1>GigaZonk</h1>
         <p class="subtitle">Survive. Zonk. Ascend.</p>
-        <p class="menu-hint" style="margin-bottom:20px">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
-        <button class="btn btn-primary" id="btn-village">Enter Village</button>
-        <button class="btn btn-secondary" id="btn-arena">Quick Arena Run</button>
+        <p class="menu-hint" style="margin-bottom:20px">${CONFIRM_HINT}</p>
+        <button class="btn btn-primary" id="btn-play">Play</button>
         <p class="title-stats">
           Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
         </p>
         <p class="title-version">v${GAME_VERSION}</p>
       </div>
     `;
-    const village = screen.querySelector('#btn-village');
-    const arena = screen.querySelector('#btn-arena');
-    village.onclick = () => { this._audio?.ui(); onAction('village'); };
-    arena.onclick = () => { this._audio?.ui(); onAction('arena'); };
-    this._navCleanup = this._bindMenuList([village, arena]);
+    const play = screen.querySelector('#btn-play');
+    play.onclick = () => { this._audio?.ui(); onAction('arena'); };
+    this._navCleanup = this._bindMenuList([play]);
   }
 
   setAudio(audio) { this._audio = audio; }
@@ -367,7 +364,7 @@ export class UI {
 
     const hint = document.createElement('div');
     hint.className = 'controls-hint';
-    hint.innerHTML = 'WASD / Hold LMB Forward | RMB Drag Camera | Shift Sprint | Q Dodge | Space Jump | F Interact | Wheel Zoom | Esc Menu';
+    hint.innerHTML = 'WASD / Left stick | RMB / Right stick camera | L3 Sprint | LB Dodge | RT Jump | LT Interact | D-pad Zoom | Start Menu';
 
     const rewardStrip = document.createElement('div');
     rewardStrip.className = 'reward-strip';
@@ -731,6 +728,12 @@ export class UI {
     `).join('');
   }
 
+  _sortBuffBarTrack(track) {
+    const chips = [...track.querySelectorAll('.buff-chip[data-buff-id]')];
+    chips.sort((a, b) => buffDisplayRank(a.dataset.buffId) - buffDisplayRank(b.dataset.buffId));
+    for (const chip of chips) track.appendChild(chip);
+  }
+
   applyBuffBarHighlights(trackId, highlights = [], { tooltipId = null } = {}) {
     const track = document.getElementById(trackId);
     if (!track) return;
@@ -792,6 +795,8 @@ export class UI {
       `;
       track.appendChild(chip);
     }
+
+    this._sortBuffBarTrack(track);
 
     if (tooltipId) document.getElementById(tooltipId)?.classList.add('hidden');
   }
@@ -975,9 +980,18 @@ export class UI {
     this._navCleanup = this._bindMenuList([resume, newRun, cancel]);
   }
 
-  showSkillTree(onClose) {
+  showSkillTree(onClose, restore = {}) {
     this._navCleanup?.();
     this._navCleanup = null;
+
+    for (const el of this.layer.querySelectorAll('.screen')) {
+      if (!el.querySelector('.skill-tree')) continue;
+      if (restore.scrollTop == null) {
+        restore.scrollTop = el.querySelector('.skill-tree')?.scrollTop ?? 0;
+      }
+      el.remove();
+    }
+
     const screen = this._screen();
     const levels = saveData.data.skillLevels;
 
@@ -1027,6 +1041,15 @@ export class UI {
       <button class="btn btn-secondary" id="btn-close">Leave Trainer</button>
     `;
 
+    const skillTreeEl = screen.querySelector('.skill-tree');
+    const scrollTop = restore.scrollTop ?? 0;
+    if (skillTreeEl && scrollTop > 0) {
+      skillTreeEl.scrollTop = scrollTop;
+      requestAnimationFrame(() => {
+        skillTreeEl.scrollTop = scrollTop;
+      });
+    }
+
     const upgradeable = [...screen.querySelectorAll('.skill-node--available')];
     upgradeable.forEach((el) => {
       el.onclick = () => {
@@ -1034,7 +1057,10 @@ export class UI {
         if (!skill) return;
         if (saveData.applySkillUpgrade(skill.id)) {
           this.toast(`Upgraded ${skill.name}!`);
-          this.showSkillTree(onClose);
+          this.showSkillTree(onClose, {
+            scrollTop: skillTreeEl?.scrollTop ?? 0,
+            focusSkillId: skill.id,
+          });
         } else {
           this.toast('Not enough coins or skill maxed!');
         }
@@ -1051,7 +1077,12 @@ export class UI {
     closeBtn.onclick = leave;
 
     const navItems = [...upgradeable, closeBtn];
-    this._navCleanup = this._bindMenuList(navItems, leave);
+    let initialIndex = 0;
+    if (restore.focusSkillId) {
+      const idx = navItems.findIndex((el) => el.dataset?.id === restore.focusSkillId);
+      if (idx >= 0) initialIndex = idx;
+    }
+    this._navCleanup = this._bindMenuList(navItems, leave, initialIndex);
   }
 
   showVillageHUD(coins, reputation) {
@@ -1186,12 +1217,12 @@ export class UI {
     };
   }
 
-  _bindMenuList(buttons, onCancel) {
+  _bindMenuList(buttons, onCancel, initialIndex = 0) {
     if (!buttons.length) return () => {};
 
     const pointer = this._createNavPointerGuard();
     const unguardClicks = this._guardPointerClicks(buttons, pointer);
-    let index = 0;
+    let index = Math.min(Math.max(0, initialIndex), buttons.length - 1);
     const updateFocus = () => {
       buttons.forEach((btn, i) => btn.classList.toggle('focused', i === index));
     };

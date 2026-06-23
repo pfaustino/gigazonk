@@ -1151,6 +1151,17 @@ export class Game {
     this.timer.update(timestamp);
     const dt = Math.min(this.timer.getDelta(), 0.05);
 
+    const inWorld = this.state === 'arena' || this.state === 'village';
+    const gameplay = inWorld
+      && !this.modalPause
+      && !this.ui.gameMenu.isOpen()
+      && !this.ui.isLevelUpOpen();
+    this.input.setGameplayEnabled(gameplay);
+    this.input.setInvertLookY(saveData.data.settings.invertMouseY);
+    this.input.pollGamepad(dt, {
+      menuNav: this.ui.hasModalScreen() || this.ui.gameMenu.isOpen(),
+    });
+
     if (this.state === 'arena') {
       this.updateArena(dt);
       this.recoverStuckModalPause();

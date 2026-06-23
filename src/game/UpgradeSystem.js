@@ -80,7 +80,13 @@ export function getUpgradePreview(player, upgrade) {
     addRunMultPreview(lines, 'Blast radius', player.area, player.area * (1 + e.areaMult), base);
   }
   if (e.critChance) {
-    add('Crit chance', player.critChance, Math.min(CRIT_CHANCE_CAP, player.critChance + e.critChance), fmtPct);
+    const boost = 1 + (player.upgradeBoost ?? 0);
+    add(
+      'Crit chance',
+      player.critChance,
+      Math.min(CRIT_CHANCE_CAP, player.critChance + e.critChance * boost),
+      fmtPct
+    );
   }
   if (e.element) {
     const after = new Set(player.elements);
@@ -179,7 +185,7 @@ export function getUpgradePreview(player, upgrade) {
     add('Hurt speed', player.hurtSpeedBurst, player.hurtSpeedBurst + e.hurtSpeedBurst, fmtPct);
   }
 
-  return lines;
+  return sortPreviewLines(lines);
 }
 
 export const LOOT_REWARD_ICONS = {
@@ -387,6 +393,84 @@ const BUFF_ID_DISPLAY = {
   hurtSpeedBurst: { icon: '😤', title: 'Hurt speed burst' },
 };
 
+/** Canonical left-to-right order for buff bar chips (HUD + level-up). */
+const BUFF_DISPLAY_ORDER = [
+  'extraProjectiles',
+  'pierce',
+  'damage',
+  'moveSpeed',
+  'attackSpeed',
+  'maxHp',
+  'pickupRadius',
+  'blastRadius',
+  'critChance',
+  'critDamage',
+  'lifesteal',
+  'thorns',
+  'familiars',
+  'airJumps',
+  'element-fire',
+  'element-ice',
+  'element-lightning',
+  'lightningChains',
+  'magnetPulse',
+  'hpRegen',
+  'xpGain',
+  'evasion',
+  'armor',
+  'meleeDamage',
+  'airborneDamage',
+  'bossDamage',
+  'poisonChance',
+  'bonkChance',
+  'explodeChance',
+  'killDamageBonus',
+  'projectileSpeed',
+  'jumpHeight',
+  'greasedFire',
+  'coinBonus',
+  'killXp',
+  'healOnKill',
+  'magnetRadius',
+  'upgradeBoost',
+  'critSplash',
+  'idleDamage',
+  'moveAtkSpeed',
+  'hurtSpeedBurst',
+];
+
+export function buffDisplayRank(id) {
+  const idx = BUFF_DISPLAY_ORDER.indexOf(id);
+  return idx >= 0 ? idx : 9999;
+}
+
+export function sortByBuffDisplayOrder(items, getId = (item) => item.id) {
+  return [...items].sort((a, b) => {
+    const idA = getId(a);
+    const idB = getId(b);
+    const rankA = buffDisplayRank(idA);
+    const rankB = buffDisplayRank(idB);
+    if (rankA !== rankB) return rankA - rankB;
+    return String(idA).localeCompare(String(idB));
+  });
+}
+
+function previewRowRank(row) {
+  const ids = getBuffIdsForPreviewRow(row);
+  if (ids.length) return buffDisplayRank(ids[0]);
+  if (row.label === 'HP') return buffDisplayRank('maxHp') + 0.5;
+  return 9999;
+}
+
+function sortPreviewLines(lines) {
+  return [...lines].sort((a, b) => {
+    const rankA = previewRowRank(a);
+    const rankB = previewRowRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    return a.label.localeCompare(b.label);
+  });
+}
+
 function getBuffIdsForPreviewRow(row) {
   const ids = [];
   const push = (id) => {
@@ -442,7 +526,7 @@ export function getUpgradeBuffHighlights(player, upgrade) {
     }
   }
 
-  return highlights;
+  return sortByBuffDisplayOrder(highlights);
 }
 
 export function getBuffTargetsFromStats(stats = []) {
@@ -488,10 +572,11 @@ export function getActiveBuffs(player) {
   const areaPct = Math.round((player.area / base.area - 1) * 100);
   if (areaPct > 0) add('💫', `+${areaPct}%`, 'Blast radius', 'blastRadius');
 
-  const critPct = Math.round((player.critChance - base.critChance) * 100);
-  if (critPct > 0) {
+  const critRunGain = player.critChance - base.critChance;
+  if (critRunGain > 0.0001) {
     const atCap = player.critChance >= CRIT_CHANCE_CAP - 0.0001;
-    add('🎯', `+${critPct}%`, atCap ? 'Crit chance (max)' : 'Crit chance', 'critChance');
+    const total = Math.round(player.critChance * 100);
+    add('🎯', `${total}%`, atCap ? 'Crit chance (max)' : 'Crit chance', 'critChance');
   }
 
   const critDmgBonus = Math.round((player.critDamageMult - base.critDamageMult) * 10) / 10;
@@ -511,8 +596,8 @@ export function getActiveBuffs(player) {
   const jumpExtra = Math.round(player.maxAirJumps) - Math.round(base.maxAirJumps);
   if (jumpExtra > 0) add('🦘', `+${jumpExtra}`, 'Air jumps', 'airJumps');
 
-  for (const el of player.elements) {
-    if (!base.elements.has(el)) {
+  for (const el of SYNERGY_ELEMENTS) {
+    if (player.elements.has(el) && !base.elements.has(el)) {
       const elName = ELEMENT_NAMES[el] || (el ? el.charAt(0).toUpperCase() + el.slice(1) : 'Unknown');
       add(ELEMENT_ICONS[el] || '✨', 'ON', `${elName} element`, `element-${el}`);
     }
@@ -565,7 +650,7 @@ export function getActiveBuffs(player) {
   const hurtSpdExtra = player.hurtSpeedBurst - (base.hurtSpeedBurst ?? 0);
   if (hurtSpdExtra > 0) add('😤', fmtPct(hurtSpdExtra), 'Hurt speed burst', 'hurtSpeedBurst');
 
-  return buffs;
+  return sortByBuffDisplayOrder(buffs);
 }
 
 export class UpgradeSystem {

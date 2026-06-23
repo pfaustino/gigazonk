@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+const ARENA_HUD_TIMEOUT = process.env.CI ? 120_000 : 20_000;
+
 /** Title → character select → quick arena (same path as smoke play flow). */
 export async function startQuickArena(page: Page) {
   await page.locator('#btn-play').click();
@@ -9,5 +11,5 @@ export async function startQuickArena(page: Page) {
   await confirm.scrollIntoViewIfNeeded();
   // DOM click avoids keyboard-nav pointer guard blocking Playwright clicks (WebKit).
   await confirm.evaluate((el) => (el as HTMLButtonElement).click());
-  await expect(page.locator('#hp-bar')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#hp-bar')).toBeVisible({ timeout: ARENA_HUD_TIMEOUT });
 }

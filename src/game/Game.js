@@ -64,6 +64,7 @@ export class Game {
     this._devPendingBiome = this._devFlags.biome;
     this.village = null;
     this.arena = null;
+    this._worldWarmPending = false;
 
     if (this._devFlags.coins) {
       saveData.addCoins(this._devFlags.coins);
@@ -237,10 +238,10 @@ export class Game {
     this.village.setVisible(false);
     this.arena.setVisible(true);
     this.applyArenaScene();
-    this.resetRun();
-    this.quests.assignNewQuests();
     this.ui.clear();
     this.ui.buildHUD();
+    this.resetRun();
+    this.quests.assignNewQuests();
     if (this._devPendingBiome) {
       const biome = BIOMES.find((b) => b.id === this._devPendingBiome);
       if (biome) {
@@ -1000,6 +1001,13 @@ export class Game {
 
   animate(timestamp) {
     requestAnimationFrame((t) => this.animate(t));
+    if (this.state === 'title' && !this.village && !this._worldWarmPending) {
+      this._worldWarmPending = true;
+      queueMicrotask(() => {
+        this._ensureWorldScenes();
+        this._worldWarmPending = false;
+      });
+    }
     this.timer.update(timestamp);
     const dt = Math.min(this.timer.getDelta(), 0.05);
 

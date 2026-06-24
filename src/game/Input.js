@@ -5,6 +5,18 @@ const MENU_STICK_THRESHOLD = 0.38;
 const MENU_REPEAT_DELAY = 0.32;
 const MENU_REPEAT_RATE = 0.09;
 
+/** Screen-space move direction for each movement key (matches getMoveVector). */
+const MOVE_KEY_DIRS = {
+  KeyW: { x: 0, z: -1 },
+  ArrowUp: { x: 0, z: -1 },
+  KeyS: { x: 0, z: 1 },
+  ArrowDown: { x: 0, z: 1 },
+  KeyA: { x: -1, z: 0 },
+  ArrowLeft: { x: -1, z: 0 },
+  KeyD: { x: 1, z: 0 },
+  ArrowRight: { x: 1, z: 0 },
+};
+
 export class Input {
   constructor(canvas) {
     this.keys = {};
@@ -24,6 +36,8 @@ export class Input {
     };
     this._stickMove = { x: 0, z: 0 };
     this._touchMove = { x: 0, z: 0 };
+    /** Last movement input direction (WASD / stick) for dodge-without-hold. */
+    this._lastMoveDir = { x: 0, z: -1 };
     this._gpPrev = null;
     this._menuStickTimers = { up: 0, down: 0, left: 0, right: 0 };
 
@@ -87,6 +101,11 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (!this.keys[e.code]) this.justPressed[e.code] = true;
       this.keys[e.code] = true;
+      const keyDir = MOVE_KEY_DIRS[e.code];
+      if (keyDir) {
+        this._lastMoveDir.x = keyDir.x;
+        this._lastMoveDir.z = keyDir.z;
+      }
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
@@ -169,11 +188,24 @@ export class Input {
   setTouchMove(x, z) {
     this._touchMove.x = x;
     this._touchMove.z = z;
+    if (Math.hypot(x, z) > 0.01) this._rememberMoveDir(x, z);
+  }
+
+  _rememberMoveDir(x, z) {
+    const len = Math.hypot(x, z);
+    if (len < 0.01) return;
+    this._lastMoveDir.x = x / len;
+    this._lastMoveDir.z = z / len;
+  }
+
+  /** Last pressed movement direction (WASD / stick), before camera rotation. */
+  getLastMoveDir() {
+    return { x: this._lastMoveDir.x, z: this._lastMoveDir.z };
   }
 
   touchTap(action) {
     if (action === 'dodge') this.justPressed.KeyQ = true;
-    if (action === 'magnet') this.justPressed.Space = true;
+    if (action === 'jump') this.justPressed.Space = true;
     if (action === 'interact') this.justPressed.KeyF = true;
   }
 
@@ -246,6 +278,7 @@ export class Input {
       const ly = this._axis(pad.axes[1]);
       this._stickMove.x = lx;
       this._stickMove.z = ly;
+      if (Math.hypot(lx, ly) > DEADZONE) this._rememberMoveDir(lx, ly);
 
       const rx = this._axis(pad.axes[2]);
       const ry = this._axis(pad.axes[3]);

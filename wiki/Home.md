@@ -174,7 +174,7 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 |------|--------|
 | All four characters playable | `constants.js` |
 | End-of-run summary + achievements | `ui/RunSummaryScreen.js`, `AchievementSystem.js`, `data/achievements.json` |
-| First-run tutorial overlay | `Tutorial.js`, `ui/TutorialOverlay.js` |
+| First-run tutorial (title → village → arena, 15 steps) | `Tutorial.js`, `ui/TutorialOverlay.js`, `Game._tryShowTutorial` |
 | Daily challenge (+50 coins / 3 min) | `DailyChallenge.js`, `ui/TitleScreens.js` |
 | Reputation village unlocks (NPCs + landmarks) | `Village.js`, `constants.js` |
 | Biome-weighted enemy spawns (`frostling`, `ember`) | `EnemyManager.js`, `data/enemies.json` |

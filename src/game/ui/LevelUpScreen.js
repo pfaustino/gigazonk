@@ -2,6 +2,7 @@ import { CONFIRM_HINT, bindGridNavigation } from './MenuNavigation.js';
 import { getUpgradePreview, getUpgradeBuffHighlights } from '../UpgradeSystem.js';
 import { upgradeTagsHTML } from '../UpgradeTags.js';
 import { SYNERGY_ELEMENTS, SYNERGY_NAME } from '../constants.js';
+import { ELEMENT_OFFER_INFO } from '../UpgradeText.js';
 
 const SYNERGY_ICONS = { fire: '🔥', ice: '❄️', lightning: '⚡' };
 
@@ -9,7 +10,9 @@ function synergyProgressHTML(player) {
   const slots = SYNERGY_ELEMENTS.map((el) => {
     const active = player.elements?.has(el);
     const icon = SYNERGY_ICONS[el] || el;
-    return `<span class="levelup-synergy-slot${active ? ' active' : ''}">${icon}</span>`;
+    const tip = ELEMENT_OFFER_INFO[el];
+    const title = tip ? `${icon} ${tip.name}: ${tip.onHit}` : el;
+    return `<span class="levelup-synergy-slot${active ? ' active' : ''}" title="${title}">${icon}</span>`;
   }).join('');
   const ready = SYNERGY_ELEMENTS.every((el) => player.elements?.has(el));
   const hint = ready ? 'Ready!' : `${SYNERGY_ELEMENTS.filter((el) => !player.elements?.has(el)).length} to go`;
@@ -18,6 +21,7 @@ function synergyProgressHTML(player) {
       <span class="levelup-synergy-label">${SYNERGY_NAME}</span>
       <span class="levelup-synergy-slots">${slots}</span>
       <span class="levelup-synergy-hint">${hint}</span>
+      <p class="levelup-synergy-note">Element picks add to your shot pool — each attack rolls one element at random.</p>
     </div>`;
 }
 

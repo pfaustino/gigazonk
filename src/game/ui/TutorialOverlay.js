@@ -1,4 +1,4 @@
-import { getCurrentTutorialStep } from '../Tutorial.js';
+import { getCurrentTutorialStep, getTutorialStepIndex, getTutorialStepCount } from '../Tutorial.js';
 
 /** First-run tutorial toast overlay during arena. */
 export function showTutorialOverlay(ui, onDismiss) {
@@ -13,8 +13,11 @@ export function showTutorialOverlay(ui, onDismiss) {
     ui.layer.appendChild(el);
   }
 
+  const stepNum = getTutorialStepIndex() + 1;
+  const total = getTutorialStepCount();
   el.innerHTML = `
     <div class="tutorial-card">
+      <p class="tutorial-progress">Step ${stepNum} of ${total}</p>
       <h3>${step.title}</h3>
       <p>${step.body}</p>
       <button type="button" class="btn btn-secondary btn-sm" id="tutorial-ok">Got it</button>

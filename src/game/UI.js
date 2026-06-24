@@ -1,4 +1,4 @@
-import { QUESTS, SYNERGY_ELEMENTS } from './constants.js';
+import { QUESTS, SYNERGY_ELEMENTS, DODGE_COOLDOWN_SECONDS } from './constants.js';
 import { saveData } from './SaveData.js';
 import {
   SKILL_BRANCHES,
@@ -43,6 +43,8 @@ export class UI {
     this._runAlertTimer = null;
     this._damageFlashTimer = null;
     this._bossIntroTimer = null;
+    this._bossDefeatTimer = null;
+    this._bossVictoryFlashTimer = null;
     this._ensureMetricsOverlay();
   }
 
@@ -114,8 +116,9 @@ export class UI {
   }
 
   clear() {
+    const keep = new Set(['damage-numbers', 'enemy-hp-bars', 'game-metrics', 'tutorial-overlay']);
     for (const child of [...this.layer.children]) {
-      if (child.id === 'damage-numbers' || child.id === 'enemy-hp-bars' || child.id === 'game-metrics') continue;
+      if (keep.has(child.id)) continue;
       child.remove();
     }
   }
@@ -468,7 +471,45 @@ export class UI {
     });
 
     this.renderBuffBar(player);
+    this.updateAbilityCooldowns(player);
     this.updateLowHpVignette(player.hp / player.maxHp);
+  }
+
+  updateAbilityCooldowns(player) {
+    const slot = document.getElementById('ability-dodge');
+    if (!slot) return;
+
+    const remaining = Math.max(0, player.dodgeCooldown);
+    const ratio = Math.min(1, remaining / DODGE_COOLDOWN_SECONDS);
+    const ready = remaining <= 0.05;
+    const deg = ratio * 360;
+
+    slot.classList.toggle('ability-ready', ready);
+    slot.classList.toggle('ability-cooldown', !ready);
+
+    this._applyCooldownRadar({
+      ready,
+      deg,
+      radar: document.getElementById('dodge-cooldown-radar'),
+      sweep: document.getElementById('dodge-cooldown-sweep'),
+      hand: document.getElementById('dodge-cooldown-hand'),
+    });
+    this._applyCooldownRadar({
+      ready,
+      deg,
+      radar: document.getElementById('touch-dodge-cooldown-radar'),
+      sweep: document.getElementById('touch-dodge-cooldown-sweep'),
+      hand: document.getElementById('touch-dodge-cooldown-hand'),
+    });
+
+    const touchBtn = document.getElementById('touch-btn-dodge');
+    if (touchBtn) touchBtn.classList.toggle('on-cooldown', !ready);
+  }
+
+  _applyCooldownRadar({ ready, deg, radar, sweep, hand }) {
+    if (radar) radar.classList.toggle('hidden', ready);
+    if (sweep) sweep.style.setProperty('--cd-deg', `${deg}deg`);
+    if (hand) hand.style.transform = `rotate(${deg}deg)`;
   }
 
   flashDamage(amount = 1, maxHp = 100) {
@@ -726,6 +767,32 @@ export class UI {
       el.classList.add('hidden');
       this._bossIntroTimer = null;
     }, durationMs);
+  }
+
+  showBossDefeat(bossCount = 1, durationMs = 2600) {
+    const el = document.getElementById('boss-defeat');
+    if (!el) return;
+    const sub = el.querySelector('.boss-defeat-sub');
+    if (sub) sub.textContent = `#${bossCount} · Treasure dropped`;
+    if (this._bossDefeatTimer) clearTimeout(this._bossDefeatTimer);
+    el.classList.remove('hidden');
+    this._bossDefeatTimer = setTimeout(() => {
+      el.classList.add('hidden');
+      this._bossDefeatTimer = null;
+    }, durationMs);
+  }
+
+  flashBossVictory() {
+    const el = document.getElementById('boss-victory-flash');
+    if (!el) return;
+    el.classList.remove('active');
+    void el.offsetWidth;
+    el.classList.add('active');
+    if (this._bossVictoryFlashTimer) clearTimeout(this._bossVictoryFlashTimer);
+    this._bossVictoryFlashTimer = setTimeout(() => {
+      el.classList.remove('active');
+      this._bossVictoryFlashTimer = null;
+    }, 700);
   }
 
   toast(msg, type = '') {

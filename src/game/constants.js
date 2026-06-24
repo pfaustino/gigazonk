@@ -80,6 +80,12 @@ export const ENEMY_MESH_LIFT = 0.9;
 export const ENEMY_FACE_SWAY_DEG = 8;
 /** Sway cycle speed (radians per second of phase). */
 export const ENEMY_FACE_SWAY_SPEED = 2.4;
+/** Mouth sprite row advances per second (5-row sheet, ping-pong chew). */
+export const ENEMY_MOUTH_CHEW_FPS = 10;
+/** Switch to scream row when an enemy is this close to the player. */
+export const ENEMY_MOUTH_SCREAM_RADIUS = 14;
+/** Scream mouth after taking damage (seconds). */
+export const ENEMY_MOUTH_SCREAM_HIT_SEC = 0.45;
 
 export function getEnemyHpBarWorldY(enemy) {
   const surfaceY = enemy.groundY ?? enemy.feetY ?? 0;
@@ -127,6 +133,9 @@ export const GIGA_SPAWN_INTERVAL = 180;
 export const BOSS_SPAWN_INTERVAL = 120;
 export const BOSS_TELEGRAPH_SECONDS = 3;
 export const HIT_STOP_CRIT_SECONDS = 0.045;
+/** Seconds before dodge (Q / LB) can be used again. */
+export const DODGE_COOLDOWN_SECONDS = 2;
+export const DODGE_DURATION_SECONDS = 0.25;
 export const BASE_SPAWN_GROUP_SIZE = 3;
 export const GROUP_CLUSTER_RADIUS = 4.5;
 export const MAX_SPAWN_GROUP_SIZE = 7;

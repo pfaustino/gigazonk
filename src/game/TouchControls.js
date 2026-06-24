@@ -10,8 +10,14 @@ export class TouchControls {
         <div class="touch-stick-knob" id="touch-move-knob"></div>
       </div>
       <div class="touch-actions">
-        <button type="button" class="touch-btn" data-action="dodge" aria-label="Dodge">Dodge</button>
-        <button type="button" class="touch-btn" data-action="magnet" aria-label="Magnet">Magnet</button>
+        <button type="button" class="touch-btn" data-action="dodge" id="touch-btn-dodge" aria-label="Dodge">
+          <span class="touch-btn-label">Dodge</span>
+          <div class="cooldown-radar hidden" id="touch-dodge-cooldown-radar" aria-hidden="true">
+            <div class="cooldown-sweep" id="touch-dodge-cooldown-sweep"></div>
+            <div class="cooldown-hand" id="touch-dodge-cooldown-hand"></div>
+          </div>
+        </button>
+        <button type="button" class="touch-btn" data-action="jump" aria-label="Jump">Jump</button>
         <button type="button" class="touch-btn" data-action="interact" aria-label="Interact">Use</button>
       </div>
     `;
@@ -41,7 +47,7 @@ export class TouchControls {
       const action = btn.dataset.action;
       const fire = () => {
         if (action === 'dodge') this.input.touchTap('dodge');
-        if (action === 'magnet') this.input.touchTap('magnet');
+        if (action === 'jump') this.input.touchTap('jump');
         if (action === 'interact') this.input.touchTap('interact');
       };
       btn.addEventListener('touchstart', (e) => { e.preventDefault(); fire(); });

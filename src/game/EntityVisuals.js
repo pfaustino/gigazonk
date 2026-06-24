@@ -34,8 +34,18 @@ const _sphere = new THREE.SphereGeometry(1, 6, 5);
 const _cone = new THREE.ConeGeometry(1, 1, 4);
 const _cyl = new THREE.CylinderGeometry(1, 1, 1, 6);
 const _eyeDisc = new THREE.CircleGeometry(1, 16);
+const _mouthPlane = new THREE.PlaneGeometry(1, 1);
 
 let _enemyEyeTexture;
+let _enemyMouthTexture;
+let _enemyMouthMaterial;
+
+export const ENEMY_MOUTH_COLS = 7;
+export const ENEMY_MOUTH_ROWS = 5;
+
+/** Lip palette columns in mouths.png (left → right). */
+const MOUTH_COLUMN_HUES = [0, 28, 52, 118, 272, 318, 38];
+const MOUTH_BEIGE_COLUMN = 6;
 
 /** White sclera + black pupil — readable from the gameplay camera angle. */
 function getEnemyEyeTexture() {
@@ -120,6 +130,48 @@ const ENEMY_EYE_LAYOUTS = {
   grunt: { y: 1.0, z: 0.38, spacing: 0.11, baseSize: 0.085 },
 };
 
+/** Mouth patch sits on the front of the blob — partially embedded, not a floating quad. */
+const MOUTH_LAYOUT_TWEAKS = {
+  brute: { yOff: -0.05, zOff: 0.05, widthMult: 1.1, heightMult: 1.05 },
+  elite: { yOff: -0.07, zOff: 0.07, widthMult: 1.12, heightMult: 1.08 },
+};
+
+function getEnemyMouthLayout(type) {
+  const eye = ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt;
+  const tweak = MOUTH_LAYOUT_TWEAKS[type] || {};
+  const width = eye.baseSize * 7 * (tweak.widthMult ?? 1);
+  const height = eye.baseSize * 4.2 * (tweak.heightMult ?? 1);
+  return {
+    y: eye.y - eye.baseSize * 3.2 + (tweak.yOff ?? 0),
+    z: eye.z + eye.baseSize * 0.42 + (tweak.zOff ?? 0),
+    width,
+    height,
+  };
+}
+
+function buildEnemyMouthPatchGeometry(type) {
+  const layout = getEnemyMouthLayout(type);
+  const g = _mouthPlane.clone();
+  g.scale(layout.width, layout.height, 1);
+  g.rotateX(-0.62);
+  g.translate(0, layout.y, layout.z + layout.height * 0.04);
+  const count = g.attributes.position.count;
+  const colors = new Float32Array(count * 3);
+  colors.fill(1);
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return g;
+}
+
+/** Body mesh + mouth texture patch (group 0 = tinted body, group 1 = sprite mouth). */
+export function buildEnemyBodyWithMouthGeometry(type, instanceCount) {
+  const bodyGeo = mergeParts(enemyBodyParts(type));
+  const mouthGeo = buildEnemyMouthPatchGeometry(type);
+  const combined = mergeGeometries([bodyGeo, mouthGeo], true);
+  combined.computeVertexNormals();
+  const mouthAttrs = attachEnemyMouthInstanceAttrs(combined, instanceCount);
+  return { geometry: combined, mouthAttrs };
+}
+
 function enemyBodyParts(type) {
   switch (type) {
     case 'runner':
@@ -184,6 +236,108 @@ export function buildEnemyBodyGeometry(type) {
 export function buildEnemyEyeGeometry(type, eyeStyle = 'even') {
   const layout = ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt;
   return mergeParts(titleEyes(layout.y, layout.z, layout.spacing, layout.baseSize, eyeStyle));
+}
+
+export function mouthColumnForColor(hex) {
+  const c = new THREE.Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  if (hsl.s < 0.22) return MOUTH_BEIGE_COLUMN;
+
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < MOUTH_COLUMN_HUES.length; i++) {
+    if (i === MOUTH_BEIGE_COLUMN) continue;
+    let dh = Math.abs(hsl.h * 360 - MOUTH_COLUMN_HUES[i]);
+    if (dh > 180) dh = 360 - dh;
+    if (dh < bestDist) {
+      bestDist = dh;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Chewing loop — ping-pong rows 1–4; row 0 = scream when aggro. */
+const MOUTH_CHEW_ROWS = [1, 2, 3, 4, 3, 2];
+export const MOUTH_SCREAM_ROW = 0;
+
+export function mouthFrameForTime(timeSec, slot = 0, chewFps = 10, { scream = false } = {}) {
+  if (scream) return MOUTH_SCREAM_ROW;
+  const step = Math.floor((timeSec + slot * 0.13) * chewFps);
+  return MOUTH_CHEW_ROWS[((step % MOUTH_CHEW_ROWS.length) + MOUTH_CHEW_ROWS.length) % MOUTH_CHEW_ROWS.length];
+}
+
+function getEnemyMouthTexture() {
+  if (_enemyMouthTexture) return _enemyMouthTexture;
+  const loader = new THREE.TextureLoader();
+  _enemyMouthTexture = loader.load(`${import.meta.env.BASE_URL}images/mouths.png`);
+  _enemyMouthTexture.colorSpace = THREE.SRGBColorSpace;
+  _enemyMouthTexture.format = THREE.RGBAFormat;
+  _enemyMouthTexture.premultiplyAlpha = false;
+  _enemyMouthTexture.magFilter = THREE.LinearFilter;
+  _enemyMouthTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  _enemyMouthTexture.generateMipmaps = true;
+  return _enemyMouthTexture;
+}
+
+export function attachEnemyMouthInstanceAttrs(geo, count) {
+  const col = new THREE.InstancedBufferAttribute(new Float32Array(count), 1);
+  const frame = new THREE.InstancedBufferAttribute(new Float32Array(count), 1);
+  geo.setAttribute('instanceMouthCol', col);
+  geo.setAttribute('instanceMouthFrame', frame);
+  return { col, frame };
+}
+
+export function createEnemyMouthMaterial() {
+  if (_enemyMouthMaterial) return _enemyMouthMaterial;
+
+  _enemyMouthMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      mouthMap: { value: getEnemyMouthTexture() },
+      gridSize: { value: new THREE.Vector2(ENEMY_MOUTH_COLS, ENEMY_MOUTH_ROWS) },
+    },
+    vertexShader: `
+      attribute float instanceMouthCol;
+      attribute float instanceMouthFrame;
+      varying vec2 vMouthUv;
+      varying vec2 vMouthCell;
+      void main() {
+        vMouthUv = uv;
+        vMouthCell = vec2(instanceMouthCol, instanceMouthFrame);
+        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D mouthMap;
+      uniform vec2 gridSize;
+      varying vec2 vMouthUv;
+      varying vec2 vMouthCell;
+      void main() {
+        vec2 localUv = mix(vec2(0.1), vec2(0.9), vMouthUv);
+        vec2 uv = vec2(
+          (vMouthCell.x + localUv.x) / gridSize.x,
+          1.0 - (vMouthCell.y + localUv.y) / gridSize.y
+        );
+        vec4 tex = texture2D(mouthMap, uv);
+        if (tex.a < 0.55) discard;
+        float lum = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+        float sat = max(tex.r, max(tex.g, tex.b)) - min(tex.r, min(tex.g, tex.b));
+        if (sat < 0.045 && lum > 0.82 && tex.a < 0.98) discard;
+        gl_FragColor = vec4(tex.rgb, 1.0);
+      }
+    `,
+    transparent: true,
+    alphaTest: 0.55,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    depthWrite: true,
+    depthTest: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  return _enemyMouthMaterial;
 }
 
 /** Body + eyes merged (legacy); eyes tint with body color — prefer split meshes in EnemyManager. */

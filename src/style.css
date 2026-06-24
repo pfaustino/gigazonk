@@ -132,6 +132,110 @@ html, body {
   margin-bottom: 4px;
 }
 
+.ability-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.ability-slot {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 2px solid #4a3a8a;
+  background: rgba(10, 8, 24, 0.9);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ability-slot.ability-ready {
+  border-color: #88ccaa;
+  box-shadow: 0 0 10px rgba(100, 220, 160, 0.35);
+}
+
+.ability-slot.ability-cooldown {
+  border-color: #3a3058;
+}
+
+.ability-slot.ability-cooldown .ability-icon {
+  opacity: 0.5;
+}
+
+.ability-icon {
+  font-size: 20px;
+  line-height: 1;
+  z-index: 1;
+  transition: opacity 0.12s ease;
+}
+
+.ability-key {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #c8b8ff;
+  z-index: 3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.cooldown-radar {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cooldown-radar.hidden {
+  display: none;
+}
+
+.cooldown-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from -90deg,
+    rgba(8, 6, 18, 0.82) 0deg,
+    rgba(8, 6, 18, 0.82) var(--cd-deg, 360deg),
+    transparent var(--cd-deg, 360deg),
+    transparent 360deg
+  );
+}
+
+.cooldown-hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 46%;
+  margin-left: -1px;
+  margin-top: -46%;
+  transform-origin: 50% 100%;
+  transform: rotate(0deg);
+  border-radius: 1px;
+  background: linear-gradient(to top, rgba(210, 235, 255, 0.95), rgba(140, 190, 255, 0.35));
+  box-shadow: 0 0 4px rgba(160, 210, 255, 0.65);
+}
+
+.cooldown-hand::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  margin-bottom: -2.5px;
+  border-radius: 50%;
+  background: rgba(210, 235, 255, 0.95);
+  box-shadow: 0 0 5px rgba(160, 210, 255, 0.8);
+}
+
 .bar-track {
   height: 12px;
   background: #1a1030;
@@ -479,6 +583,14 @@ html, body {
   font-size: 18px;
 }
 
+.tutorial-progress {
+  color: #888;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
 .tutorial-card p {
   color: #ccc;
   font-size: 14px;
@@ -533,6 +645,7 @@ html, body {
 }
 
 .touch-btn {
+  position: relative;
   min-width: 72px;
   padding: 10px 16px;
   background: rgba(24, 18, 36, 0.85);
@@ -543,6 +656,26 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   touch-action: manipulation;
+  overflow: hidden;
+}
+
+.touch-btn.on-cooldown {
+  border-color: #3a3058;
+  opacity: 0.85;
+}
+
+.touch-btn-label {
+  position: relative;
+  z-index: 1;
+}
+
+.touch-btn.on-cooldown .touch-btn-label {
+  opacity: 0.55;
+}
+
+.touch-btn .cooldown-hand {
+  height: 42%;
+  margin-top: -42%;
 }
 
 .touch-btn:active {
@@ -832,6 +965,14 @@ html, body {
 .levelup-synergy-hint {
   color: #888;
   font-size: 11px;
+}
+
+.levelup-synergy-note {
+  margin: 6px 0 0;
+  max-width: 420px;
+  color: #777;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .reward-tile .rarity-badge {
@@ -1213,6 +1354,83 @@ html, body {
 @keyframes bossIntroPulse {
   from { transform: translate(-50%, -50%) scale(1); }
   to { transform: translate(-50%, -50%) scale(1.06); }
+}
+
+.boss-defeat {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 49;
+  animation: bossDefeatPop 0.5s ease-out, bossDefeatPulse 0.55s ease-in-out 0.5s infinite alternate;
+}
+
+.boss-defeat.hidden {
+  display: none;
+}
+
+.boss-defeat-title {
+  display: block;
+  font-size: clamp(2rem, 7.5vw, 3.6rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #f7c948;
+  text-shadow:
+    0 0 32px rgba(255, 210, 80, 0.95),
+    0 0 64px rgba(120, 255, 160, 0.35),
+    0 3px 0 #664400;
+}
+
+.boss-defeat-sub {
+  display: block;
+  margin-top: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #a8ffcc;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@keyframes bossDefeatPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes bossDefeatPulse {
+  from { transform: translate(-50%, -50%) scale(1); }
+  to { transform: translate(-50%, -50%) scale(1.05); }
+}
+
+.boss-victory-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 47;
+  background:
+    radial-gradient(ellipse at center, rgba(255, 220, 90, 0.55) 0%, transparent 62%),
+    radial-gradient(ellipse at center, rgba(80, 255, 140, 0.2) 0%, transparent 75%);
+  opacity: 0;
+}
+
+.boss-victory-flash.active {
+  animation: bossVictoryFlash 0.7s ease-out forwards;
+}
+
+@keyframes bossVictoryFlash {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @keyframes runAlertPulse {
@@ -1679,8 +1897,13 @@ html, body {
 }
 
 .char-card.selected {
-  border-color: #6b4fd4;
-  box-shadow: 0 0 20px rgba(107, 79, 212, 0.4);
+  background: rgba(62, 48, 110, 0.95);
+  border-color: #9b7dff;
+  box-shadow: 0 0 22px rgba(155, 125, 255, 0.45);
+}
+
+.char-card.selected .char-status {
+  color: #c4b0ff;
 }
 
 .char-card.locked,

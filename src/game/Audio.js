@@ -15,6 +15,8 @@ export class Audio {
     this._musicSrc = null;
     this._playlistMode = false;
     this.musicBase = import.meta.env.BASE_URL;
+    this.sfxFiles = {};
+    this._sfxPool = {};
   }
 
   _getMusicEl() {
@@ -41,6 +43,44 @@ export class Audio {
       ErrorReporter.capture('AUDIO_INIT', err);
       this.enabled = false;
     }
+  }
+
+  async loadSoundManifest() {
+    try {
+      const res = await fetch(`${this.musicBase}sounds/manifest.json`);
+      if (!res.ok) return;
+      const data = await res.json();
+      this.sfxFiles = data;
+      for (const [key, file] of Object.entries(data)) {
+        if (typeof file !== 'string') continue;
+        const el = new window.Audio(`${this.musicBase}sounds/${file}`);
+        el.preload = 'auto';
+        this._sfxPool[key] = el;
+      }
+    } catch (err) {
+      ErrorReporter.capture('AUDIO_SFX_MANIFEST', err);
+    }
+  }
+
+  playSfx(key, volume = 1) {
+    if (!this.enabled) return;
+    const src = this._sfxPool[key];
+    if (!src) return;
+    const el = src.cloneNode();
+    el.volume = Math.min(1, this._sfxVol * volume);
+    el.play().catch(() => {});
+  }
+
+  chestBurstSfx() {
+    this.playSfx('chestBurst', 0.85);
+  }
+
+  mesaTreasureBurstSfx() {
+    this.playSfx('mesaTreasureBurst', 1);
+  }
+
+  potBreakSfx() {
+    this.playSfx('potBreak', 0.9);
   }
 
   async loadMusicManifest() {
@@ -209,12 +249,28 @@ export class Audio {
     setTimeout(() => this.tone(660, 0.18, 'sine', 0.06), 100);
     setTimeout(() => this.tone(880, 0.2, 'sine', 0.05), 220);
   }
+  mesaCacheOpen() {
+    this.tone(440, 0.12, 'triangle', 0.08);
+    this.tone(660, 0.16, 'sine', 0.09);
+    setTimeout(() => this.tone(880, 0.2, 'sine', 0.08), 90);
+    setTimeout(() => this.tone(990, 0.24, 'sine', 0.09), 200);
+    setTimeout(() => this.noise(0.12, 0.05), 140);
+  }
+  mesaCacheReveal() {
+    this.tone(784, 0.22, 'sine', 0.1);
+    setTimeout(() => this.tone(988, 0.28, 'sine', 0.09), 100);
+    setTimeout(() => this.tone(1175, 0.32, 'triangle', 0.08), 220);
+    setTimeout(() => this.noise(0.18, 0.08), 60);
+  }
   dodge() { this.noise(0.12, 0.06); this.tone(200, 0.1, 'sine', 0.05); }
   boss() {
     [110, 87, 73].forEach((f, i) => setTimeout(() => this.tone(f, 0.4, 'sawtooth', 0.15), i * 150));
   }
   bossEnrage() {
     [140, 95, 70, 110].forEach((f, i) => setTimeout(() => this.tone(f, 0.22, 'sawtooth', 0.13, false), i * 90));
+  }
+  bossKillFanfare() {
+    this.playSfx('bossKill', 1);
   }
   bossChest() {
     this.chest();

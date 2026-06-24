@@ -153,6 +153,7 @@ export function showCharacterSelect(ui, onSelect, onBack) {
     columns: 2,
     focusClass: 'focused',
     initialIndex,
+    selectionOnMouseFocus: false,
     onFocusChange: (index) => {
       const el = cardEls[index];
       if (el.dataset.playable !== '1') return;

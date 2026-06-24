@@ -9,6 +9,11 @@ import {
 import { isLootSpotClear } from './TerrainFeatures.js';
 import { getLootPreview, getShrinePreview, LOOT_REWARD_ICONS } from './UpgradeSystem.js';
 import { runRandom } from '../lib/runRandom.js';
+import {
+  CHEST_REWARD_UI_DELAY_MS,
+  MESA_REWARD_UI_DELAY_MS,
+  POT_REWARD_UI_DELAY_MS,
+} from './Particles.js';
 
 const LOOT_TABLE = [
   { weight: 22, type: 'xp', value: 15, label: '+15 XP' },
@@ -16,7 +21,7 @@ const LOOT_TABLE = [
   { weight: 12, type: 'damage', value: 0.1, label: '+10% Damage' },
   { weight: 10, type: 'speed', value: 0.1, label: '+10% Speed' },
   { weight: 8, type: 'coins', value: 5, label: '+5 Zonk Coins' },
-  { weight: 8, type: 'magnet', value: 1, label: 'Instant Magnet!' },
+  { weight: 8, type: 'magnet', value: 3, label: '+3 Magnet radius' },
   { weight: 6, type: 'crit', value: 0.05, label: '+5% Crit' },
   { weight: 6, type: 'regen', value: 0.25, label: '+0.25 HP/s' },
   { weight: 5, type: 'armor', value: 0.05, label: '+5% Armor' },
@@ -51,8 +56,10 @@ const MESA_LOOT_TABLE = [
   { weight: 5, type: 'regen', value: 0.45, label: '+0.45 HP/s' },
   { weight: 4, type: 'lifesteal', value: 0.04, label: '+4% Lifesteal' },
   { weight: 3, type: 'xp_boost', value: 0.12, label: '+12% XP Gain' },
-  { weight: 2, type: 'magnet', value: 1, label: 'Instant Magnet!' },
+  { weight: 2, type: 'magnet', value: 4, label: '+4 Magnet radius' },
 ];
+
+const _chestBurstPos = new THREE.Vector3();
 
 export class Interactables {
   constructor(scene) {
@@ -179,12 +186,26 @@ export class Interactables {
   }
 
   spawnMesaCache(x, z, surfaceY) {
-    const geo = new THREE.BoxGeometry(1.15, 0.95, 0.95);
-    const mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x664400 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, surfaceY + 0.48, z);
-    mesh.castShadow = true;
-    this.group.add(mesh);
+    const group = new THREE.Group();
+    group.position.set(x, surfaceY + 0.52, z);
+
+    const baseMat = new THREE.MeshLambertMaterial({ color: 0xcc9900, emissive: 0x443300 });
+    const lidMat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x664400 });
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.55, 0.95), baseMat);
+    base.position.y = -0.2;
+    base.castShadow = true;
+
+    const lidPivot = new THREE.Group();
+    lidPivot.position.set(0, 0.06, -0.45);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.22, 0.95), lidMat);
+    lid.position.set(0, 0.11, 0.45);
+    lid.castShadow = true;
+    lidPivot.add(lid);
+
+    group.add(base);
+    group.add(lidPivot);
+    this.group.add(group);
 
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(0.85, 0.08, 6, 20),
@@ -196,12 +217,15 @@ export class Interactables {
 
     this.items.push({
       type: 'mesa_cache',
-      mesh,
+      mesh: group,
+      lidPivot,
       ringMesh: ring,
       x,
       z,
       surfaceY,
       opened: false,
+      opening: false,
+      openT: 0,
       radius: 2.4,
     });
   }
@@ -324,7 +348,7 @@ export class Interactables {
       if (item.type === 'pot' || item.type === 'mesa_beacon') continue;
       if ((item.type === 'chest' && (item.opened || item.opening))
         || (item.type === 'shrine' && item.used)
-        || (item.type === 'mesa_cache' && item.opened)) continue;
+        || (item.type === 'mesa_cache' && (item.opened || item.opening))) continue;
       const dist = Math.hypot(item.x - px, item.z - pz);
       if (dist < item.radius && dist < minDist) {
         minDist = dist;
@@ -366,12 +390,17 @@ export class Interactables {
 
     if (item.type === 'pot' && !item.broken) {
       item.broken = true;
-      this.removeMesh(item);
+      let burstY = 0.35;
+      if (item.mesh) {
+        item.mesh.getWorldPosition(_chestBurstPos);
+        burstY = _chestBurstPos.y + 0.08;
+      }
+      callbacks.onPot?.();
+      callbacks.onPotBurst?.(item.x, burstY, item.z);
       const loot = pickLoot();
       const preview = getLootPreview(player, loot);
       const levelsGained = this.applyLoot(loot, player, callbacks);
-      callbacks.onPot?.();
-      return {
+      const result = {
         type: 'pot',
         loot,
         preview,
@@ -379,6 +408,9 @@ export class Interactables {
         icon: LOOT_REWARD_ICONS[loot.type] || '🏺',
         name: loot.label,
       };
+      setTimeout(() => this.removeMesh(item), 180);
+      setTimeout(() => this.onInteractResult?.(result), POT_REWARD_UI_DELAY_MS);
+      return null;
     }
 
     if (item.type === 'shrine' && !item.used) {
@@ -399,21 +431,17 @@ export class Interactables {
       };
     }
 
-    if (item.type === 'mesa_cache' && !item.opened) {
-      item.opened = true;
-      this._disposeItemMeshes(item);
+    if (item.type === 'mesa_cache' && !item.opened && !item.opening) {
+      item.opening = true;
+      item.openT = 0;
+      if (item.mesh) {
+        item.mesh.rotation.set(0, 0, 0);
+      }
       const loot = pickLoot(MESA_LOOT_TABLE);
       const preview = getLootPreview(player, loot);
-      const levelsGained = this.applyLoot(loot, player, callbacks);
+      item._pending = { loot, preview, player, callbacks };
       callbacks.onMesaCache?.();
-      return {
-        type: 'mesa_cache',
-        loot,
-        preview,
-        levelsGained,
-        icon: LOOT_REWARD_ICONS[loot.type] || '🏔️',
-        name: loot.label,
-      };
+      return null;
     }
 
     if (item.type === 'village_portal') {
@@ -435,8 +463,7 @@ export class Interactables {
       case 'speed': player.speed *= (1 + loot.value); break;
       case 'coins': callbacks.onCoins?.(loot.value); break;
       case 'magnet':
-        player.magnetActive = true;
-        setTimeout(() => { player.magnetActive = false; }, 2000);
+        player.magnetRadius += loot.value;
         break;
       case 'crit':
         player.critChance = Math.min(CRIT_CHANCE_CAP, player.critChance + loot.value);
@@ -481,15 +508,37 @@ export class Interactables {
     item.opened = true;
     item.opening = false;
     const levelsGained = this.applyLoot(pending.loot, pending.player, pending.callbacks);
-    this.onInteractResult?.({
-      type: 'chest',
+    if (item.type === 'mesa_cache') {
+      let burstY = (item.surfaceY ?? 0) + 0.87;
+      if (item.mesh) {
+        item.mesh.getWorldPosition(_chestBurstPos);
+        burstY = _chestBurstPos.y + 0.35;
+      }
+      pending.callbacks.onMesaCacheBurst?.(item.x, burstY, item.z);
+    } else if (item.type === 'chest') {
+      let burstY = (item.surfaceY ?? 0) + 0.65;
+      if (item.mesh) {
+        item.mesh.getWorldPosition(_chestBurstPos);
+        burstY = _chestBurstPos.y + 0.25;
+      }
+      pending.callbacks.onChestBurst?.(item.x, burstY, item.z);
+    }
+    const result = {
+      type: item.type,
       loot: pending.loot,
       preview: pending.preview,
       levelsGained,
-      icon: LOOT_REWARD_ICONS[pending.loot.type] || '🎁',
+      icon: LOOT_REWARD_ICONS[pending.loot.type] || (item.type === 'mesa_cache' ? '🏔️' : '🎁'),
       name: pending.loot.label,
-    });
-    setTimeout(() => this.removeMesh(item), 700);
+    };
+    const removeDelay = item.type === 'mesa_cache' ? 900 : 700;
+    const uiDelay = item.type === 'mesa_cache' ? MESA_REWARD_UI_DELAY_MS : CHEST_REWARD_UI_DELAY_MS;
+    setTimeout(() => this.removeMesh(item), removeDelay);
+    setTimeout(() => this.onInteractResult?.(result), uiDelay);
+  }
+
+  _isOpeningLoot(item) {
+    return (item.type === 'chest' || item.type === 'mesa_cache') && item.opening && item.lidPivot;
   }
 
   update(dt, px, pz) {
@@ -497,10 +546,16 @@ export class Interactables {
     for (const item of this.items) {
       if (!item.mesh) continue;
 
-      if (item.type === 'chest' && item.opening && item.lidPivot) {
-        item.openT = Math.min(1, item.openT + dt * 2.4);
+      if (this._isOpeningLoot(item)) {
+        const openSpeed = item.type === 'mesa_cache' ? 1.6 : 2.4;
+        item.openT = Math.min(1, item.openT + dt * openSpeed);
         const eased = 1 - (1 - item.openT) ** 3;
         item.lidPivot.rotation.x = -Math.PI * 0.62 * eased;
+        if (item.type === 'mesa_cache' && item.ringMesh) {
+          item.ringMesh.rotation.z += dt * 5;
+          const pulse = 1 + Math.sin(item.openT * Math.PI) * 0.2;
+          item.ringMesh.scale.set(pulse, pulse, 1);
+        }
         if (item.openT >= 1) this._finishChestOpen(item);
         continue;
       }
@@ -508,7 +563,7 @@ export class Interactables {
       const used = (item.type === 'chest' && (item.opened || item.opening))
         || (item.type === 'pot' && item.broken)
         || (item.type === 'shrine' && item.used)
-        || (item.type === 'mesa_cache' && item.opened);
+        || (item.type === 'mesa_cache' && (item.opened || item.opening));
       const inRange = !used && Math.hypot(item.x - px, item.z - pz) < item.radius;
 
       if (item.type === 'mesa_beacon') {

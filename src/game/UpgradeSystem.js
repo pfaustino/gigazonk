@@ -228,7 +228,7 @@ export function getLootPreview(player, loot) {
       add('Coins', 'Run', `+${loot.value}`, v => v);
       break;
     case 'magnet':
-      add('Magnet', 'Off', 'Pulse', v => v);
+      add('Magnet radius', player.magnetRadius, player.magnetRadius + loot.value, v => fmtNum(v, 1));
       break;
     case 'crit':
       add('Crit chance', player.critChance, Math.min(CRIT_CHANCE_CAP, player.critChance + loot.value), fmtPct);
@@ -334,7 +334,6 @@ const STAT_LABEL_TO_BUFF_ID = {
   'Move atk spd': 'moveAtkSpeed',
   'Hurt speed': 'hurtSpeedBurst',
   Speed: 'moveSpeed',
-  Magnet: 'magnetPulse',
 };
 
 const ELEMENT_NAME_TO_ID = {
@@ -362,7 +361,6 @@ const BUFF_ID_DISPLAY = {
   'element-ice': { icon: '❄️', title: 'Ice element' },
   'element-lightning': { icon: '⚡', title: 'Lightning element' },
   lightningChains: { icon: '⚡', title: 'Lightning chains' },
-  magnetPulse: { icon: '🧲', title: 'Magnet pulse' },
   hpRegen: { icon: '🩹', title: 'HP regen' },
   xpGain: { icon: '⌚', title: 'XP gain' },
   evasion: { icon: '💍', title: 'Evasion' },
@@ -408,7 +406,6 @@ const BUFF_DISPLAY_ORDER = [
   'element-ice',
   'element-lightning',
   'lightningChains',
-  'magnetPulse',
   'hpRegen',
   'xpGain',
   'evasion',
@@ -600,8 +597,6 @@ export function getActiveBuffs(player) {
   if (player.lightningChains > 3) {
     add('⚡', `×${player.lightningChains}`, 'Lightning chains', 'lightningChains');
   }
-
-  if (player.magnetActive) add('🧲', 'ON', 'Magnet pulse', 'magnetPulse');
 
   if (player.hpRegen > (base.hpRegen ?? 0)) add('🩹', fmtNum(player.hpRegen - (base.hpRegen ?? 0), 1), 'HP regen', 'hpRegen');
   if (player.runXpMult > (base.runXpMult ?? 0)) add('⌚', fmtPct(player.runXpMult - (base.runXpMult ?? 0)), 'XP gain', 'xpGain');

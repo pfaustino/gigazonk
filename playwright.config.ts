@@ -35,7 +35,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CROSS_BROWSER ? 1 : process.env.CI ? 1 : undefined,
+  workers: process.env.CROSS_BROWSER ? 1 : process.env.CI ? 1 : 4,
   reporter: process.env.CI ? 'github' : 'list',
   timeout: 60_000,
   expect: {
@@ -57,7 +57,7 @@ export default defineConfig({
         {
           name: 'chromium',
           use: { ...devices['Desktop Chrome'] },
-          testMatch: 'smoke.spec.ts',
+          testMatch: ['smoke.spec.ts', 'tutorial.spec.ts'],
         },
       ],
   webServer: {

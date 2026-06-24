@@ -10,6 +10,9 @@ Pixabay tracks in `public/music/` — see `public/music/manifest.json`. Verify l
 
 | File | Source | License |
 |------|--------|---------|
+| `public/images/mouths.png` | Project art (7×5 mouth sprite sheet, RGBA) | — |
+
+Export from your art tool as **PNG with transparency** when possible; the repo can fall back to checkerboard keying if the file is RGB-only.
 | `public/images/title-hero.png` | Project art | — |
 | `public/images/pixabay-*.jpg` | Pixabay | Check per file |
 | Terrain textures | Pixabay | Check per file |

@@ -31,6 +31,9 @@ import {
   getTutorialStepIndex,
   advanceTutorialStep,
   isTutorialComplete,
+  isStepForState,
+  skipTutorialStepsUntil,
+  resetTutorialProgress,
 } from './Tutorial.js';
 import { getActiveBuffs } from './UpgradeSystem.js';
 import { GameMetrics } from './GameMetrics.js';
@@ -124,9 +127,10 @@ export class Game {
     this._runMaxCombo = 0;
     this._runNova = false;
     this._tutorialShownStep = -1;
+    this._charSelectOpen = false;
     this._wasInRift = false;
     this._tutorialMoveDist = 0;
-    this._tutorialFlags = { move: false, dodge: false, magnet: false, levelup: false, rift: false };
+    this._tutorialFlags = this._initTutorialFlags();
     this._hitStopTimer = 0;
     this._bossTelegraph = null;
 
@@ -134,10 +138,9 @@ export class Game {
       this.audio.dodge();
       this._tutorialFlags.dodge = true;
     };
-    this.player._onJump = () => this.audio.dodge();
-    this.player._onMagnet = () => {
-      this.audio.magnet();
-      this._tutorialFlags.magnet = true;
+    this.player._onJump = () => {
+      this.audio.dodge();
+      this._tutorialFlags.jump = true;
     };
     this.player._onHurt = () => this.audio.hurt();
     this.player._onDamageTaken = (amount) => {
@@ -164,11 +167,91 @@ export class Game {
     this.audio.loadMusicManifest().then(() => {
       if (this.state === 'title') this.audio.playMusic('title');
     });
+    this.audio.loadSoundManifest();
 
     if (import.meta.env.DEV || this._devFlags.dev) {
       this.devPanel = new DevPanel(this);
     }
     this.animate();
+    if (shouldShowTutorial()) {
+      requestAnimationFrame(() => this._tryShowTutorial({ force: true }));
+    }
+  }
+
+  _initTutorialFlags() {
+    return {
+      move: false,
+      dodge: false,
+      jump: false,
+      interact: false,
+      levelup: false,
+      rift: false,
+      boss: false,
+      villageQuests: false,
+      villageSkills: false,
+      villageMerchant: false,
+      villagePortal: false,
+    };
+  }
+
+  _hasTouchInput() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  }
+
+  _isTutorialStepReady(step) {
+    const f = this._tutorialFlags;
+    switch (step.id) {
+      case 'welcome':
+      case 'village_hub':
+      case 'village_quests':
+      case 'move':
+        return true;
+      case 'characters':
+        return this._charSelectOpen;
+      case 'village_skills':
+        return f.villageQuests;
+      case 'village_merchant':
+        return f.villageSkills;
+      case 'village_portal':
+        return f.villageMerchant;
+      case 'touch':
+      case 'dodge':
+        return f.move || this._tutorialMoveDist > 8;
+      case 'jump':
+        return f.dodge;
+      case 'interact':
+        return f.jump;
+      case 'levelup':
+        return f.interact;
+      case 'rift':
+        return f.levelup && f.rift;
+      case 'boss':
+        return f.boss;
+      default:
+        return false;
+    }
+  }
+
+  _tryShowTutorial({ force = false } = {}) {
+    if (isTutorialComplete() || this.ui.isLevelUpOpen()) return;
+    const step = getCurrentTutorialStep();
+    if (!step || !isStepForState(step, this.state)) return;
+    const idx = getTutorialStepIndex();
+    if (!force && idx <= this._tutorialShownStep) return;
+    if (!this._isTutorialStepReady(step)) return;
+
+    if (step.id === 'touch' && !this._hasTouchInput()) {
+      advanceTutorialStep();
+      this._tutorialShownStep = getTutorialStepIndex();
+      queueMicrotask(() => this._tryShowTutorial({ force: true }));
+      return;
+    }
+
+    this._tutorialShownStep = idx;
+    this.ui.showTutorial(() => {
+      advanceTutorialStep();
+      queueMicrotask(() => this._tryShowTutorial({ force: true }));
+    });
   }
 
   _ensureCombatManagers() {
@@ -379,17 +462,22 @@ export class Game {
     this.audio.resume();
     this.pendingAction = action;
     this.ui.removeScreens();
+    this._charSelectOpen = true;
     this.ui.showCharacterSelect(
       () => {
+        this._charSelectOpen = false;
         this.ui.removeScreens();
         if (this.pendingAction === 'village') this.enterVillage();
         else this.startArena();
       },
       () => {
+        this._charSelectOpen = false;
         this.ui.removeScreens();
         this.ui.showTitle((a) => this.handleTitleAction(a));
+        queueMicrotask(() => this._tryShowTutorial({ force: true }));
       }
     );
+    queueMicrotask(() => this._tryShowTutorial({ force: true }));
   }
 
   enterVillage() {
@@ -413,9 +501,11 @@ export class Game {
     this.quests.assignNewQuests();
     this.audio.playMusic('village');
     this.clearRunRng();
+    this._tutorialShownStep = getTutorialStepIndex() - 1;
+    this._tryShowTutorial({ force: true });
   }
 
-  startArena({ keepBiome = false, quickRetry = false } = {}) {
+  startArena({ keepBiome = false, quickRetry = false, fromVillagePortal = false } = {}) {
     this._ensureCombatManagers();
     this._ensureArena();
     saveData.data.runSnapshot = null;
@@ -433,10 +523,11 @@ export class Game {
     saveData.data.totalRuns++;
     saveData.save();
     this.ui.toast(`Entering ${this.currentBiome.name}`, 'synergy');
-    if (shouldShowTutorial() && !quickRetry) {
-      this._tutorialShownStep = getTutorialStepIndex();
-      this.ui.showTutorial(() => advanceTutorialStep());
+    if (shouldShowTutorial() && !fromVillagePortal && !quickRetry) {
+      skipTutorialStepsUntil('move');
     }
+    this._tutorialShownStep = getTutorialStepIndex() - 1;
+    this._tryShowTutorial({ force: true });
     this.touchControls.setVisible(true);
     this.audio.playMusic('arena');
   }
@@ -487,7 +578,7 @@ export class Game {
     this._runNova = false;
     this._wasInRift = false;
     this._tutorialMoveDist = 0;
-    this._tutorialFlags = { move: false, dodge: false, magnet: false, levelup: false, rift: false };
+    this._tutorialFlags = this._initTutorialFlags();
     this._hitStopTimer = 0;
     this._bossTelegraph = null;
     this._tutorialShownStep = getCurrentTutorialStep() ? getTutorialStepIndex() : -1;
@@ -752,6 +843,8 @@ export class Game {
     this.bossCount++;
     const { x, z } = this._pickBossSpawnPoint();
     this._bossTelegraph = { x, z, timer: BOSS_TELEGRAPH_SECONDS, pulse: 0 };
+    this._tutorialFlags.boss = true;
+    this._tryShowTutorial();
     this.audio.zonkDomeWarn();
     this.ui.toast(
       `☠️ ZONK LORD #${this.bossCount} inbound — ${BOSS_TELEGRAPH_SECONDS}s!`,
@@ -785,33 +878,7 @@ export class Game {
   }
 
   _checkTutorial() {
-    if (isTutorialComplete()) return;
-    const step = getCurrentTutorialStep();
-    if (!step) return;
-    const idx = getTutorialStepIndex();
-    if (idx <= this._tutorialShownStep) return;
-
-    let ready = false;
-    switch (step.id) {
-      case 'dodge':
-        ready = this._tutorialFlags.move || this._tutorialMoveDist > 8;
-        break;
-      case 'magnet':
-        ready = this._tutorialFlags.dodge;
-        break;
-      case 'levelup':
-        ready = this._tutorialFlags.magnet;
-        break;
-      case 'rift':
-        ready = this._tutorialFlags.levelup;
-        break;
-      default:
-        break;
-    }
-    if (!ready) return;
-
-    this._tutorialShownStep = idx;
-    this.ui.showTutorial(() => advanceTutorialStep());
+    this._tryShowTutorial();
   }
 
   _flushPlayerFloatNumbers(dt) {
@@ -837,8 +904,23 @@ export class Game {
   _getInteractCallbacks() {
     return {
       onChest: () => { this.quests.track('chests'); this.audio.openChest(); },
-      onPot: () => { this.quests.track('pots'); this.audio.chest(); },
-      onMesaCache: () => { this.quests.track('chests'); this.audio.chest(); },
+      onChestBurst: (x, y, z) => {
+        this.particles.chestBurstAt(x, y, z);
+        this.audio.chestBurstSfx();
+        this.cameraController.addShake(0.12);
+      },
+      onPot: () => { this.quests.track('pots'); },
+      onPotBurst: (x, y, z) => {
+        this.particles.potBurstAt(x, y, z);
+        this.audio.potBreakSfx();
+        this.cameraController.addShake(0.08);
+      },
+      onMesaCache: () => { this.quests.track('chests'); this.audio.mesaCacheOpen(); },
+      onMesaCacheBurst: (x, y, z) => {
+        this.audio.mesaTreasureBurstSfx();
+        this.cameraController.addShake(0.32);
+        this.particles.treasureBurstAt(x, y, z);
+      },
       onShrine: () => {
         this.quests.track('shrines');
         this.ui.toast('Power surges through you!');
@@ -850,6 +932,10 @@ export class Game {
 
   _handleInteractResult(result) {
     if (!result) return;
+    if (result.type === 'pot' || result.type === 'chest' || result.type === 'shrine' || result.type === 'mesa_cache') {
+      this._tutorialFlags.interact = true;
+      this._tryShowTutorial();
+    }
     if (result.loot || result.preview) {
       if (!result.levelsGained) {
         this.ui.pushReward({
@@ -1045,7 +1131,6 @@ export class Game {
     }
 
     this._flushPlayerFloatNumbers(dt);
-    this.particles.update(dt, this.camera, this.renderer, this.enemies.enemies);
     this._checkTutorial();
 
     this.zonkDomes.update(dt, this.player, this.arena, this.elapsed, {
@@ -1103,12 +1188,15 @@ export class Game {
         this.audio.ui();
         if (npc.id === 'questgiver') {
           this.quests.assignNewQuests();
+          this._tutorialFlags.villageQuests = true;
           this.ui.showQuestBoard(this.quests, () => {});
         } else if (npc.id === 'trainer') {
+          this._tutorialFlags.villageSkills = true;
           this.ui.showSkillTree(() => {
             this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
           });
         } else if (npc.id === 'merchant') {
+          this._tutorialFlags.villageMerchant = true;
           this.ui.toast(
             `Bonk Merchant: "You've got ${saveData.data.zonkCoins} coins — Coach Zonk upgrades your build!"`,
             'synergy'
@@ -1119,6 +1207,7 @@ export class Game {
             'synergy'
           );
         } else if (npc.id === 'portal') {
+          this._tutorialFlags.villagePortal = true;
           if (saveData.data.runSnapshot?.pausedInVillage) {
             this.ui.showArenaPortalChoice(
               () => this.resumeArenaRun(),
@@ -1126,7 +1215,7 @@ export class Game {
                 saveData.data.runSnapshot = null;
                 saveData.save();
                 this.ui.showCharacterSelect(
-                  () => { this.ui.removeScreens(); this.startArena(); },
+                  () => { this.ui.removeScreens(); this.startArena({ fromVillagePortal: true }); },
                   () => { this.ui.removeScreens(); }
                 );
               },
@@ -1134,7 +1223,7 @@ export class Game {
             );
           } else {
             this.ui.showCharacterSelect(
-              () => { this.ui.removeScreens(); this.startArena(); },
+              () => { this.ui.removeScreens(); this.startArena({ fromVillagePortal: true }); },
               () => { this.ui.removeScreens(); }
             );
           }
@@ -1143,6 +1232,7 @@ export class Game {
     } else {
       this.ui.showInteractPrompt(false);
     }
+    this._tryShowTutorial();
   }
 
   updateCameraInput() {
@@ -1330,6 +1420,9 @@ export class Game {
       this.updateArena(dt);
       this.recoverStuckModalPause();
       this.flushPendingLevelUp();
+      if (this.particles && this.enemies) {
+        this.particles.update(dt, this.camera, this.renderer, this.enemies.enemies);
+      }
     } else if (this.state === 'village') {
       this.updateVillage(dt);
     }
@@ -1498,9 +1591,15 @@ export class Game {
   }
 
   devResetTutorial() {
-    saveData.data.tutorialStep = 0;
-    saveData.data.tutorialComplete = false;
-    saveData.save();
-    this.ui.toast('Dev: tutorial reset', 'synergy');
+    resetTutorialProgress();
+    this._tutorialShownStep = -1;
+    this._tutorialFlags = this._initTutorialFlags();
+    this._tutorialMoveDist = 0;
+    this._charSelectOpen = false;
+    this.ui.hideTutorial();
+    this.returnToTitle();
+    this.touchControls.setVisible(false);
+    this.ui.toast('Dev: tutorial reset — welcome step restored', 'synergy');
+    queueMicrotask(() => this._tryShowTutorial({ force: true }));
   }
 }

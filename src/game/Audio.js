@@ -212,6 +212,14 @@ export class Audio {
   ui() { this.tone(500, 0.05, 'sine', 0.08); }
   hurt() { this.tone(120, 0.15, 'sawtooth', 0.12); }
   zonkDomeWarn() { this.tone(90, 0.35, 'sine', 0.1); this.tone(130, 0.5, 'triangle', 0.08); }
+  zonkDomeKlaxon() {
+    if (!this.enabled || !this.ctx) return;
+    for (let i = 0; i < 7; i++) {
+      const freq = i % 2 === 0 ? 820 : 540;
+      setTimeout(() => this.tone(freq, 0.16, 'square', 0.12, false), i * 165);
+    }
+    setTimeout(() => this.noise(0.12, 0.07), 80);
+  }
   zonkDomePop() { this.noise(0.2, 0.14); this.tone(80, 0.25, 'sawtooth', 0.14); }
   quest() { this.tone(700, 0.12, 'sine', 0.1); this.tone(900, 0.15, 'sine', 0.08); }
 }

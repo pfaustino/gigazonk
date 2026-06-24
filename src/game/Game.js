@@ -14,7 +14,7 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -819,6 +819,36 @@ export class Game {
     }
   }
 
+  _getInteractCallbacks() {
+    return {
+      onChest: () => { this.quests.track('chests'); this.audio.chest(); },
+      onPot: () => { this.quests.track('pots'); this.audio.chest(); },
+      onMesaCache: () => { this.quests.track('chests'); this.audio.chest(); },
+      onShrine: () => {
+        this.quests.track('shrines');
+        this.ui.toast('Power surges through you!');
+      },
+      onCoins: (v) => { this.runCoins += v; },
+      onToast: (msg) => this.ui.toast(msg),
+    };
+  }
+
+  _handleInteractResult(result) {
+    if (!result) return;
+    if (result.loot || result.preview) {
+      if (!result.levelsGained) {
+        this.ui.pushReward({
+          icon: result.icon || '🎁',
+          name: result.name || result.loot?.label || 'Reward',
+          stats: result.preview || [],
+          player: this.player,
+        });
+      }
+    }
+    if (result.label) this.ui.toast(result.label);
+    if (result.levelsGained) this.queueLevelUp(result.levelsGained);
+  }
+
   updateArena(dt) {
     if (!this.modalPause && !this.ui.gameMenu.isOpen() && this.input.wasPressed('Escape')) {
       this.openGameMenu();
@@ -963,15 +993,20 @@ export class Game {
       this.player.position.x, this.player.position.z, 0.8, diffMult
     );
     if (contactDmg > 0) {
-      const dead = this.player.takeDamage(contactDmg * dt);
+      const dead = this.player.takeDamage(contactDmg);
       if (dead) { this.gameOver(); return; }
     }
 
     this.interactables.update(dt, this.player.position.x, this.player.position.z);
+    if (!this.paused) {
+      const autoPot = this.interactables.getNearestPot(this.player.position.x, this.player.position.z);
+      if (autoPot) {
+        this._handleInteractResult(this.interactables.interact(autoPot, this.player, this._getInteractCallbacks()));
+      }
+    }
     const nearItem = this.interactables.getNearest(this.player.position.x, this.player.position.z);
     if (!this.paused && nearItem) {
       const label = nearItem.type === 'chest' ? '[F] Open Chest' :
-        nearItem.type === 'pot' ? '[F] Break Pot' :
         nearItem.type === 'mesa_cache' ? '[F] Claim Mesa Treasure' :
         nearItem.type === 'village_portal' ? '[F] Return to Village (bank coins)' :
         '[F] Ascension Shrine';
@@ -981,29 +1016,7 @@ export class Game {
           this.audio.ui();
           this.leaveArenaForVillage();
         } else {
-        const result = this.interactables.interact(nearItem, this.player, {
-          onChest: () => { this.quests.track('chests'); this.audio.chest(); },
-          onPot: () => { this.quests.track('pots'); this.audio.chest(); },
-          onMesaCache: () => { this.quests.track('chests'); this.audio.chest(); },
-          onShrine: () => {
-            this.quests.track('shrines');
-            this.ui.toast('Power surges through you!');
-          },
-          onCoins: (v) => { this.runCoins += v; },
-          onToast: (msg) => this.ui.toast(msg),
-        });
-        if (result?.loot || result?.preview) {
-          if (!result?.levelsGained) {
-            this.ui.pushReward({
-              icon: result.icon || '🎁',
-              name: result.name || result.loot?.label || 'Reward',
-              stats: result.preview || [],
-              player: this.player,
-            });
-          }
-        }
-        if (result?.label) this.ui.toast(result.label);
-        if (result?.levelsGained) this.queueLevelUp(result.levelsGained);
+          this._handleInteractResult(this.interactables.interact(nearItem, this.player, this._getInteractCallbacks()));
         }
       }
     } else {
@@ -1022,13 +1035,15 @@ export class Game {
 
     this.zonkDomes.update(dt, this.player, this.arena, this.elapsed, {
       onWarn: () => {
-        this.audio.zonkDomeWarn();
-        this.ui.toast('⚠️ Zonk Dome incoming — leave the zone!', 'synergy');
+        this.audio.zonkDomeKlaxon();
+        this.ui.showRunAlert(ZONK_DOME_GROW_TIME * 1000);
       },
       onFollowupWarn: () => {
-        this.audio.zonkDomeWarn();
+        this.audio.zonkDomeKlaxon();
+        this.ui.showRunAlert(ZONK_DOME_GROW_TIME * 1000);
       },
       onPop: (dome) => {
+        this.ui.hideRunAlert();
         this.audio.zonkDomePop();
         const isFollowup = dome.isFollowup;
         const kb = isFollowup ? 18 : 22;

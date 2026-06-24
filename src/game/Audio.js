@@ -4,6 +4,8 @@ export class Audio {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this._musicVol = 0.3;
+    this._sfxVol = 0.3;
     this.masterGain = null;
     this.musicTracks = {};
     this.arenaPlaylist = [];
@@ -33,7 +35,7 @@ export class Audio {
     }
     this.ctx = new Ctx();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.3;
+      this.masterGain.gain.value = this._sfxVol;
       this.masterGain.connect(this.ctx.destination);
     } catch (err) {
       ErrorReporter.capture('AUDIO_INIT', err);
@@ -130,15 +132,15 @@ export class Audio {
   }
 
   _musicVolume() {
-    if (!this.enabled) return 0;
-    return Math.min(1, (this.masterGain?.gain.value ?? 0.3) * 0.85);
+    if (this._musicVol <= 0) return 0;
+    return Math.min(1, this._musicVol * 0.85);
   }
 
   resume() {
     this.init();
     if (this.ctx?.state === 'suspended') this.ctx.resume();
     const el = this._musicAudio;
-    if (el?.paused && this.enabled && this._musicSrc) {
+    if (el?.paused && this._musicSrc && this._musicVolume() > 0) {
       el.volume = this._musicVolume();
       el.play().catch(() => {});
     }
@@ -146,11 +148,16 @@ export class Audio {
 
   applySettings(settings) {
     this.enabled = settings.sfxEnabled !== false;
-    if (this.masterGain) this.masterGain.gain.value = settings.masterVolume ?? 0.3;
+    const legacy = settings.masterVolume;
+    this._musicVol = settings.musicVolume ?? legacy ?? 0.3;
+    this._sfxVol = settings.sfxVolume ?? legacy ?? 0.3;
+    if (this.masterGain) this.masterGain.gain.value = this._sfxVol;
     const el = this._musicAudio;
-    if (el) el.volume = this._musicVolume();
-    if (!this.enabled) el?.pause();
-    else if (el?.paused && this.musicTrackId) el.play().catch(() => {});
+    if (el) {
+      el.volume = this._musicVolume();
+      if (this._musicVolume() <= 0) el.pause();
+      else if (el.paused && this.musicTrackId) el.play().catch(() => {});
+    }
   }
 
   tone(freq, duration, type = 'square', volume = 0.15, decay = true) {

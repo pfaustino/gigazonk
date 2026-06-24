@@ -1803,3 +1803,24 @@ html, body {
   margin: 4px 0 2px;
 }
 
+.dev-panel-light {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: 92px 1fr 36px;
+  gap: 8px;
+  align-items: center;
+  color: #c8bddf;
+  font-size: 11px;
+}
+
+.dev-panel-light input[type='range'] {
+  width: 100%;
+  accent-color: #f7c948;
+}
+
+.dev-panel-light code {
+  color: #f7c948;
+  font-size: 10px;
+  text-align: right;
+}
+

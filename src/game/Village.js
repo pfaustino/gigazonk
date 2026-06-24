@@ -76,16 +76,25 @@ export class Village {
     const w = 3 + Math.random() * 2;
     const h = 2 + Math.random() * 2;
     const geo = new THREE.BoxGeometry(w, h, w);
+    const facadeHues = [0.02, 0.08, 0.12, 0.55, 0.72, 0.92];
+    const hue = facadeHues[Math.floor(Math.random() * facadeHues.length)];
     const mat = new THREE.MeshLambertMaterial({
-      color: new THREE.Color().setHSL(0.08, 0.3, 0.3 + Math.random() * 0.2)
+      color: new THREE.Color().setHSL(hue, 0.42 + Math.random() * 0.12, 0.62 + Math.random() * 0.1),
+      emissive: 0x222018,
+      emissiveIntensity: 0.08,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, h / 2, z);
     mesh.castShadow = true;
+    mesh.receiveShadow = true;
     this.group.add(mesh);
 
     const roofGeo = new THREE.ConeGeometry(w * 0.7, 1.5, 4);
-    const roofMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+    const roofMat = new THREE.MeshLambertMaterial({
+      color: 0xe08850,
+      emissive: 0x402010,
+      emissiveIntensity: 0.06,
+    });
     const roof = new THREE.Mesh(roofGeo, roofMat);
     roof.position.set(x, h + 0.75, z);
     roof.rotation.y = Math.PI / 4;

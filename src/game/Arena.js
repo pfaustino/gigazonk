@@ -113,7 +113,7 @@ export class Arena {
       this.groundGeo.deleteAttribute('color');
     }
 
-    this.groundMat = createTerrainLambertMaterial(0x384858);
+    this.groundMat = createTerrainLambertMaterial(getBiomeOuterColor(BIOMES[0]));
     this.ground = new THREE.Mesh(this.groundGeo, this.groundMat);
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
@@ -123,7 +123,7 @@ export class Arena {
     if (padGeo.getAttribute('color')) {
       padGeo.deleteAttribute('color');
     }
-    this.spawnPadMat = createTerrainLambertMaterial(0x5e5448);
+    this.spawnPadMat = createTerrainLambertMaterial(getBiomeRockColor(BIOMES[0]));
     this.spawnPad = new THREE.Mesh(padGeo, this.spawnPadMat);
     this.spawnPad.rotation.x = -Math.PI / 2;
     this.spawnPad.position.y = 0.04;

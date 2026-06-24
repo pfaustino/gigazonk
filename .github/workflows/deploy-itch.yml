@@ -56,3 +56,6 @@ jobs:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
         run: |
           ./butler push dist pfaustino/gigazonk:html5 --userversion "${{ steps.version.outputs.version }}"
+
+      - name: Verify itch.io embed serves expected version
+        run: bash scripts/verify-itch-embed.sh "${{ steps.version.outputs.version }}"

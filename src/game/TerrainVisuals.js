@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ARENA_SIZE, ARENA_REFERENCE_SIZE } from './constants.js';
+import { ARENA_SIZE, ARENA_REFERENCE_SIZE, GROUND_TEXTURE_EMISSIVE_INTENSITY, ROCK_TEXTURE_EMISSIVE_INTENSITY, TERRAIN_EMISSIVE_INTENSITY } from './constants.js';
 
 const _c = new THREE.Color();
 const _b = new THREE.Color();
@@ -79,11 +79,11 @@ function createTiledLambertMaterial(texture, color, repeatX, repeatY, emissiveIn
 }
 
 export function createRockTexturedMaterial(texture, color, repeatX, repeatY) {
-  return createTiledLambertMaterial(texture, color, repeatX, repeatY, 0.07);
+  return createTiledLambertMaterial(texture, color, repeatX, repeatY, ROCK_TEXTURE_EMISSIVE_INTENSITY);
 }
 
 export function createGroundTexturedMaterial(texture, color, repeatX, repeatY) {
-  return createTiledLambertMaterial(texture, color, repeatX, repeatY, 0.05);
+  return createTiledLambertMaterial(texture, color, repeatX, repeatY, GROUND_TEXTURE_EMISSIVE_INTENSITY);
 }
 
 function lerpColors(colors, i, a, b, t) {
@@ -104,7 +104,7 @@ export function paintPackedGround(geometry, texScale = 1) {
     const z = geometry.attributes.position.getZ(i) * texScale;
     const brick = (Math.floor(x * 0.75) + Math.floor(z * 0.75)) % 2;
     const noise = Math.sin(x * 0.5) * Math.sin(z * 0.5) * 0.08;
-    lerpColors(colors, i, brick ? 0x5e5448 : 0x4a4238, 0x6a6054, 0.5 + noise);
+    lerpColors(colors, i, brick ? 0xa89888 : 0x908070, 0xc8b8a0, 0.5 + noise);
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
@@ -118,7 +118,7 @@ export function paintGrassGround(geometry, texScale = 1) {
     const z = geometry.attributes.position.getZ(i) * texScale;
     const patch = Math.sin(x * 0.12) * Math.cos(z * 0.1) + Math.sin(x * 0.35 + z * 0.25);
     const t = (patch + 1) * 0.5;
-    lerpColors(colors, i, 0x2f5c2a, 0x4a8a42, t);
+    lerpColors(colors, i, 0x5a9848, 0x7ec868, t);
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
@@ -132,7 +132,7 @@ export function createTerrainLambertMaterial(color) {
   return new THREE.MeshLambertMaterial({
     color,
     emissive: color,
-    emissiveIntensity: 0.14,
+    emissiveIntensity: TERRAIN_EMISSIVE_INTENSITY,
   });
 }
 

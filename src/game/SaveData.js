@@ -50,12 +50,21 @@ function migrateDiscoveredQuests(parsed) {
   return [...discovered].filter((id) => QUESTS.some((q) => q.id === id));
 }
 
+function migrateSettings(settings = {}) {
+  const merged = { ...DEFAULT_SETTINGS, ...settings };
+  if (merged.musicVolume == null && merged.sfxVolume == null && settings.masterVolume != null) {
+    merged.musicVolume = settings.masterVolume;
+    merged.sfxVolume = settings.masterVolume;
+  }
+  return merged;
+}
+
 /** Merge parsed localStorage JSON into a full save record (exported for tests). */
 export function hydrateSave(parsed) {
   return {
     ...DEFAULT_SAVE,
     ...parsed,
-    settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
+    settings: migrateSettings(parsed.settings),
     skillLevels: migrateSkillLevels(parsed),
     activeQuests: (parsed.activeQuests ?? DEFAULT_SAVE.activeQuests)
       .filter((id) => QUESTS.some((q) => q.id === id)),

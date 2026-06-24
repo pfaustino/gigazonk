@@ -11,7 +11,8 @@ export const LANGUAGES = {
 };
 
 export const DEFAULT_SETTINGS = {
-  masterVolume: 0.3,
+  musicVolume: 0.3,
+  sfxVolume: 0.3,
   sfxEnabled: true,
   language: 'en',
   difficulty: 'normal',

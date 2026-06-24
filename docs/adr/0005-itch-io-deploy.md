@@ -14,8 +14,9 @@ Deploy to itch.io automatically on every push to `main` (Option A), mirroring Pa
 
 1. Workflow `.github/workflows/deploy-itch.yml` runs `npm run check:itch` (lint + tsc + vitest + `build:itch`).
 2. **butler** pushes `dist/` to `pfaustino/gigazonk:html5` with `--userversion` from `package.json`.
-3. Secret `BUTLER_API_KEY` lives in GitHub Environment **`itch`** (not in the repo).
-4. `workflow_dispatch` allows manual re-push without a commit.
+3. Post-push, `scripts/verify-itch-embed.sh` polls the live embed JS until it contains `GAME_VERSION` (up to ~3 minutes).
+4. Secret `BUTLER_API_KEY` lives in GitHub Environment **`itch`** (not in the repo).
+5. `workflow_dispatch` allows manual re-push without a commit.
 
 Pages deploy (`deploy-pages.yml`) and itch deploy run **in parallel** after merge; each job builds its own artifact.
 
@@ -36,6 +37,21 @@ Pages deploy (`deploy-pages.yml`) and itch deploy run **in parallel** after merg
 
 - Missing or invalid `BUTLER_API_KEY` fails the workflow until configured
 - First push must create the `html5` channel in the itch dashboard if not present
+- A **legacy manual zip upload** can block the butler `html5` embed from updating (wharf metadata shows the new version while players still get the old embed)
+
+## Stale embed troubleshooting
+
+Symptoms: download label / wharf API show the new `--userversion`, but the title screen or embed JS still shows an older `GAME_VERSION`. Hard refresh does not help — itch is serving stale embed files.
+
+This repo has **never** auto-deleted itch uploads; CI has always been `butler push dist …:html5` only (since `aef3c12`). The usual cause is an old **manual zip** left on the Edit page before butler CI, not a removed script.
+
+Fix:
+
+1. itch.io → **Edit game** → delete the stale HTML5 upload (e.g. `gigazonk-html5.zip`).
+2. **Save**, then re-run **Deploy to itch.io** (Actions → Run workflow).
+3. Ensure only the butler `html5` channel upload remains, tagged **HTML5 / Playable in browser**, project kind **HTML**.
+
+Local check: `bash scripts/verify-itch-embed.sh "$(node -p "require('./package.json').version")"`
 
 ## Setup (one-time)
 

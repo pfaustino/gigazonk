@@ -43,6 +43,12 @@ gh run list --branch main --workflow "Deploy to itch.io" --limit 1
 - Re-run: Actions → **Deploy to itch.io** → Run workflow
 - See `docs/adr/0005-itch-io-deploy.md`
 
+## If embed shows an old version (verify step failed)
+
+Butler can succeed while the **Play in browser** embed still serves old JS. CI catches this via `scripts/verify-itch-embed.sh`.
+
+Fix: itch Edit page → delete stale HTML5 upload → Save → re-run **Deploy to itch.io**. There is no butler auto-delete; a leftover manual zip usually caused this.
+
 ## Do not
 
 - Run butler locally unless user asks

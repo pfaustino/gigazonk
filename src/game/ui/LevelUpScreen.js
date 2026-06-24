@@ -1,5 +1,25 @@
 import { CONFIRM_HINT, bindGridNavigation } from './MenuNavigation.js';
 import { getUpgradePreview, getUpgradeBuffHighlights } from '../UpgradeSystem.js';
+import { upgradeTagsHTML } from '../UpgradeTags.js';
+import { SYNERGY_ELEMENTS, SYNERGY_NAME } from '../constants.js';
+
+const SYNERGY_ICONS = { fire: '🔥', ice: '❄️', lightning: '⚡' };
+
+function synergyProgressHTML(player) {
+  const slots = SYNERGY_ELEMENTS.map((el) => {
+    const active = player.elements?.has(el);
+    const icon = SYNERGY_ICONS[el] || el;
+    return `<span class="levelup-synergy-slot${active ? ' active' : ''}">${icon}</span>`;
+  }).join('');
+  const ready = SYNERGY_ELEMENTS.every((el) => player.elements?.has(el));
+  const hint = ready ? 'Ready!' : `${SYNERGY_ELEMENTS.filter((el) => !player.elements?.has(el)).length} to go`;
+  return `
+    <div class="levelup-synergy">
+      <span class="levelup-synergy-label">${SYNERGY_NAME}</span>
+      <span class="levelup-synergy-slots">${slots}</span>
+      <span class="levelup-synergy-hint">${hint}</span>
+    </div>`;
+}
 
 function navCtx(ui) {
   return { layer: ui.layer, audio: ui._audio };
@@ -30,6 +50,7 @@ export function showLevelUp(ui, choices, player, onPick) {
       <div class="levelup-body">
         <h2 style="font-size:36px;color:#f7c948">LEVEL UP!</h2>
         <p style="color:#888;margin-bottom:8px">Choose your Zonk upgrade</p>
+        ${synergyProgressHTML(player)}
         <p style="color:#666;font-size:12px;margin-bottom:8px">← → or A D to select | ${CONFIRM_HINT}</p>
         <div class="levelup-grid" id="upgrade-grid"></div>
       </div>
@@ -68,6 +89,7 @@ export function showLevelUp(ui, choices, player, onPick) {
     card.className = `upgrade-card rarity-${upgrade.rarity || 'common'}`;
     card.innerHTML = `
         ${ui._rarityBadgeHTML(upgrade.rarity)}
+        ${upgradeTagsHTML(upgrade.tags)}
         <div class="icon">${upgrade.icon}</div>
         <h4>${upgrade.name}</h4>
         <p>${upgrade.desc}</p>

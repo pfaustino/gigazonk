@@ -60,6 +60,8 @@ export class Interactables {
     this.items = [];
     this.group = new THREE.Group();
     scene.add(this.group);
+    /** @type {((result: object) => void) | null} */
+    this.onInteractResult = null;
   }
 
   reset() {
@@ -70,7 +72,18 @@ export class Interactables {
   }
 
   _disposeItemMeshes(item) {
-    for (const key of ['mesh', 'ringMesh', 'baseMesh']) {
+    if (item.mesh) {
+      item.mesh.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry?.dispose();
+          child.material?.dispose();
+        }
+      });
+      this.group.remove(item.mesh);
+      item.mesh = null;
+    }
+    item.lidPivot = null;
+    for (const key of ['ringMesh', 'baseMesh']) {
       const m = item[key];
       if (!m) continue;
       this.group.remove(m);
@@ -81,13 +94,39 @@ export class Interactables {
   }
 
   spawnChest(x, z, surfaceY = 0) {
-    const geo = new THREE.BoxGeometry(1, 0.8, 0.8);
-    const mat = new THREE.MeshLambertMaterial({ color: 0xf7c948 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, surfaceY + 0.4, z);
-    mesh.castShadow = true;
-    this.group.add(mesh);
-    this.items.push({ type: 'chest', mesh, x, z, surfaceY, opened: false, radius: 2 });
+    const group = new THREE.Group();
+    group.position.set(x, surfaceY + 0.4, z);
+
+    const baseMat = new THREE.MeshLambertMaterial({ color: 0xc9941a });
+    const lidMat = new THREE.MeshLambertMaterial({ color: 0xf7c948 });
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1, 0.45, 0.8), baseMat);
+    base.position.y = -0.175;
+    base.castShadow = true;
+
+    const lidPivot = new THREE.Group();
+    lidPivot.position.set(0, 0.05, -0.38);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1, 0.18, 0.8), lidMat);
+    lid.position.set(0, 0.09, 0.38);
+    lid.castShadow = true;
+    lidPivot.add(lid);
+
+    group.add(base);
+    group.add(lidPivot);
+    this.group.add(group);
+
+    this.items.push({
+      type: 'chest',
+      mesh: group,
+      lidPivot,
+      x,
+      z,
+      surfaceY,
+      opened: false,
+      opening: false,
+      openT: 0,
+      radius: 2,
+    });
   }
 
   spawnPot(x, z) {
@@ -283,7 +322,7 @@ export class Interactables {
     let minDist = Infinity;
     for (const item of this.items) {
       if (item.type === 'pot' || item.type === 'mesa_beacon') continue;
-      if ((item.type === 'chest' && item.opened)
+      if ((item.type === 'chest' && (item.opened || item.opening))
         || (item.type === 'shrine' && item.used)
         || (item.type === 'mesa_cache' && item.opened)) continue;
       const dist = Math.hypot(item.x - px, item.z - pz);
@@ -312,21 +351,17 @@ export class Interactables {
   interact(item, player, callbacks) {
     if (!item) return null;
 
-    if (item.type === 'chest' && !item.opened) {
-      item.opened = true;
-      this.removeMesh(item);
+    if (item.type === 'chest' && !item.opened && !item.opening) {
+      item.opening = true;
+      item.openT = 0;
+      if (item.mesh) {
+        item.mesh.rotation.set(0, 0, 0);
+      }
       const loot = pickLoot();
       const preview = getLootPreview(player, loot);
-      const levelsGained = this.applyLoot(loot, player, callbacks);
+      item._pending = { loot, preview, player, callbacks };
       callbacks.onChest?.();
-      return {
-        type: 'chest',
-        loot,
-        preview,
-        levelsGained,
-        icon: LOOT_REWARD_ICONS[loot.type] || '🎁',
-        name: loot.label,
-      };
+      return null;
     }
 
     if (item.type === 'pot' && !item.broken) {
@@ -439,11 +474,38 @@ export class Interactables {
     this._disposeItemMeshes(item);
   }
 
+  _finishChestOpen(item) {
+    const pending = item._pending;
+    if (!pending) return;
+    item._pending = null;
+    item.opened = true;
+    item.opening = false;
+    const levelsGained = this.applyLoot(pending.loot, pending.player, pending.callbacks);
+    this.onInteractResult?.({
+      type: 'chest',
+      loot: pending.loot,
+      preview: pending.preview,
+      levelsGained,
+      icon: LOOT_REWARD_ICONS[pending.loot.type] || '🎁',
+      name: pending.loot.label,
+    });
+    setTimeout(() => this.removeMesh(item), 700);
+  }
+
   update(dt, px, pz) {
     const time = Date.now() * 0.004;
     for (const item of this.items) {
       if (!item.mesh) continue;
-      const used = (item.type === 'chest' && item.opened)
+
+      if (item.type === 'chest' && item.opening && item.lidPivot) {
+        item.openT = Math.min(1, item.openT + dt * 2.4);
+        const eased = 1 - (1 - item.openT) ** 3;
+        item.lidPivot.rotation.x = -Math.PI * 0.62 * eased;
+        if (item.openT >= 1) this._finishChestOpen(item);
+        continue;
+      }
+
+      const used = (item.type === 'chest' && (item.opened || item.opening))
         || (item.type === 'pot' && item.broken)
         || (item.type === 'shrine' && item.used)
         || (item.type === 'mesa_cache' && item.opened);

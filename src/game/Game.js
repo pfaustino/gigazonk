@@ -174,9 +174,11 @@ export class Game {
   _ensureCombatManagers() {
     if (this._combatReady) return;
     this.enemies = new EnemyManager(this.scene);
+    this.enemies.onBossPhase2 = (enemy) => this._onBossPhase2(enemy);
     this.projectiles = new ProjectileManager(this.scene);
     this.gems = new GemManager(this.scene);
     this.interactables = new Interactables(this.scene);
+    this.interactables.onInteractResult = (result) => this._handleInteractResult(result);
     this.familiars = new FamiliarManager(this.scene);
     this.fireTrail = new FireTrailManager(this.scene);
     this.zonkDomes = new ZonkDomeManager(this.scene);
@@ -413,7 +415,7 @@ export class Game {
     this.clearRunRng();
   }
 
-  startArena() {
+  startArena({ keepBiome = false, quickRetry = false } = {}) {
     this._ensureCombatManagers();
     this._ensureArena();
     saveData.data.runSnapshot = null;
@@ -422,7 +424,7 @@ export class Game {
     this.quests.assignNewQuests();
     this.ui.clear();
     this.ui.buildHUD();
-    this._applyBiome(this._resolveStartBiome());
+    this._applyBiome(keepBiome && this.currentBiome ? this.currentBiome : this._resolveStartBiome());
     this.enemies.setBiome(this.currentBiome?.id ?? 'grass');
     this._deferArenaFieldSetup(true);
     this.player.position.set(0, 0, 0);
@@ -431,7 +433,7 @@ export class Game {
     saveData.data.totalRuns++;
     saveData.save();
     this.ui.toast(`Entering ${this.currentBiome.name}`, 'synergy');
-    if (shouldShowTutorial()) {
+    if (shouldShowTutorial() && !quickRetry) {
       this._tutorialShownStep = getTutorialStepIndex();
       this.ui.showTutorial(() => advanceTutorialStep());
     }
@@ -762,8 +764,18 @@ export class Game {
     this.enemies.spawnBoss(x, z, this.player.getEffectiveDamage());
     this.audio.boss();
     this.cameraController.addShake(0.85);
+    this.ui.showBossIntro(this.bossCount);
+    this.particles.burst(x, z, 0xff2244, 18);
+    this.particles.burst(x, z, 0xff8844, 10);
     this.ui.toast(`⚠️ ZONK LORD #${this.bossCount} APPROACHES!`, 'synergy');
     this.bossTimer = 0;
+  }
+
+  _onBossPhase2(enemy) {
+    this.audio.bossEnrage();
+    this.cameraController.addShake(0.55);
+    this.particles.burst(enemy.x, enemy.z, 0xff1144, 16);
+    this.ui.toast('☠️ ZONK LORD ENRAGES!', 'synergy');
   }
 
   spawnBoss() {
@@ -824,7 +836,7 @@ export class Game {
 
   _getInteractCallbacks() {
     return {
-      onChest: () => { this.quests.track('chests'); this.audio.chest(); },
+      onChest: () => { this.quests.track('chests'); this.audio.openChest(); },
       onPot: () => { this.quests.track('pots'); this.audio.chest(); },
       onMesaCache: () => { this.quests.track('chests'); this.audio.chest(); },
       onShrine: () => {
@@ -932,7 +944,7 @@ export class Game {
       this._bossTelegraph.pulse += dt;
       if (this._bossTelegraph.pulse >= 0.45) {
         this._bossTelegraph.pulse = 0;
-        this.particles.burst(this._bossTelegraph.x, this._bossTelegraph.z, 0xff5533);
+        this.particles.burst(this._bossTelegraph.x, this._bossTelegraph.z, 0xff5533, 8);
       }
       if (this._bossTelegraph.timer <= 0) {
         const { x, z } = this._bossTelegraph;
@@ -992,12 +1004,12 @@ export class Game {
     this.enemies.flushInstances();
     this.combat.flushHordeCombat();
 
-    const contactDmg = this.enemies.checkPlayerCollision(
+    const contact = this.enemies.checkPlayerCollision(
       this.player.position.x, this.player.position.z, 0.8, diffMult
     );
-    if (contactDmg > 0) {
-      const dead = this.player.takeDamage(contactDmg);
-      if (dead) { this.gameOver(); return; }
+    if (contact.damage > 0) {
+      const dead = this.player.takeDamage(contact.damage);
+      if (dead) { this.gameOver(this._deathCauseFromEnemy(contact.killer)); return; }
     }
 
     this.interactables.update(dt, this.player.position.x, this.player.position.z);
@@ -1055,7 +1067,7 @@ export class Game {
         const dmg = Math.max(8, Math.floor(this.player.maxHp * 0.18 * dmgMult));
         const dead = this.player.takeDamage(dmg, { forced: true });
         this.particles.burst(this.player.position.x, this.player.position.z, isFollowup ? 0xcc66ff : 0xff44ff);
-        if (dead) { this.gameOver(); return; }
+        if (dead) { this.gameOver({ icon: '🔮', label: 'Zonk Dome' }); return; }
       },
     });
 
@@ -1206,9 +1218,29 @@ export class Game {
     }
   }
 
-  gameOver() {
+  _deathCauseFromEnemy(enemy) {
+    if (!enemy) return { icon: '💀', label: 'The horde' };
+    if (enemy.isMesaGuardian) return { icon: '🏔️', label: 'Mesa Guardian' };
+    if (enemy.isBoss) return { icon: '👹', label: 'Zonk Lord' };
+    const labels = {
+      grunt: 'Grunt',
+      runner: 'Runner',
+      brute: 'Brute',
+      elite: 'Elite',
+      wisp: 'Wisp',
+      frostling: 'Frostling',
+      ember: 'Ember',
+    };
+    return { icon: '💀', label: labels[enemy.type] || 'Horde' };
+  }
+
+  gameOver(cause = { icon: '💀', label: 'Unknown' }) {
     if (this._gameOverActive) return;
     this._gameOverActive = true;
+    this.player.hp = 0;
+    this.ui.updateLowHpVignette(0);
+    const hpBar = document.getElementById('hp-bar');
+    if (hpBar) hpBar.style.width = '0%';
     this.modalPause = true;
     this.paused = true;
     this.input.releaseCameraLook();
@@ -1251,19 +1283,11 @@ export class Game {
       buffs: getActiveBuffs(this.player),
       newAchievements,
       dailyBonus,
+      deathCause: cause,
     }, (action) => {
       this.ui.removeScreens();
       if (action === 'retry') {
-        this.ui.showCharacterSelect(
-          () => { this.ui.removeScreens(); this.startArena(); },
-          () => {
-            this.modalPause = false;
-            this.paused = false;
-            this._gameOverActive = false;
-            this.ui.removeScreens();
-            this.enterVillage();
-          }
-        );
+        this.startArena({ keepBiome: true, quickRetry: true });
         return;
       }
       this.modalPause = false;

@@ -364,6 +364,16 @@ html, body {
   margin-bottom: 8px;
 }
 
+.run-summary-cause {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  color: #ff8899;
+}
+
+.run-summary-cause strong {
+  color: #ffccd5;
+}
+
 .run-summary-sub {
   color: #aaa;
   margin-bottom: 20px;
@@ -1165,6 +1175,44 @@ html, body {
 @keyframes lowHpPulse {
   0%, 100% { opacity: 0.85; }
   50% { opacity: 1; }
+}
+
+.boss-intro {
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 48;
+  animation: bossIntroPulse 0.5s ease-in-out infinite alternate;
+}
+
+.boss-intro.hidden {
+  display: none;
+}
+
+.boss-intro-title {
+  display: block;
+  font-size: clamp(2.2rem, 8vw, 3.8rem);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #ff4466;
+  text-shadow: 0 0 28px rgba(255, 50, 80, 0.85);
+}
+
+.boss-intro-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f7c948;
+  letter-spacing: 0.2em;
+}
+
+@keyframes bossIntroPulse {
+  from { transform: translate(-50%, -50%) scale(1); }
+  to { transform: translate(-50%, -50%) scale(1.06); }
 }
 
 @keyframes runAlertPulse {

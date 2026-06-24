@@ -103,5 +103,15 @@ export function buildHUD(ui) {
   lowHpVignette.setAttribute('aria-hidden', 'true');
 
   ui.layer.append(damageFlash, lowHpVignette);
+
+  const bossIntro = document.createElement('div');
+  bossIntro.className = 'boss-intro hidden';
+  bossIntro.id = 'boss-intro';
+  bossIntro.setAttribute('aria-live', 'assertive');
+  bossIntro.innerHTML = `
+    <span class="boss-intro-title">ZONK LORD</span>
+    <span class="boss-intro-sub">#1</span>
+  `;
+  ui.layer.append(bossIntro);
   setGameReady(GAME_READY.ARENA_HUD);
 }

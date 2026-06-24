@@ -42,6 +42,7 @@ export class UI {
     this.levelUpActive = false;
     this._runAlertTimer = null;
     this._damageFlashTimer = null;
+    this._bossIntroTimer = null;
     this._ensureMetricsOverlay();
   }
 
@@ -712,6 +713,19 @@ export class UI {
       this._runAlertTimer = null;
     }
     el?.classList.add('hidden');
+  }
+
+  showBossIntro(bossCount = 1, durationMs = 2600) {
+    const el = document.getElementById('boss-intro');
+    if (!el) return;
+    const sub = el.querySelector('.boss-intro-sub');
+    if (sub) sub.textContent = `#${bossCount}`;
+    if (this._bossIntroTimer) clearTimeout(this._bossIntroTimer);
+    el.classList.remove('hidden');
+    this._bossIntroTimer = setTimeout(() => {
+      el.classList.add('hidden');
+      this._bossIntroTimer = null;
+    }, durationMs);
   }
 
   toast(msg, type = '') {

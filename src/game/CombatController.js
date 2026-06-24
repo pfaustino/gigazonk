@@ -160,10 +160,14 @@ export class CombatController {
       g.interactables.removeMesaBeaconForGuardian(enemy);
     }
     g.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
-    const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0x44ff88;
+    g.audio.bossChest();
+    g.ui.toast('Boss defeated! Treasure chest dropped!', 'synergy');
+    g.cameraController.addShake(0.35);
+    const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0xf7c948;
     if (this._killBurstsThisFrame < 4) {
       g.particles.burst(killResult.pos.x, killResult.pos.z, color, 8);
-      this._killBurstsThisFrame++;
+      g.particles.burst(killResult.pos.x, killResult.pos.z, 0xf7c948, 10);
+      this._killBurstsThisFrame += 2;
     }
     if (!this._frameKillSound) {
       g.audio.kill();

@@ -46,6 +46,7 @@ const _color = new THREE.Color();
 export class EnemyManager {
   constructor(scene) {
     this.scene = scene;
+    this.onBossPhase2 = null;
     this.count = 0;
     this.enemies = [];
     this.spatialCell = 8;
@@ -593,19 +594,42 @@ export class EnemyManager {
     if (element === 'ice') enemy.slowTimer = 2;
     if (element === 'lightning') enemy.slowTimer = Math.max(enemy.slowTimer, 0.45);
     if (enemy.hp <= 0) return this.killEnemy(enemy);
+    this._checkBossPhase2(enemy);
     return null;
+  }
+
+  _checkBossPhase2(enemy) {
+    if (!enemy.isBoss || enemy.isMesaGuardian || enemy.bossPhase2 || enemy.hp <= 0) return;
+    if (enemy.hp > enemy.maxHp * 0.5) return;
+    enemy.bossPhase2 = true;
+    enemy.speed *= 1.28;
+    enemy.damage = Math.round(enemy.damage * 1.25);
+    enemy.color = 0xff3366;
+    enemy._colorDirty = true;
+    this._markMeshDirty(enemy);
+    this.onBossPhase2?.(enemy);
   }
 
   /** Sum of touching enemies' contact damage (HP per hit; player i-frames throttle repeats). */
   checkPlayerCollision(px, pz, radius = 0.8, diffMult = 1) {
     const nearby = this.getNearby(px, pz, radius + 1);
     let totalDamage = 0;
+    let topEnemy = null;
+    let topDmg = 0;
     for (const { enemy } of nearby) {
       if (enemy.alive && Math.hypot(enemy.x - px, enemy.z - pz) < radius + enemy.scale * 0.4) {
-        totalDamage += enemy.damage * diffMult;
+        const hitDmg = enemy.damage * diffMult;
+        totalDamage += hitDmg;
+        if (hitDmg > topDmg) {
+          topDmg = hitDmg;
+          topEnemy = enemy;
+        }
       }
     }
-    return Math.min(totalDamage, ENEMY_CONTACT_DAMAGE_CAP);
+    return {
+      damage: Math.min(totalDamage, ENEMY_CONTACT_DAMAGE_CAP),
+      killer: topEnemy,
+    };
   }
 
   setBiome(biomeId) {

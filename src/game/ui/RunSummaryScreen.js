@@ -31,9 +31,15 @@ export function showRunSummary(ui, stats, onAction) {
 
   const unlockedCount = saveData.data.unlockedAchievements.length;
 
+  const title = stats.deathCause ? 'You Died' : 'Run Complete';
+  const causeLine = stats.deathCause
+    ? `<p class="run-summary-cause">${stats.deathCause.icon} Slain by <strong>${stats.deathCause.label}</strong></p>`
+    : '';
+
   screen.innerHTML = `
-    <h2 class="run-summary-title">Run Complete</h2>
-    <p class="run-summary-sub">Survived ${timeStr} · Level ${stats.level} · ${stats.kills} kills</p>
+    <h2 class="run-summary-title">${title}</h2>
+    ${causeLine}
+    <p class="run-summary-sub">${timeStr} · Level ${stats.level} · ${stats.kills} kills</p>
     <div class="run-summary-grid">
       <div class="run-summary-stat"><span>Coins earned</span><strong>+${stats.coins}🪙</strong></div>
       <div class="run-summary-stat"><span>Best time</span><strong>${best}</strong></div>

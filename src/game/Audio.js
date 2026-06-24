@@ -203,9 +203,23 @@ export class Audio {
     setTimeout(() => this.tone(880, 0.35, 'triangle', 0.1), 320);
   }
   chest() { this.tone(600, 0.15, 'sine', 0.12); this.tone(900, 0.2, 'sine', 0.1); }
+  openChest() {
+    this.tone(600, 0.12, 'sine', 0.07);
+    this.tone(900, 0.16, 'sine', 0.06);
+    setTimeout(() => this.tone(660, 0.18, 'sine', 0.06), 100);
+    setTimeout(() => this.tone(880, 0.2, 'sine', 0.05), 220);
+  }
   dodge() { this.noise(0.12, 0.06); this.tone(200, 0.1, 'sine', 0.05); }
   boss() {
     [110, 87, 73].forEach((f, i) => setTimeout(() => this.tone(f, 0.4, 'sawtooth', 0.15), i * 150));
+  }
+  bossEnrage() {
+    [140, 95, 70, 110].forEach((f, i) => setTimeout(() => this.tone(f, 0.22, 'sawtooth', 0.13, false), i * 90));
+  }
+  bossChest() {
+    this.chest();
+    setTimeout(() => this.tone(660, 0.25, 'sine', 0.11), 120);
+    setTimeout(() => this.tone(990, 0.3, 'sine', 0.1), 260);
   }
   magnet() { this.tone(300, 0.3, 'sine', 0.08); this.tone(500, 0.4, 'sine', 0.06); }
   nova() { this.noise(0.3, 0.12); this.tone(150, 0.5, 'sawtooth', 0.1); }

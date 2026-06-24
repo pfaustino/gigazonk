@@ -14,7 +14,7 @@ export async function gotoClean(
     if (!enableTutorial) {
       localStorage.setItem('gigazonk_save', JSON.stringify({
         tutorialComplete: true,
-        tutorialStep: 15,
+        tutorialStep: 17,
       }));
     }
   }, withTutorial);

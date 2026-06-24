@@ -1,5 +1,6 @@
-import { QUESTS, SYNERGY_ELEMENTS, DODGE_COOLDOWN_SECONDS } from './constants.js';
+import { QUESTS, SYNERGY_ELEMENTS, DODGE_COOLDOWN_SECONDS, BOSS_DEFEAT_BANNER_MS } from './constants.js';
 import { saveData } from './SaveData.js';
+import { getActiveVillagePerks, getNextVillagePerk, formatVillagePerksHud } from './VillagePerks.js';
 import {
   SKILL_BRANCHES,
   SKILL_MAX_LEVEL,
@@ -45,6 +46,9 @@ export class UI {
     this._bossIntroTimer = null;
     this._bossDefeatTimer = null;
     this._bossVictoryFlashTimer = null;
+    this._bossDefeatActive = false;
+    this._deferredRewards = [];
+    this._bossDefeatComplete = null;
     this._ensureMetricsOverlay();
   }
 
@@ -260,7 +264,24 @@ export class UI {
     `;
   }
 
-  pushReward({ icon, name, stats = [], rarity = null, buffTargets = null, player = null }) {
+  isBossDefeatShowing() {
+    return this._bossDefeatActive;
+  }
+
+  pushReward(opts) {
+    if (this._bossDefeatActive) {
+      this._deferredRewards.push(opts);
+      return;
+    }
+    this._pushRewardNow(opts);
+  }
+
+  _flushDeferredRewards() {
+    const pending = this._deferredRewards.splice(0);
+    for (const opts of pending) this._pushRewardNow(opts);
+  }
+
+  _pushRewardNow({ icon, name, stats = [], rarity = null, buffTargets = null, player = null }) {
     if (player) this.renderBuffBar(player);
 
     const track = document.getElementById('reward-strip-track');
@@ -769,16 +790,22 @@ export class UI {
     }, durationMs);
   }
 
-  showBossDefeat(bossCount = 1, durationMs = 2600) {
+  showBossDefeat(bossCount = 1, durationMs = BOSS_DEFEAT_BANNER_MS, onComplete) {
     const el = document.getElementById('boss-defeat');
     if (!el) return;
     const sub = el.querySelector('.boss-defeat-sub');
     if (sub) sub.textContent = `#${bossCount} · Treasure dropped`;
     if (this._bossDefeatTimer) clearTimeout(this._bossDefeatTimer);
+    this._bossDefeatActive = true;
+    this._bossDefeatComplete = onComplete ?? null;
     el.classList.remove('hidden');
     this._bossDefeatTimer = setTimeout(() => {
       el.classList.add('hidden');
+      this._bossDefeatActive = false;
       this._bossDefeatTimer = null;
+      this._flushDeferredRewards();
+      this._bossDefeatComplete?.();
+      this._bossDefeatComplete = null;
     }, durationMs);
   }
 
@@ -954,12 +981,20 @@ export class UI {
 
   showVillageHUD(coins, reputation) {
     this.clear();
+    const activePerks = getActiveVillagePerks(reputation);
+    const nextPerk = getNextVillagePerk(reputation);
+    const perkLine = formatVillagePerksHud(activePerks);
+    const nextLine = nextPerk
+      ? `Next at ${nextPerk.minRep} rep: ${nextPerk.icon} ${nextPerk.name} — ${nextPerk.desc}`
+      : 'All village blessings unlocked!';
     const hint = document.createElement('div');
     hint.className = 'controls-hint';
     hint.style.bottom = '60px';
     hint.innerHTML = `
       <div style="font-size:16px;color:#f7c948;margin-bottom:8px">🏘️ Zonka Village</div>
       <div>🪙 ${coins} Zonk Coins | ⭐ ${reputation} Reputation</div>
+      ${perkLine ? `<div style="margin-top:6px;color:#a8ffcc;font-size:13px">Arena perks: ${perkLine}</div>` : ''}
+      <div style="margin-top:6px;color:#888;font-size:12px">${nextLine}</div>
       <div style="margin-top:8px">Walk to NPCs and press [F] to interact</div>
       <div>WASD / Hold LMB Forward | RMB Drag Camera | [F] Interact | [Esc] Menu | Wheel zoom</div>
     `;

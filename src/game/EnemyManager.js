@@ -16,7 +16,7 @@ import {
   ENEMY_FACE_SWAY_DEG,
   ENEMY_FACE_SWAY_SPEED,
   ENEMY_MOUTH_CHEW_FPS,
-  ENEMY_MOUTH_SCREAM_RADIUS,
+  ENEMY_MOUTH_SCREAM_PAD,
   ENEMY_MOUTH_SCREAM_HIT_SEC,
   ENEMY_SEPARATION_SCALE,
   ENEMY_SEPARATION_QUERY,
@@ -266,7 +266,8 @@ export class EnemyManager {
         const pdx = this._faceX - enemy.x;
         const pdz = this._faceZ - enemy.z;
         const playerDist = Math.hypot(pdx, pdz);
-        const scream = (enemy.mouthScreamTimer ?? 0) > 0 || playerDist < ENEMY_MOUTH_SCREAM_RADIUS;
+        const biteDist = 0.8 + enemy.scale * 0.4 + ENEMY_MOUTH_SCREAM_PAD;
+        const scream = (enemy.mouthScreamTimer ?? 0) > 0 || playerDist < biteDist;
         mouthAttrs.col.array[enemy.slot] = enemy.mouthCol ?? 0;
         mouthAttrs.frame.array[enemy.slot] = mouthFrameForTime(
           this._mouthTime,

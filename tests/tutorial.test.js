@@ -49,6 +49,16 @@ describe('Tutorial', () => {
     expect(getTutorialStepIndex()).toBe(2);
   });
 
+  it('includes Esc menu and Coach Zonk village steps', () => {
+    const ids = TUTORIAL_STEPS.map((s) => s.id);
+    expect(ids).toContain('village_menu');
+    expect(ids).toContain('arena_menu');
+    const coach = TUTORIAL_STEPS.find((s) => s.id === 'village_skills');
+    expect(coach?.title).toBe('Coach Zonk');
+    expect(coach?.action).toBe('talkTrainer');
+    expect(TUTORIAL_STEPS.length).toBe(17);
+  });
+
   it('maps phases to game states', () => {
     expect(isStepForState({ phase: 'title' }, 'title')).toBe(true);
     expect(isStepForState({ phase: 'village' }, 'arena')).toBe(false);

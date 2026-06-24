@@ -598,6 +598,14 @@ html, body {
   line-height: 1.4;
 }
 
+.tutorial-action-hint {
+  color: #f7c948;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
 /* Touch controls */
 .touch-controls {
   position: fixed;
@@ -1363,7 +1371,7 @@ html, body {
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
-  z-index: 49;
+  z-index: 300;
   animation: bossDefeatPop 0.5s ease-out, bossDefeatPulse 0.55s ease-in-out 0.5s infinite alternate;
 }
 

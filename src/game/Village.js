@@ -1,8 +1,16 @@
 import * as THREE from 'three';
-import { VILLAGE_SIZE, VILLAGE_NPCS, VILLAGE_LANDMARKS } from './constants.js';
+import { VILLAGE_SIZE, VILLAGE_NPCS, VILLAGE_LANDMARKS, VILLAGE_BUILDING_SLOTS } from './constants.js';
 import { saveData } from './SaveData.js';
+import { isInVillageClearZone } from './VillagePerks.js';
 import { createGrassField, createPathStrip } from './TerrainVisuals.js';
 import { GROUND_WALL_HEIGHT, resolveCircleAabb } from './TerrainFeatures.js';
+
+/** Deterministic footprint from slot index — stable layout between visits. */
+function buildingSizeForSlot(index) {
+  const w = 3.2 + (index % 3) * 0.55;
+  const h = 2.1 + (index % 4) * 0.45;
+  return { w, h };
+}
 
 export class Village {
   constructor(scene) {
@@ -32,11 +40,13 @@ export class Village {
     this.group.add(path);
     this.pathMesh = path;
 
-    const buildingCount = 3 + Math.floor(rep / 20);
+    const buildingCount = Math.min(
+      VILLAGE_BUILDING_SLOTS.length,
+      3 + Math.floor(rep / 20),
+    );
     for (let i = 0; i < buildingCount; i++) {
-      const angle = (i / buildingCount) * Math.PI * 2 + 0.3;
-      const dist = 12 + (i % 3) * 4;
-      this.addBuilding(Math.cos(angle) * dist, Math.sin(angle) * dist);
+      const [x, z] = VILLAGE_BUILDING_SLOTS[i];
+      this.addBuilding(x, z, i);
     }
 
     for (const landmark of VILLAGE_LANDMARKS) {
@@ -72,14 +82,13 @@ export class Village {
     this.build();
   }
 
-  addBuilding(x, z) {
-    const w = 3 + Math.random() * 2;
-    const h = 2 + Math.random() * 2;
+  addBuilding(x, z, slotIndex = 0) {
+    const { w, h } = buildingSizeForSlot(slotIndex);
     const geo = new THREE.BoxGeometry(w, h, w);
     const facadeHues = [0.02, 0.08, 0.12, 0.55, 0.72, 0.92];
-    const hue = facadeHues[Math.floor(Math.random() * facadeHues.length)];
+    const hue = facadeHues[slotIndex % facadeHues.length];
     const mat = new THREE.MeshLambertMaterial({
-      color: new THREE.Color().setHSL(hue, 0.42 + Math.random() * 0.12, 0.62 + Math.random() * 0.1),
+      color: new THREE.Color().setHSL(hue, 0.42 + (slotIndex % 3) * 0.04, 0.62 + (slotIndex % 2) * 0.06),
       emissive: 0x222018,
       emissiveIntensity: 0.08,
     });
@@ -130,12 +139,17 @@ export class Village {
   }
 
   addDecorations() {
-    for (let i = 0; i < 15; i++) {
+    let placed = 0;
+    let attempts = 0;
+    while (placed < 15 && attempts < 100) {
+      attempts++;
+      const x = (Math.random() - 0.5) * VILLAGE_SIZE * 0.85;
+      const z = (Math.random() - 0.5) * VILLAGE_SIZE * 0.85;
+      if (isInVillageClearZone(x, z, 1.8)) continue;
+
       const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 6);
       const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1e });
       const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      const x = (Math.random() - 0.5) * VILLAGE_SIZE * 0.85;
-      const z = (Math.random() - 0.5) * VILLAGE_SIZE * 0.85;
       trunk.position.set(x, 0.75, z);
       this.group.add(trunk);
 
@@ -152,6 +166,7 @@ export class Village {
         radius: 0.5,
         blockBelowY: 2.5,
       });
+      placed++;
     }
 
     const portalGeo = new THREE.TorusGeometry(2, 0.2, 8, 24);

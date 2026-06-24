@@ -22,6 +22,11 @@ import { ErrorReporter } from '../lib/ErrorReporter.js';
 import { DevPanel } from '../dev/DevPanel.js';
 import { RunRng } from '../lib/RunRng.js';
 import { setActiveRunRng, getActiveRunRng, runRandom } from '../lib/runRandom.js';
+import {
+  applyVillagePerksToRun,
+  formatVillagePerksToast,
+  getActiveVillagePerks,
+} from './VillagePerks.js';
 import { TouchControls } from './TouchControls.js';
 import { checkRunAchievements } from './AchievementSystem.js';
 import { tryCompleteDailyChallenge, syncDailyChallengeDay } from './DailyChallenge.js';
@@ -188,6 +193,7 @@ export class Game {
       rift: false,
       boss: false,
       villageQuests: false,
+      villageMenu: false,
       villageSkills: false,
       villageMerchant: false,
       villagePortal: false,
@@ -204,15 +210,20 @@ export class Game {
       case 'welcome':
       case 'village_hub':
       case 'village_quests':
+      case 'arena_menu':
       case 'move':
+        return true;
+      case 'village_menu':
         return true;
       case 'characters':
         return this._charSelectOpen;
       case 'village_skills':
-        return f.villageQuests;
+        return true;
       case 'village_merchant':
         return f.villageSkills;
       case 'village_portal':
+        if (!f.villageSkills) return false;
+        if (saveData.data.reputation < 25) return true;
         return f.villageMerchant;
       case 'touch':
       case 'dodge':
@@ -232,8 +243,18 @@ export class Game {
     }
   }
 
+  _advanceTutorialAction(stepId) {
+    if (isTutorialComplete()) return;
+    const step = getCurrentTutorialStep();
+    if (!step || step.id !== stepId) return;
+    this.ui.hideTutorial();
+    advanceTutorialStep();
+    this._tutorialShownStep = getTutorialStepIndex() - 1;
+    queueMicrotask(() => this._tryShowTutorial({ force: true }));
+  }
+
   _tryShowTutorial({ force = false } = {}) {
-    if (isTutorialComplete() || this.ui.isLevelUpOpen()) return;
+    if (isTutorialComplete() || this.ui.isLevelUpOpen() || this.ui.gameMenu.isOpen()) return;
     const step = getCurrentTutorialStep();
     if (!step || !isStepForState(step, this.state)) return;
     const idx = getTutorialStepIndex();
@@ -244,6 +265,12 @@ export class Game {
       advanceTutorialStep();
       this._tutorialShownStep = getTutorialStepIndex();
       queueMicrotask(() => this._tryShowTutorial({ force: true }));
+      return;
+    }
+
+    if (step.action) {
+      this._tutorialShownStep = idx;
+      this.ui.showTutorial(() => {});
       return;
     }
 
@@ -523,6 +550,10 @@ export class Game {
     saveData.data.totalRuns++;
     saveData.save();
     this.ui.toast(`Entering ${this.currentBiome.name}`, 'synergy');
+    const perkToast = formatVillagePerksToast(this._activeVillagePerks);
+    if (perkToast) {
+      queueMicrotask(() => this.ui.toast(`Village blessings: ${perkToast}`, 'synergy'));
+    }
     if (shouldShowTutorial() && !fromVillagePortal && !quickRetry) {
       skipTutorialStepsUntil('move');
     }
@@ -586,6 +617,7 @@ export class Game {
     this.ui.dismissLevelUp();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
+    this._activeVillagePerks = applyVillagePerksToRun(this.player, this);
     this.resetRunManagers({ upgrades: true, questsRun: true });
     this._floatHurtAcc = 0;
     this._floatHealAcc = 0;
@@ -629,6 +661,7 @@ export class Game {
 
   flushPendingLevelUp() {
     if (this.pendingLevelUps <= 0 || this.modalPause || this.ui.isLevelUpOpen()) return;
+    if (this.ui.isBossDefeatShowing()) return;
     this.onLevelUp();
   }
 
@@ -637,6 +670,7 @@ export class Game {
     this.input.releaseCameraLook();
     this.menuPause = true;
     this.paused = true;
+    if (this.state === 'village') this._tutorialFlags.villageMenu = true;
     this.ui.gameMenu.open({
       inArena: this.state === 'arena',
       onResume: () => this.closeGameMenu(),
@@ -650,6 +684,7 @@ export class Game {
       onMainMenu: () => this.returnToTitle(),
       onExit: () => this.exitGame(),
     });
+    this._advanceTutorialAction('village_menu');
   }
 
   computeTotalRunCoins() {
@@ -738,6 +773,7 @@ export class Game {
   closeGameMenu() {
     this.menuPause = false;
     if (!this.modalPause) this.paused = false;
+    queueMicrotask(() => this._tryShowTutorial({ force: true }));
   }
 
   saveGame() {
@@ -1192,19 +1228,29 @@ export class Game {
           this.ui.showQuestBoard(this.quests, () => {});
         } else if (npc.id === 'trainer') {
           this._tutorialFlags.villageSkills = true;
+          this._advanceTutorialAction('village_skills');
           this.ui.showSkillTree(() => {
             this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+            queueMicrotask(() => this._tryShowTutorial({ force: true }));
           });
         } else if (npc.id === 'merchant') {
           this._tutorialFlags.villageMerchant = true;
+          const perks = getActiveVillagePerks();
+          const merchantPerk = perks.find((p) => p.id === 'merchant');
           this.ui.toast(
-            `Bonk Merchant: "You've got ${saveData.data.zonkCoins} coins — Coach Zonk upgrades your build!"`,
-            'synergy'
+            merchantPerk
+              ? `Bonk Merchant: "${merchantPerk.desc} is active when you enter the arena."`
+              : `Bonk Merchant: "Reach 25 reputation — I'll stash coins on your next arena run!"`,
+            'synergy',
           );
         } else if (npc.id === 'shrine') {
+          const perks = getActiveVillagePerks();
+          const shrinePerk = perks.find((p) => p.id === 'shrine');
           this.ui.toast(
-            `Ascension Shrine: ${saveData.data.reputation} reputation — landmarks unlock as you grow.`,
-            'synergy'
+            shrinePerk
+              ? `Ascension Shrine: "${shrinePerk.desc} — arena blessing active."`
+              : `Ascension Shrine: ${saveData.data.reputation} reputation — unlocks arena XP blessing at 50 rep.`,
+            'synergy',
           );
         } else if (npc.id === 'portal') {
           this._tutorialFlags.villagePortal = true;

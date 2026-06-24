@@ -21,22 +21,30 @@ export const TUTORIAL_STEPS = [
     body: 'Walk with WASD and talk to NPCs with F. Reputation unlocks new landmarks as you complete quests.',
   },
   {
+    id: 'village_menu',
+    phase: 'village',
+    title: 'Game Menu',
+    action: 'openMenu',
+    body: 'Press Esc (Start on gamepad) to open the menu — tweak settings, pause, or return to the title screen.',
+  },
+  {
     id: 'village_quests',
     phase: 'village',
     title: 'Quest Board',
-    body: 'Find Elder Zonka and press F to view active quests. Completing them earns coins and reputation.',
+    body: 'Elder Zonka stands on the west path. Press F at the Quests marker to view active quests and earn coins.',
   },
   {
     id: 'village_skills',
     phase: 'village',
-    title: 'Skill Tree',
-    body: 'Talk to Coach Zonk (trainer) with F to spend Zonk Coins on permanent upgrades between runs.',
+    title: 'Coach Zonk',
+    action: 'talkTrainer',
+    body: 'Find Coach Zonk on the east path (Skill Tree). Press F to spend Zonk Coins on permanent upgrades — damage, speed, and more between runs.',
   },
   {
     id: 'village_merchant',
     phase: 'village',
     title: 'Bonk Merchant',
-    body: 'Press F at the merchant stall to check your coin balance and hear what is in stock.',
+    body: 'The Bonk Merchant unlocks at 25 reputation — +25 run coins at each arena start.',
   },
   {
     id: 'village_portal',
@@ -49,6 +57,12 @@ export const TUTORIAL_STEPS = [
     phase: 'arena',
     title: 'Move',
     body: 'Use WASD or the left stick to dodge the horde. Enemies hurt on contact — keep moving!',
+  },
+  {
+    id: 'arena_menu',
+    phase: 'arena',
+    title: 'Pause Anytime',
+    body: 'Press Esc (Start on gamepad) mid-run for the game menu — pause, adjust settings, or retreat to Zonka Village.',
   },
   {
     id: 'touch',
@@ -72,7 +86,7 @@ export const TUTORIAL_STEPS = [
     id: 'interact',
     phase: 'arena',
     title: 'Interact',
-    body: 'Walk over pots and chests, then press F to break pots, open chests, or use shrines.',
+    body: 'Walk over pots to smash them for loot. Press F at chests and shrines to open or activate them.',
   },
   {
     id: 'levelup',

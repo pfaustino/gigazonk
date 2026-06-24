@@ -3,7 +3,7 @@ import { gotoClean } from './helpers/navigation.js';
 import {
   dismissTutorialStep,
   completeTutorialThroughArenaMove,
-  reachVillageTutorialHub,
+  reachVillageQuestStep,
 } from './helpers/tutorialFlow.js';
 
 test.describe('Onboarding tutorial', () => {
@@ -11,14 +11,15 @@ test.describe('Onboarding tutorial', () => {
     await gotoClean(page, '/', { tutorial: true });
     await completeTutorialThroughArenaMove(page);
     await dismissTutorialStep(page);
+    await dismissTutorialStep(page);
     await expect(page.locator('#tutorial-overlay')).toBeHidden();
   });
 
-  test('Enter Village path shows village hub step', async ({ page }) => {
+  test('Enter Village path shows quest step after Esc menu', async ({ page }) => {
     await gotoClean(page, '/', { tutorial: true });
-    await reachVillageTutorialHub(page);
+    await reachVillageQuestStep(page);
     await dismissTutorialStep(page);
-    await expect(page.locator('.tutorial-card h3').filter({ hasText: 'Quest Board' })).toBeVisible();
+    await expect(page.locator('.tutorial-card h3').filter({ hasText: 'Coach Zonk' })).toBeVisible();
   });
 
   test('dev reset tutorial returns to welcome on title', async ({ page }) => {

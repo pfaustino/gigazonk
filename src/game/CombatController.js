@@ -170,7 +170,7 @@ export class CombatController {
       g.ui.toast('Guardian defeated! Mesa treasure unlocked!', 'synergy');
     } else {
       g.interactables.spawnChest(x, z, killY);
-      g.ui.showBossDefeat(g._runBosses);
+      g.ui.showBossDefeat(g._runBosses, undefined, () => g.flushPendingLevelUp());
       g.ui.flashBossVictory();
       g.audio.bossKillFanfare();
       g.applyHitStop(0.14);

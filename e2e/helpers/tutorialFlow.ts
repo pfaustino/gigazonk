@@ -40,6 +40,15 @@ export async function completeTutorialThroughArenaMove(page: Page) {
   await expect(page.locator('#hp-bar')).toBeVisible();
 }
 
+/** Press Esc through the village game-menu tutorial step. */
+export async function completeVillageMenuStep(page: Page) {
+  await expect(page.locator('.tutorial-card h3').filter({ hasText: 'Game Menu' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.menu-screen')).toBeVisible({ timeout: 5000 });
+  await page.locator('.menu-item').filter({ hasText: 'Resume' }).click();
+  await expect(page.locator('.menu-screen')).toHaveCount(0, { timeout: 5000 });
+}
+
 /** Village hub intro after Enter Village (does not finish village action steps). */
 export async function reachVillageTutorialHub(page: Page) {
   await dismissTutorialStep(page);
@@ -49,4 +58,12 @@ export async function reachVillageTutorialHub(page: Page) {
   await page.locator('#btn-confirm').evaluate((el) => (el as HTMLButtonElement).click());
   await expect(page.getByText('🏘️ Zonka Village')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.tutorial-card h3').filter({ hasText: 'Zonka Village' })).toBeVisible();
+}
+
+/** Village hub → Esc menu → Quest Board tutorial card. */
+export async function reachVillageQuestStep(page: Page) {
+  await reachVillageTutorialHub(page);
+  await dismissTutorialStep(page);
+  await completeVillageMenuStep(page);
+  await expect(page.locator('.tutorial-card h3').filter({ hasText: 'Quest Board' })).toBeVisible();
 }

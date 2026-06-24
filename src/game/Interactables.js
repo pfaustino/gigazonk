@@ -282,11 +282,24 @@ export class Interactables {
     let nearest = null;
     let minDist = Infinity;
     for (const item of this.items) {
-      if (item.type === 'mesa_beacon') continue;
+      if (item.type === 'pot' || item.type === 'mesa_beacon') continue;
       if ((item.type === 'chest' && item.opened)
-        || (item.type === 'pot' && item.broken)
         || (item.type === 'shrine' && item.used)
         || (item.type === 'mesa_cache' && item.opened)) continue;
+      const dist = Math.hypot(item.x - px, item.z - pz);
+      if (dist < item.radius && dist < minDist) {
+        minDist = dist;
+        nearest = item;
+      }
+    }
+    return nearest;
+  }
+
+  getNearestPot(px, pz) {
+    let nearest = null;
+    let minDist = Infinity;
+    for (const item of this.items) {
+      if (item.type !== 'pot' || item.broken) continue;
       const dist = Math.hypot(item.x - px, item.z - pz);
       if (dist < item.radius && dist < minDist) {
         minDist = dist;

@@ -67,6 +67,12 @@ export function buildHUD(ui) {
   prompt.id = 'interact-prompt';
   prompt.textContent = '[F] Interact';
 
+  const runAlert = document.createElement('div');
+  runAlert.className = 'run-alert hidden';
+  runAlert.id = 'run-alert';
+  runAlert.setAttribute('aria-live', 'assertive');
+  runAlert.textContent = 'RUN!';
+
   const toasts = document.createElement('div');
   toasts.className = 'toast-container';
   toasts.id = 'toasts';
@@ -84,6 +90,6 @@ export function buildHUD(ui) {
   ui._rewardSeq = 0;
   ui._rewardQueue = [];
   ui._rewardShowcaseActive = false;
-  ui.layer.append(hud, hudRight, synergy, prompt, toasts, rewardStrip, hint);
+  ui.layer.append(hud, hudRight, synergy, prompt, runAlert, toasts, rewardStrip, hint);
   setGameReady(GAME_READY.ARENA_HUD);
 }

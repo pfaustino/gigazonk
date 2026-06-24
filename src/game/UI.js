@@ -40,6 +40,7 @@ export class UI {
     this._rewardQueue = [];
     this._rewardShowcaseActive = false;
     this.levelUpActive = false;
+    this._runAlertTimer = null;
     this._ensureMetricsOverlay();
   }
 
@@ -664,6 +665,26 @@ export class UI {
     if (!el) return;
     el.textContent = text;
     el.classList.toggle('hidden', !show);
+  }
+
+  showRunAlert(durationMs = 2000) {
+    const el = document.getElementById('run-alert');
+    if (!el) return;
+    if (this._runAlertTimer) clearTimeout(this._runAlertTimer);
+    el.classList.remove('hidden');
+    this._runAlertTimer = setTimeout(() => {
+      el.classList.add('hidden');
+      this._runAlertTimer = null;
+    }, durationMs);
+  }
+
+  hideRunAlert() {
+    const el = document.getElementById('run-alert');
+    if (this._runAlertTimer) {
+      clearTimeout(this._runAlertTimer);
+      this._runAlertTimer = null;
+    }
+    el?.classList.add('hidden');
   }
 
   toast(msg, type = '') {

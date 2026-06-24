@@ -595,6 +595,7 @@ export class EnemyManager {
     return null;
   }
 
+  /** Sum of touching enemies' contact damage (HP per hit; player i-frames throttle repeats). */
   checkPlayerCollision(px, pz, radius = 0.8, diffMult = 1) {
     const nearby = this.getNearby(px, pz, radius + 1);
     let totalDamage = 0;

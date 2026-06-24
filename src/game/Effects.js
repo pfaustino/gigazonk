@@ -407,7 +407,6 @@ export class ZonkDomeManager {
       ring: null,
       grow: 0,
       hurtRadius: ZONK_DOME_HURT_RADIUS,
-      playerWasInside: false,
       isFollowup,
     };
     this.activeDomes.push(dome);
@@ -424,13 +423,10 @@ export class ZonkDomeManager {
     d.mesh.material.opacity = 0.18 + t * 0.5;
     if (d.ring) d.ring.material.opacity = 0.22 * (1 - t * 0.65);
 
-    const dist = Math.hypot(player.position.x - d.cx, player.position.z - d.cz);
-    if (dist < currentRadius + 0.6) {
-      d.playerWasInside = true;
-    }
-
     if (t >= 1) {
-      if (d.playerWasInside) {
+      const dist = Math.hypot(player.position.x - d.cx, player.position.z - d.cz);
+      const playerRadius = 0.5;
+      if (dist < d.hurtRadius + playerRadius) {
         onPop?.(d);
       }
       return true;

@@ -17,7 +17,7 @@
     "grunt": {
       "hpHits": 1.25,
       "speed": 2,
-      "damage": 8,
+      "damage": 7,
       "xp": 3,
       "color": "#f04e45",
       "scale": 0.8,
@@ -35,7 +35,7 @@
     "brute": {
       "hpHits": 3.5,
       "speed": 1.4,
-      "damage": 20,
+      "damage": 18,
       "xp": 12,
       "color": "#aa4444",
       "scale": 1.4,
@@ -53,7 +53,7 @@
     "elite": {
       "hpHits": 6,
       "speed": 1.75,
-      "damage": 25,
+      "damage": 22,
       "xp": 25,
       "color": "#ff44ff",
       "scale": 1.6,

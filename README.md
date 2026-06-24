@@ -22,7 +22,7 @@ npm run deploy
 | Shift | Sprint |
 | Q | Dodge roll (i-frames) |
 | Space | Magnet Pulse (pull XP gems) |
-| E | Interact (chests, pots, NPCs, shrines) |
+| F | Interact (chests, pots, NPCs, shrines) |
 | Esc | Pause / Menu |
 
 ## Characters

@@ -143,6 +143,9 @@ export class Game {
     this.player._onDamageTaken = (amount) => {
       this._floatHurtAcc += amount;
       if (amount >= 1.5) this._floatHurtTimer = 0;
+      if (this.state === 'arena') {
+        this.ui.flashDamage(amount, this.player.maxHp);
+      }
     };
     this.player._onHeal = (amount) => { this._floatHealAcc += amount; };
     this._floatHurtAcc = 0;

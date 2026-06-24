@@ -1,5 +1,6 @@
 import { RARITIES, UPGRADE_TEMPLATES } from './gameData.js';
 import { formatOfferDesc } from './UpgradeText.js';
+import { getUpgradeTags } from './UpgradeTags.js';
 import { runRandom } from '../lib/runRandom.js';
 import { RARITY_FIXED_EFFECT_KEYS } from './upgradeStatSchema.js';
 
@@ -36,6 +37,7 @@ export function buildUpgradeOffer(template, rarity) {
     rarity,
     effect,
     desc: formatOfferDesc(template, effect),
+    tags: getUpgradeTags({ effect }),
   };
 }
 

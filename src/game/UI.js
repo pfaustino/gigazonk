@@ -41,6 +41,7 @@ export class UI {
     this._rewardShowcaseActive = false;
     this.levelUpActive = false;
     this._runAlertTimer = null;
+    this._damageFlashTimer = null;
     this._ensureMetricsOverlay();
   }
 
@@ -466,6 +467,32 @@ export class UI {
     });
 
     this.renderBuffBar(player);
+    this.updateLowHpVignette(player.hp / player.maxHp);
+  }
+
+  flashDamage(amount = 1, maxHp = 100) {
+    const el = document.getElementById('damage-flash');
+    if (!el) return;
+    const ratio = maxHp > 0 ? amount / maxHp : 0.1;
+    const alpha = Math.min(0.55, 0.12 + ratio * 0.75);
+    el.style.setProperty('--flash-alpha', alpha.toFixed(3));
+    el.classList.remove('active');
+    void el.offsetWidth;
+    el.classList.add('active');
+    if (this._damageFlashTimer) clearTimeout(this._damageFlashTimer);
+    this._damageFlashTimer = setTimeout(() => {
+      el.classList.remove('active');
+      this._damageFlashTimer = null;
+    }, 360);
+  }
+
+  updateLowHpVignette(hpRatio) {
+    const el = document.getElementById('low-hp-vignette');
+    if (!el) return;
+    const critical = hpRatio <= 0.2;
+    const low = hpRatio <= 0.35;
+    el.classList.toggle('active', low);
+    el.classList.toggle('critical', critical);
   }
 
   _getBuffChip(buffId) {

@@ -23,6 +23,7 @@ import {
   ENEMY_SEPARATION_HEAVY_COUNT,
   ENEMY_SEPARATION_PLAYER_RADIUS,
   ENEMY_HP_BAR_HORDE_LIMIT,
+  ENEMY_CONTACT_DAMAGE_CAP,
   pickGruntColor,
   BIOME_ENEMY_WEIGHTS,
 } from './constants.js';
@@ -604,7 +605,7 @@ export class EnemyManager {
         totalDamage += enemy.damage * diffMult;
       }
     }
-    return totalDamage;
+    return Math.min(totalDamage, ENEMY_CONTACT_DAMAGE_CAP);
   }
 
   setBiome(biomeId) {
@@ -676,6 +677,7 @@ export class EnemyManager {
       minInterval,
       baseInterval / ramp / (inRift ? 1.35 : 1) / Math.sqrt(diffMult)
     );
+    if (elapsed < 60) interval *= 1.12;
     if (this.count > ENEMY_SOFT_CAP) {
       const over = (this.count - ENEMY_SOFT_CAP) / (MAX_ENEMIES - ENEMY_SOFT_CAP);
       interval *= 1 + over * 3.5;

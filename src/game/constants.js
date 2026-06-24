@@ -55,6 +55,10 @@ export const PLAYER_BASE = {
 /** Hard cap on crit chance (75%). Crit damage has no cap. */
 export const CRIT_CHANCE_CAP = 0.75;
 
+/** Max HP removed per contact tick when many enemies overlap (before armor). */
+export const ENEMY_CONTACT_DAMAGE_CAP = 28;
+/** Enemy `damage` in data/enemies.json = HP per contact hit (player i-frames apply). */
+
 /** Level N→N+1 XP = floor(XP_LEVEL_BASE * XP_LEVEL_GROWTH^(N-1)). Tune with XP_PICKUP_MULT. */
 export const XP_LEVEL_BASE = 48;
 export const XP_LEVEL_GROWTH = 1.172;

@@ -91,5 +91,17 @@ export function buildHUD(ui) {
   ui._rewardQueue = [];
   ui._rewardShowcaseActive = false;
   ui.layer.append(hud, hudRight, synergy, prompt, runAlert, toasts, rewardStrip, hint);
+
+  const damageFlash = document.createElement('div');
+  damageFlash.id = 'damage-flash';
+  damageFlash.className = 'damage-flash';
+  damageFlash.setAttribute('aria-hidden', 'true');
+
+  const lowHpVignette = document.createElement('div');
+  lowHpVignette.id = 'low-hp-vignette';
+  lowHpVignette.className = 'low-hp-vignette';
+  lowHpVignette.setAttribute('aria-hidden', 'true');
+
+  ui.layer.append(damageFlash, lowHpVignette);
   setGameReady(GAME_READY.ARENA_HUD);
 }

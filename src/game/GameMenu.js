@@ -182,6 +182,11 @@ export class GameMenu {
   renderAudio() {
     this.ui._navCleanup?.();
     const s = saveData.data.settings;
+    const savedSnapshot = {
+      sfxEnabled: s.sfxEnabled,
+      musicVolume: s.musicVolume ?? 0.3,
+      sfxVolume: s.sfxVolume ?? 0.3,
+    };
     this.screen.innerHTML = `
       <div class="menu-panel menu-panel-wide">
         <h2 class="menu-title">Audio</h2>
@@ -191,10 +196,15 @@ export class GameMenu {
             <span>Sound effects</span>
             <input type="checkbox" id="sfx-enabled" ${s.sfxEnabled ? 'checked' : ''} />
           </label>
-          <label class="menu-setting" id="vol-row">
-            <span>Master volume</span>
-            <input type="range" id="master-volume" min="0" max="100" value="${Math.round(s.masterVolume * 100)}" />
-            <span id="vol-label">${Math.round(s.masterVolume * 100)}%</span>
+          <label class="menu-setting" id="music-vol-row">
+            <span>Music</span>
+            <input type="range" id="music-volume" min="0" max="100" value="${Math.round(savedSnapshot.musicVolume * 100)}" />
+            <span id="music-vol-label">${Math.round(savedSnapshot.musicVolume * 100)}%</span>
+          </label>
+          <label class="menu-setting" id="sfx-vol-row">
+            <span>Sounds</span>
+            <input type="range" id="sfx-volume" min="0" max="100" value="${Math.round(savedSnapshot.sfxVolume * 100)}" />
+            <span id="sfx-vol-label">${Math.round(savedSnapshot.sfxVolume * 100)}%</span>
           </label>
         </div>
         <button class="btn btn-primary" id="audio-save">Apply</button>
@@ -203,30 +213,59 @@ export class GameMenu {
     `;
 
     const sfx = this.screen.querySelector('#sfx-enabled');
-    const vol = this.screen.querySelector('#master-volume');
-    const volLabel = this.screen.querySelector('#vol-label');
+    const musicVol = this.screen.querySelector('#music-volume');
+    const musicVolLabel = this.screen.querySelector('#music-vol-label');
+    const sfxVol = this.screen.querySelector('#sfx-volume');
+    const sfxVolLabel = this.screen.querySelector('#sfx-vol-label');
     const sfxRow = this.screen.querySelector('#sfx-row');
-    const volRow = this.screen.querySelector('#vol-row');
+    const musicVolRow = this.screen.querySelector('#music-vol-row');
+    const sfxVolRow = this.screen.querySelector('#sfx-vol-row');
     const saveBtn = this.screen.querySelector('#audio-save');
     const backBtn = this.screen.querySelector('#menu-back');
 
-    vol.oninput = () => { volLabel.textContent = `${vol.value}%`; };
+    let lastSfxPreview = 0;
+    const playSfxPreview = () => {
+      const now = Date.now();
+      if (now - lastSfxPreview < 120) return;
+      lastSfxPreview = now;
+      this.ui._audio?.resume();
+      this.ui._audio?.ui();
+    };
 
-    const adjustVolume = (delta) => {
-      vol.value = Math.max(0, Math.min(100, Number(vol.value) + delta));
-      volLabel.textContent = `${vol.value}%`;
+    const applyLive = (previewSfx = false) => {
+      s.sfxEnabled = sfx.checked;
+      s.musicVolume = musicVol.value / 100;
+      s.sfxVolume = sfxVol.value / 100;
+      this.handlers?.onSettingsChanged?.();
+      this.ui._audio?.resume();
+      if (previewSfx) playSfxPreview();
+    };
+
+    musicVol.oninput = () => {
+      musicVolLabel.textContent = `${musicVol.value}%`;
+      applyLive(false);
+    };
+    sfxVol.oninput = () => {
+      sfxVolLabel.textContent = `${sfxVol.value}%`;
+      applyLive(true);
+    };
+    sfx.onchange = () => applyLive(true);
+
+    const adjustSlider = (input, label, delta, preview = false) => {
+      input.value = Math.max(0, Math.min(100, Number(input.value) + delta));
+      label.textContent = `${input.value}%`;
+      applyLive(preview);
     };
 
     saveBtn.onclick = () => {
-      s.sfxEnabled = sfx.checked;
-      s.masterVolume = vol.value / 100;
+      applyLive(false);
       saveData.save();
-      this.handlers?.onSettingsChanged?.();
       this.ui._audio?.ui();
-      this.flash('Audio settings saved');
       this.renderMain();
     };
     backBtn.onclick = () => {
+      Object.assign(s, savedSnapshot);
+      this.handlers?.onSettingsChanged?.();
       this.ui._audio?.ui();
       this.renderMain();
     };
@@ -234,12 +273,20 @@ export class GameMenu {
     this.ui._navCleanup = bindSettingsNav(this._navCtx(), [
       {
         el: sfxRow,
-        onActivate: () => { sfx.checked = !sfx.checked; },
+        onActivate: () => {
+          sfx.checked = !sfx.checked;
+          applyLive(true);
+        },
       },
       {
-        el: volRow,
-        onLeft: () => adjustVolume(-5),
-        onRight: () => adjustVolume(5),
+        el: musicVolRow,
+        onLeft: () => adjustSlider(musicVol, musicVolLabel, -5, false),
+        onRight: () => adjustSlider(musicVol, musicVolLabel, 5, false),
+      },
+      {
+        el: sfxVolRow,
+        onLeft: () => adjustSlider(sfxVol, sfxVolLabel, -5, true),
+        onRight: () => adjustSlider(sfxVol, sfxVolLabel, 5, true),
       },
       { el: saveBtn },
       { el: backBtn },

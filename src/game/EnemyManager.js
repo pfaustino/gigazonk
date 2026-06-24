@@ -13,6 +13,8 @@ import {
   MAX_GIGA_GROUP_SIZE,
   MESA_GUARDIAN_HP_HITS,
   ENEMY_MESH_LIFT,
+  ENEMY_FACE_SWAY_DEG,
+  ENEMY_FACE_SWAY_SPEED,
   ENEMY_SEPARATION_SCALE,
   ENEMY_SEPARATION_QUERY,
   ENEMY_SEPARATION_STRENGTH,
@@ -28,8 +30,12 @@ import { runRandom, runRandomInt } from '../lib/runRandom.js';
 import { assert } from '../lib/assert.js';
 import {
   ENEMY_MESH_CAPS,
-  buildEnemyGeometry,
+  ENEMY_EYE_STYLES,
+  buildEnemyBodyGeometry,
+  buildEnemyEyeGeometry,
   createEnemyMaterial,
+  createEnemyEyeMaterial,
+  enemyMeshKey,
 } from './EntityVisuals.js';
 import { isOnMesaPlateau } from './TerrainFeatures.js';
 
@@ -49,27 +55,66 @@ export class EnemyManager {
     this.biomeId = 'grass';
 
     this.meshes = {};
+    this.eyeMeshes = {};
     this.freeSlots = {};
+    this._meshCaps = {};
     this._dirtyMeshes = new Set();
     this._nearbyScratch = [];
-    this._instanceTick = 0;
-    this._animPhase = 0;
+    this._faceX = 0;
+    this._faceZ = 1;
+    this._swayPhase = 0;
 
     for (const type of Object.keys(ENEMY_TYPES)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
-      const geo = buildEnemyGeometry(type);
-      const mat = createEnemyMaterial();
-      const mesh = new THREE.InstancedMesh(geo, mat, cap);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.frustumCulled = false;
-      mesh.castShadow = true;
-      mesh.count = 0;
-      mesh.userData.enemyType = type;
-      scene.add(mesh);
-      this.meshes[type] = mesh;
-      this.freeSlots[type] = [];
-      for (let i = cap - 1; i >= 0; i--) this.freeSlots[type].push(i);
+      const perStyle = Math.max(1, Math.ceil(cap / ENEMY_EYE_STYLES.length));
+      for (const eyeStyle of ENEMY_EYE_STYLES) {
+        const key = enemyMeshKey(type, eyeStyle);
+        const bodyGeo = buildEnemyBodyGeometry(type);
+        const mat = createEnemyMaterial();
+        const mesh = new THREE.InstancedMesh(bodyGeo, mat, perStyle);
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        mesh.frustumCulled = false;
+        mesh.castShadow = true;
+        mesh.count = 0;
+        mesh.userData.enemyType = type;
+        mesh.userData.eyeStyle = eyeStyle;
+        scene.add(mesh);
+        this.meshes[key] = mesh;
+
+        const eyeGeo = buildEnemyEyeGeometry(type, eyeStyle);
+        const eyeMat = createEnemyEyeMaterial();
+        const eyeMesh = new THREE.InstancedMesh(eyeGeo, eyeMat, perStyle);
+        eyeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        eyeMesh.frustumCulled = false;
+        eyeMesh.castShadow = false;
+        eyeMesh.renderOrder = 1;
+        scene.add(eyeMesh);
+        this.eyeMeshes[key] = eyeMesh;
+
+        this._meshCaps[key] = perStyle;
+        this.freeSlots[key] = [];
+        for (let i = perStyle - 1; i >= 0; i--) this.freeSlots[key].push(i);
+      }
     }
+  }
+
+  _slotsAvailable(type) {
+    return ENEMY_EYE_STYLES.reduce(
+      (total, eyeStyle) => total + (this.freeSlots[enemyMeshKey(type, eyeStyle)]?.length || 0),
+      0
+    );
+  }
+
+  _pickEyeStyle(type) {
+    const styles = ENEMY_EYE_STYLES.filter(
+      (eyeStyle) => this.freeSlots[enemyMeshKey(type, eyeStyle)]?.length
+    );
+    if (!styles.length) return null;
+    return styles[runRandomInt(styles.length)];
+  }
+
+  _releaseSlot(enemy) {
+    this.freeSlots[enemyMeshKey(enemy.type, enemy.eyeStyle || 'even')].push(enemy.slot);
   }
 
   reset() {
@@ -80,17 +125,25 @@ export class EnemyManager {
     this._deadSinceCompact = 0;
     this._threatDmg = 10;
     this.lastGroupAnchor = null;
+    this._swayPhase = 0;
     this._dirtyMeshes.clear();
-    for (const type of Object.keys(this.meshes)) {
-      const cap = ENEMY_MESH_CAPS[type] || 100;
-      this.freeSlots[type] = [];
-      for (let i = cap - 1; i >= 0; i--) this.freeSlots[type].push(i);
-      this.meshes[type].count = 0;
+    for (const key of Object.keys(this.meshes)) {
+      const cap = this._meshCaps[key];
+      this.freeSlots[key] = [];
+      for (let i = cap - 1; i >= 0; i--) this.freeSlots[key].push(i);
+      this.meshes[key].count = 0;
+      this.eyeMeshes[key].count = 0;
     }
   }
 
   _meshFor(enemy) {
-    return this.meshes[enemy.type] || this.meshes.grunt;
+    const key = enemyMeshKey(enemy.type, enemy.eyeStyle || 'even');
+    return this.meshes[key] || this.meshes[enemyMeshKey('grunt', 'even')];
+  }
+
+  _eyeMeshFor(enemy) {
+    const key = enemyMeshKey(enemy.type, enemy.eyeStyle || 'even');
+    return this.eyeMeshes[key] || this.eyeMeshes[enemyMeshKey('grunt', 'even')];
   }
 
   _markDirty(mesh) {
@@ -124,7 +177,9 @@ export class EnemyManager {
   }
 
   spawn(type, x, z, threatDmg = 10, hpMult = 1, speedMult = 1) {
-    const pool = this.freeSlots[type];
+    const eyeStyle = this._pickEyeStyle(type);
+    if (!eyeStyle) return null;
+    const pool = this.freeSlots[enemyMeshKey(type, eyeStyle)];
     if (!pool || pool.length === 0) return null;
 
     const def = ENEMY_TYPES[type] || ENEMY_TYPES.grunt;
@@ -135,6 +190,7 @@ export class EnemyManager {
     const enemy = {
       slot,
       type,
+      eyeStyle,
       x, z,
       hp: maxHp,
       maxHp,
@@ -165,6 +221,7 @@ export class EnemyManager {
 
   updateInstance(enemy) {
     const mesh = this._meshFor(enemy);
+    const eyeMesh = this._eyeMeshFor(enemy);
     dummy.position.set(0, 0, 0);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);
@@ -175,16 +232,26 @@ export class EnemyManager {
     } else {
       dummy.position.set(enemy.x, ENEMY_MESH_LIFT * enemy.scale + (enemy.groundY || 0), enemy.z);
       dummy.scale.set(enemy.scale, enemy.scale, enemy.scale);
-      dummy.rotation.y = this._animPhase + enemy.slot;
+      const dx = this._faceX - enemy.x;
+      const dz = this._faceZ - enemy.z;
+      if (dx * dx + dz * dz > 1e-6) {
+        const baseYaw = Math.atan2(dx, dz);
+        const swayMax = ENEMY_FACE_SWAY_DEG * (Math.PI / 180);
+        const sway = Math.sin(this._swayPhase + enemy.slot * 0.61) * swayMax;
+        dummy.rotation.y = baseYaw + sway;
+      }
     }
     dummy.updateMatrix();
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
+    eyeMesh.setMatrixAt(enemy.slot, dummy.matrix);
     if (enemy._colorDirty) {
       mesh.setColorAt(enemy.slot, _color.setHex(enemy.color));
       enemy._colorDirty = false;
     }
     mesh.count = Math.max(mesh.count, enemy.slot + 1);
+    eyeMesh.count = Math.max(eyeMesh.count, enemy.slot + 1);
     this._markDirty(mesh);
+    this._markDirty(eyeMesh);
     enemy._meshDirty = false;
   }
 
@@ -367,13 +434,16 @@ export class EnemyManager {
     this.count--;
     this._deadSinceCompact++;
     const mesh = this._meshFor(enemy);
+    const eyeMesh = this._eyeMeshFor(enemy);
     dummy.position.set(0, 0, 0);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(0, 0, 0);
     dummy.updateMatrix();
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
+    eyeMesh.setMatrixAt(enemy.slot, dummy.matrix);
     this._markDirty(mesh);
-    this.freeSlots[enemy.type].push(enemy.slot);
+    this._markDirty(eyeMesh);
+    this._releaseSlot(enemy);
   }
 
   _cullDistant(playerPos) {
@@ -395,9 +465,10 @@ export class EnemyManager {
   }
 
   update(dt, playerPos, terrain = null) {
+    this._faceX = playerPos.x;
+    this._faceZ = playerPos.z;
+    this._swayPhase += dt * ENEMY_FACE_SWAY_SPEED;
     this._cullDistant(playerPos);
-    this._instanceTick++;
-    this._animPhase = this._instanceTick * 0.05;
 
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -484,10 +555,7 @@ export class EnemyManager {
         e.verticalVel = 0;
       }
 
-      const needsAnim = (e.slot + this._instanceTick) & 3 === 0;
-      if (e._meshDirty || needsAnim) {
-        this.updateInstance(e);
-      }
+      this.updateInstance(e);
     }
     this.rebuildGrid();
     this._flushInstances();
@@ -501,13 +569,16 @@ export class EnemyManager {
     const xp = enemy.xp;
     const pos = { x: enemy.x, z: enemy.z, y: enemy.groundY ?? enemy.feetY ?? 0 };
     const mesh = this._meshFor(enemy);
+    const eyeMesh = this._eyeMeshFor(enemy);
     dummy.position.set(0, 0, 0);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(0, 0, 0);
     dummy.updateMatrix();
     mesh.setMatrixAt(enemy.slot, dummy.matrix);
+    eyeMesh.setMatrixAt(enemy.slot, dummy.matrix);
     this._markDirty(mesh);
-    this.freeSlots[enemy.type].push(enemy.slot);
+    this._markDirty(eyeMesh);
+    this._releaseSlot(enemy);
     return { xp, pos, isBoss: enemy.isBoss };
   }
 
@@ -543,7 +614,7 @@ export class EnemyManager {
     const weights = BIOME_ENEMY_WEIGHTS[this.biomeId] || BIOME_ENEMY_WEIGHTS.grass;
     const pool = [];
     for (const [type, weight] of Object.entries(weights)) {
-      if (!weight || !ENEMY_TYPES[type] || !this.freeSlots[type]?.length) continue;
+      if (!weight || !ENEMY_TYPES[type] || !this._slotsAvailable(type)) continue;
       if (type === 'elite' && elapsed <= 180) continue;
       if (type === 'brute' && elapsed <= 120) continue;
       if (type === 'runner' && elapsed <= 60) continue;
@@ -564,8 +635,8 @@ export class EnemyManager {
   }
 
   _resolveType(type) {
-    if (this.freeSlots[type]?.length) return type;
-    const fallback = Object.keys(this.freeSlots).find(t => this.freeSlots[t].length > 0);
+    if (this._slotsAvailable(type)) return type;
+    const fallback = Object.keys(ENEMY_TYPES).find((t) => this._slotsAvailable(t) > 0);
     return fallback || type;
   }
 

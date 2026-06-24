@@ -14,7 +14,7 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -71,6 +71,7 @@ export class Game {
     this._gameOverActive = false;
     this.runSeed = 0;
     this._devFlags = parseDevFlags();
+    this._devLightMult = { hemi: 1, ambient: 1, sun: 1 };
     this._pendingRunSeed = this._devFlags.seed;
     this._devPendingBiome = this._devFlags.biome;
     this.village = null;
@@ -94,7 +95,7 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.92;
+    this.renderer.toneMappingExposure = SCENE_TONE_EXPOSURE;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(TITLE_SKY);
@@ -232,9 +233,49 @@ export class Game {
   }
 
   applyDaylight() {
-    this.hemiLight.intensity = 0.44;
-    this.ambientLight.intensity = 0.28;
-    this.sunLight.intensity = 1.2;
+    this.applySceneLighting(0);
+  }
+
+  _getBaseLightingIntensities(nightFactor = 0) {
+    if (nightFactor <= 0) {
+      return {
+        hemi: SCENE_DAY_HEMI_INTENSITY,
+        ambient: SCENE_DAY_AMBIENT_INTENSITY,
+        sun: SCENE_DAY_SUN_INTENSITY,
+      };
+    }
+    const dayT = 1 - nightFactor;
+    return {
+      hemi: SCENE_NIGHT_HEMI_INTENSITY + (SCENE_DAY_HEMI_INTENSITY - SCENE_NIGHT_HEMI_INTENSITY) * dayT,
+      ambient: SCENE_NIGHT_AMBIENT_INTENSITY + (SCENE_DAY_AMBIENT_INTENSITY - SCENE_NIGHT_AMBIENT_INTENSITY) * dayT,
+      sun: SCENE_NIGHT_SUN_INTENSITY + (SCENE_DAY_SUN_INTENSITY - SCENE_NIGHT_SUN_INTENSITY) * dayT,
+    };
+  }
+
+  applySceneLighting(nightFactor = 0) {
+    const base = this._getBaseLightingIntensities(nightFactor);
+    const m = this._devLightMult;
+    this.hemiLight.intensity = base.hemi * m.hemi;
+    this.ambientLight.intensity = base.ambient * m.ambient;
+    this.sunLight.intensity = base.sun * m.sun;
+  }
+
+  devSetLightMult(axis, value) {
+    if (Object.hasOwn(this._devLightMult, axis)) {
+      this._devLightMult[axis] = Math.max(0, Math.min(3, value));
+    }
+    const nightFactor = this.state === 'arena' && this.arena ? this.arena.getNightFactor() : 0;
+    this.applySceneLighting(nightFactor);
+  }
+
+  devResetLightMult() {
+    this._devLightMult = { hemi: 1, ambient: 1, sun: 1 };
+    const nightFactor = this.state === 'arena' && this.arena ? this.arena.getNightFactor() : 0;
+    this.applySceneLighting(nightFactor);
+  }
+
+  getDevLightMult() {
+    return { ...this._devLightMult };
   }
 
   applyVillageScene() {
@@ -244,11 +285,11 @@ export class Game {
   }
 
   setupLights() {
-    this.hemiLight = new THREE.HemisphereLight(0x9ec8e8, 0xc8b898, 0.44);
+    this.hemiLight = new THREE.HemisphereLight(0xb8dcf0, 0xe8d8b0, SCENE_DAY_HEMI_INTENSITY);
     this.scene.add(this.hemiLight);
-    this.ambientLight = new THREE.AmbientLight(0xe8e4dc, 0.28);
+    this.ambientLight = new THREE.AmbientLight(0xfff4e8, SCENE_DAY_AMBIENT_INTENSITY);
     this.scene.add(this.ambientLight);
-    this.sunLight = new THREE.DirectionalLight(0xfff8e8, 1.2);
+    this.sunLight = new THREE.DirectionalLight(0xfff8e8, SCENE_DAY_SUN_INTENSITY);
     this.sunLight.position.set(30, 55, 18);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
@@ -801,9 +842,7 @@ export class Game {
     const diffSetting = getDifficultyFromId(saveData.data.settings.difficulty);
     const diffMult = (1 + nightFactor * 0.5 + (this.inRift ? 1 : 0)) * diffSetting.spawnMult;
 
-    this.hemiLight.intensity = 0.36 + (1 - nightFactor) * 0.16;
-    this.ambientLight.intensity = 0.24 + (1 - nightFactor) * 0.14;
-    this.sunLight.intensity = 0.68 + (1 - nightFactor) * 0.58;
+    this.applySceneLighting(nightFactor);
 
     if (this.currentBiome?.sky) {
       const daySky = new THREE.Color(this.currentBiome.sky);

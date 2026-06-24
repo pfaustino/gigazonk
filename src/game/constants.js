@@ -6,6 +6,19 @@ export const ARENA_GROUND_SEGMENTS = 96;
 export const ARENA_SPAWN_PAD_RADIUS = 30;
 export const VILLAGE_SKY = 0x7ab4d4;
 export const TITLE_SKY = 0x80b8d8;
+/** Sunny title-screen readability — lighting + terrain emissive. */
+export const SCENE_TONE_EXPOSURE = 1.08;
+/** Daylight tuned via dev panel: sky/ground ×1.35, ambient ×0, parallel ×3. */
+export const SCENE_DAY_HEMI_INTENSITY = 0.702;
+export const SCENE_DAY_AMBIENT_INTENSITY = 0;
+export const SCENE_DAY_SUN_INTENSITY = 4.05;
+/** Arena night floor (lerps up to SCENE_DAY_* by day). */
+export const SCENE_NIGHT_HEMI_INTENSITY = 0.49;
+export const SCENE_NIGHT_AMBIENT_INTENSITY = 0;
+export const SCENE_NIGHT_SUN_INTENSITY = 2.38;
+export const TERRAIN_EMISSIVE_INTENSITY = 0.24;
+export const GROUND_TEXTURE_EMISSIVE_INTENSITY = 0.12;
+export const ROCK_TEXTURE_EMISSIVE_INTENSITY = 0.14;
 export const ARENA_ROCK_COUNT = 300;
 /** Scatter rocks in the combat band (not the full 1200-unit arena plane). */
 export const ARENA_ROCK_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
@@ -59,6 +72,10 @@ export function pickGruntColor() {
 
 /** Y offset baked into enemy instanced meshes — keep in sync with EnemyManager.updateInstance. */
 export const ENEMY_MESH_LIFT = 0.9;
+/** Max left/right wobble off player-facing yaw (degrees). */
+export const ENEMY_FACE_SWAY_DEG = 8;
+/** Sway cycle speed (radians per second of phase). */
+export const ENEMY_FACE_SWAY_SPEED = 2.4;
 
 export function getEnemyHpBarWorldY(enemy) {
   const surfaceY = enemy.groundY ?? enemy.feetY ?? 0;
@@ -205,28 +222,28 @@ export function isCharacterPlayable(id) {
 /** Rock / mesa color per biome — terrain uses the same palette. */
 export function getBiomeRockColor(biome) {
   switch (biome?.id) {
-    case 'frost': return 0x5a6878;
-    case 'volcanic': return 0x6a5848;
-    case 'waste': return 0x6a6050;
-    default: return 0x5e5448;
+    case 'frost': return 0x788898;
+    case 'volcanic': return 0x886858;
+    case 'waste': return 0x887868;
+    default: return 0x9a8878;
   }
 }
 
-/** Outer arena ring — slightly darker than pad/mesas but still readable. */
+/** Outer arena ring — meadow edge / cobble surround. */
 export function getBiomeOuterColor(biome) {
   switch (biome?.id) {
-    case 'frost': return 0x384858;
-    case 'volcanic': return 0x403028;
-    case 'waste': return 0x403830;
-    default: return 0x384858;
+    case 'frost': return 0x587088;
+    case 'volcanic': return 0x584838;
+    case 'waste': return 0x685848;
+    default: return 0x5a9860;
   }
 }
 
 export const BIOMES = [
-  { id: 'grass', name: 'Zonk Meadows', ground: 0x4a9050, sky: 0x72b8d8, accent: 0x2d6030, friction: 28 },
-  { id: 'waste', name: 'Bonk Wastes', ground: 0xa08060, sky: 0xc8a878, accent: 0x6a5040, friction: 22 },
-  { id: 'frost', name: 'Frost Zonk', ground: 0x5a7080, sky: 0x6a9cb8, accent: 0x3a5870, friction: 5 },
-  { id: 'volcanic', name: 'Magma Pits', ground: 0x5a3828, sky: 0xc89878, accent: 0x2a1408, friction: 10 },
+  { id: 'grass', name: 'Zonk Meadows', ground: 0x62b868, sky: 0x80b8d8, accent: 0x3a7840, friction: 28 },
+  { id: 'waste', name: 'Bonk Wastes', ground: 0xb89878, sky: 0xd8b888, accent: 0x806050, friction: 22 },
+  { id: 'frost', name: 'Frost Zonk', ground: 0x6a8898, sky: 0x7ab4d8, accent: 0x486880, friction: 5 },
+  { id: 'volcanic', name: 'Magma Pits', ground: 0x704838, sky: 0xd8a878, accent: 0x381808, friction: 10 },
 ];
 
 /** Per-biome spawn weights (must sum ~1). Gates by elapsed time still apply in EnemyManager. */

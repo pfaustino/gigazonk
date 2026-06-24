@@ -31,6 +31,25 @@ export class DevPanel {
           <button type="button" data-cmd="heal">Full heal</button>
         </div>
         <div class="dev-panel-actions">
+          <span class="dev-panel-section-label">Lighting (× multiplier)</span>
+          <label class="dev-panel-light">
+            <span>Sky / ground</span>
+            <input type="range" min="0" max="3" step="0.05" value="1" data-light="hemi" />
+            <code class="dev-light-val" data-light-val="hemi">1.00</code>
+          </label>
+          <label class="dev-panel-light">
+            <span>Ambient</span>
+            <input type="range" min="0" max="3" step="0.05" value="1" data-light="ambient" />
+            <code class="dev-light-val" data-light-val="ambient">1.00</code>
+          </label>
+          <label class="dev-panel-light">
+            <span>Parallel (sun)</span>
+            <input type="range" min="0" max="3" step="0.05" value="1" data-light="sun" />
+            <code class="dev-light-val" data-light-val="sun">1.00</code>
+          </label>
+          <button type="button" data-cmd="resetLight">Reset lighting</button>
+        </div>
+        <div class="dev-panel-actions">
           <span class="dev-panel-section-label">Meta</span>
           <button type="button" data-cmd="coins100">+100 coins</button>
           <button type="button" data-cmd="rep50">+50 rep</button>
@@ -65,6 +84,7 @@ export class DevPanel {
     });
 
     this._renderBiomes();
+    this._bindLightingSliders();
     this.syncToggleButtons();
     this._tick = () => this.refresh();
     requestAnimationFrame(this._tick);
@@ -81,6 +101,30 @@ export class DevPanel {
     if (this.rngEl) this.rngEl.textContent = String(getActiveRunRng()?.getState() ?? '—');
     this.syncToggleButtons();
     requestAnimationFrame(this._tick);
+  }
+
+  _bindLightingSliders() {
+    this.root.querySelectorAll('input[data-light]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const axis = input.dataset.light;
+        const value = Number(input.value);
+        this.game.devSetLightMult(axis, value);
+        this._syncLightingLabels();
+      });
+    });
+  }
+
+  _syncLightingLabels() {
+    const mult = this.game.getDevLightMult();
+    this.root.querySelectorAll('input[data-light]').forEach((input) => {
+      const axis = input.dataset.light;
+      if (mult[axis] != null) input.value = String(mult[axis]);
+    });
+    this.root.querySelectorAll('[data-light-val]').forEach((el) => {
+      const axis = el.dataset.lightVal;
+      const value = mult[axis];
+      if (value != null) el.textContent = value.toFixed(2);
+    });
   }
 
   _renderBiomes() {
@@ -140,6 +184,10 @@ export class DevPanel {
         break;
       case 'exportErrors':
         this.game.devExportErrors();
+        break;
+      case 'resetLight':
+        this.game.devResetLightMult();
+        this._syncLightingLabels();
         break;
       default:
         break;

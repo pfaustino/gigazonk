@@ -33,13 +33,171 @@ const _box = new THREE.BoxGeometry(1, 1, 1);
 const _sphere = new THREE.SphereGeometry(1, 6, 5);
 const _cone = new THREE.ConeGeometry(1, 1, 4);
 const _cyl = new THREE.CylinderGeometry(1, 1, 1, 6);
-const _eye = new THREE.SphereGeometry(1, 5, 4);
+const _eyeDisc = new THREE.CircleGeometry(1, 16);
 
-function eyePair(y, z, spacing, size, rgb = [0, 0, 0]) {
-  return [
-    part(_eye, -spacing, y, z, 0, 0, 0, size, size, size * 0.9, rgb),
-    part(_eye, spacing, y, z, 0, 0, 0, size, size, size * 0.9, rgb),
-  ];
+let _enemyEyeTexture;
+
+/** White sclera + black pupil — readable from the gameplay camera angle. */
+function getEnemyEyeTexture() {
+  if (_enemyEyeTexture) return _enemyEyeTexture;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#101018';
+  ctx.beginPath();
+  ctx.arc(size * 0.52, size * 0.5, size * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  _enemyEyeTexture = new THREE.CanvasTexture(canvas);
+  _enemyEyeTexture.colorSpace = THREE.SRGBColorSpace;
+  _enemyEyeTexture.magFilter = THREE.LinearFilter;
+  _enemyEyeTexture.minFilter = THREE.LinearFilter;
+  return _enemyEyeTexture;
+}
+
+function partGeo(geo, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+  const g = geo.clone();
+  g.scale(sx, sy, sz);
+  if (rx) g.rotateX(rx);
+  if (ry) g.rotateY(ry);
+  if (rz) g.rotateZ(rz);
+  g.translate(x, y, z);
+  return g;
+}
+
+export const ENEMY_EYE_STYLES = ['even', 'leftBig', 'rightBig', 'cyclops'];
+
+/** Flat textured disc tilted toward the camera (top-down gameplay view). */
+function eyeBall(x, y, z, size) {
+  return partGeo(
+    _eyeDisc,
+    x,
+    y + size * 0.08,
+    z + size * 0.12,
+    -0.72,
+    0,
+    0,
+    size,
+    size,
+    1
+  );
+}
+
+/** even = slight mismatch; leftBig/rightBig = one eye larger; cyclops = single centered eye. */
+function titleEyes(y, z, spacing, baseSize, style = 'even') {
+  switch (style) {
+    case 'leftBig':
+      return [
+        eyeBall(-spacing, y, z, baseSize * 1.28),
+        eyeBall(spacing, y, z, baseSize * 0.72),
+      ];
+    case 'rightBig':
+      return [
+        eyeBall(-spacing, y, z, baseSize * 0.72),
+        eyeBall(spacing, y, z, baseSize * 1.28),
+      ];
+    case 'cyclops':
+      return [eyeBall(0, y + baseSize * 0.04, z, baseSize * 1.32)];
+    case 'even':
+    default:
+      return [
+        eyeBall(-spacing, y, z, baseSize * 1.05),
+        eyeBall(spacing, y, z, baseSize * 0.9),
+      ];
+  }
+}
+
+const ENEMY_EYE_LAYOUTS = {
+  runner: { y: 0.76, z: 0.42, spacing: 0.075, baseSize: 0.06 },
+  brute: { y: 1.1, z: 0.44, spacing: 0.14, baseSize: 0.09 },
+  wisp: { y: 0.62, z: 0.36, spacing: 0.09, baseSize: 0.065 },
+  elite: { y: 1.15, z: 0.4, spacing: 0.12, baseSize: 0.08 },
+  frostling: { y: 0.58, z: 0.32, spacing: 0.08, baseSize: 0.06 },
+  ember: { y: 0.72, z: 0.4, spacing: 0.07, baseSize: 0.055 },
+  grunt: { y: 1.0, z: 0.38, spacing: 0.11, baseSize: 0.085 },
+};
+
+function enemyBodyParts(type) {
+  switch (type) {
+    case 'runner':
+      return [
+        part(_sphere, 0, 0.45, 0.05, 0, 0, 0, 0.28, 0.35, 0.4),
+        part(_sphere, 0, 0.72, 0.18, 0, 0, 0, 0.22, 0.22, 0.22),
+        part(_cone, 0, 0.35, -0.22, 0.6, 0, 0, 0.12, 0.35, 0.12),
+        part(_box, -0.18, 0.2, 0.1, 0, 0, 0, 0.08, 0.08, 0.2),
+        part(_box, 0.18, 0.2, 0.1, 0, 0, 0, 0.08, 0.08, 0.2),
+      ];
+    case 'brute':
+      return [
+        part(_box, 0, 0.55, 0, 0, 0, 0, 0.75, 0.85, 0.65),
+        part(_sphere, 0, 1.05, 0, 0, 0, 0, 0.42, 0.42, 0.42),
+        part(_box, -0.55, 0.75, 0, 0, 0, 0, 0.22, 0.22, 0.22),
+        part(_box, 0.55, 0.75, 0, 0, 0, 0, 0.22, 0.22, 0.22),
+        part(_cone, -0.2, 1.35, 0, 0, 0, 0.25, 0.12, 0.28, 0.12),
+        part(_cone, 0.2, 1.35, 0, 0, 0, -0.25, 0.12, 0.28, 0.12),
+      ];
+    case 'wisp':
+      return [
+        part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.35, 0.35, 0.35),
+        part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.55, 0.55, 0.55),
+        part(_cone, 0, 0.2, 0, Math.PI, 0, 0, 0.2, 0.35, 0.2),
+      ];
+    case 'elite':
+      return [
+        part(_cyl, 0, 0.55, 0, 0, 0, 0, 0.45, 0.75, 0.45),
+        part(_sphere, 0, 1.1, 0, 0, 0, 0, 0.38, 0.38, 0.38),
+        part(_cone, 0, 1.55, 0, 0, 0, 0, 0.55, 0.35, 0.55),
+        part(_cone, -0.28, 1.25, 0, 0, 0, 0.35, 0.14, 0.35, 0.14),
+        part(_cone, 0.28, 1.25, 0, 0, 0, -0.35, 0.14, 0.35, 0.14),
+        part(_box, -0.65, 0.65, 0, 0, 0, 0.3, 0.15, 0.45, 0.15),
+        part(_box, 0.65, 0.65, 0, 0, 0, -0.3, 0.15, 0.45, 0.15),
+      ];
+    case 'frostling':
+      return [
+        part(_sphere, 0, 0.5, 0, 0, 0, 0, 0.32, 0.32, 0.32),
+        part(_cone, 0, 0.15, 0, Math.PI, 0, 0, 0.18, 0.3, 0.18),
+      ];
+    case 'ember':
+      return [
+        part(_sphere, 0, 0.42, 0.05, 0, 0, 0, 0.26, 0.32, 0.38),
+        part(_cone, 0, 0.35, -0.18, 0.5, 0, 0, 0.1, 0.3, 0.1),
+      ];
+    case 'grunt':
+    default:
+      return [
+        part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.42, 0.48, 0.42),
+        part(_sphere, 0, 0.95, 0.05, 0, 0, 0, 0.3, 0.3, 0.3),
+        part(_cone, -0.22, 1.1, 0, 0, 0, 0.35, 0.12, 0.3, 0.12),
+        part(_cone, 0.22, 1.1, 0, 0, 0, -0.35, 0.12, 0.3, 0.12),
+        part(_box, 0, 0.18, 0, 0, 0, 0, 0.5, 0.22, 0.4),
+      ];
+  }
+}
+
+export function buildEnemyBodyGeometry(type) {
+  return mergeParts(enemyBodyParts(type));
+}
+
+export function buildEnemyEyeGeometry(type, eyeStyle = 'even') {
+  const layout = ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt;
+  return mergeParts(titleEyes(layout.y, layout.z, layout.spacing, layout.baseSize, eyeStyle));
+}
+
+/** Body + eyes merged (legacy); eyes tint with body color — prefer split meshes in EnemyManager. */
+export function buildEnemyGeometry(type, eyeStyle = 'even') {
+  return mergeParts([
+    ...enemyBodyParts(type),
+    ...titleEyes(
+      (ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt).y,
+      (ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt).z,
+      (ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt).spacing,
+      (ENEMY_EYE_LAYOUTS[type] || ENEMY_EYE_LAYOUTS.grunt).baseSize,
+      eyeStyle
+    ),
+  ]);
 }
 
 export const ENEMY_MESH_CAPS = {
@@ -52,72 +210,23 @@ export const ENEMY_MESH_CAPS = {
   ember: 100,
 };
 
-export function buildEnemyGeometry(type) {
-  switch (type) {
-    case 'runner':
-      return mergeParts([
-        part(_sphere, 0, 0.45, 0.05, 0, 0, 0, 0.28, 0.35, 0.4),
-        part(_sphere, 0, 0.72, 0.18, 0, 0, 0, 0.22, 0.22, 0.22),
-        part(_cone, 0, 0.35, -0.22, 0.6, 0, 0, 0.12, 0.35, 0.12),
-        part(_box, -0.18, 0.2, 0.1, 0, 0, 0, 0.08, 0.08, 0.2),
-        part(_box, 0.18, 0.2, 0.1, 0, 0, 0, 0.08, 0.08, 0.2),
-        ...eyePair(0.76, 0.42, 0.075, 0.06),
-      ]);
-    case 'brute':
-      return mergeParts([
-        part(_box, 0, 0.55, 0, 0, 0, 0, 0.75, 0.85, 0.65),
-        part(_sphere, 0, 1.05, 0, 0, 0, 0, 0.42, 0.42, 0.42),
-        part(_box, -0.55, 0.75, 0, 0, 0, 0, 0.22, 0.22, 0.22),
-        part(_box, 0.55, 0.75, 0, 0, 0, 0, 0.22, 0.22, 0.22),
-        part(_cone, -0.2, 1.35, 0, 0, 0, 0.25, 0.12, 0.28, 0.12),
-        part(_cone, 0.2, 1.35, 0, 0, 0, -0.25, 0.12, 0.28, 0.12),
-        ...eyePair(1.1, 0.44, 0.14, 0.09),
-      ]);
-    case 'wisp':
-      return mergeParts([
-        part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.35, 0.35, 0.35),
-        part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.55, 0.55, 0.55),
-        part(_cone, 0, 0.2, 0, Math.PI, 0, 0, 0.2, 0.35, 0.2),
-        ...eyePair(0.62, 0.36, 0.09, 0.065),
-      ]);
-    case 'elite':
-      return mergeParts([
-        part(_cyl, 0, 0.55, 0, 0, 0, 0, 0.45, 0.75, 0.45),
-        part(_sphere, 0, 1.1, 0, 0, 0, 0, 0.38, 0.38, 0.38),
-        part(_cone, 0, 1.55, 0, 0, 0, 0, 0.55, 0.35, 0.55),
-        part(_cone, -0.28, 1.25, 0, 0, 0, 0.35, 0.14, 0.35, 0.14),
-        part(_cone, 0.28, 1.25, 0, 0, 0, -0.35, 0.14, 0.35, 0.14),
-        part(_box, -0.65, 0.65, 0, 0, 0, 0.3, 0.15, 0.45, 0.15),
-        part(_box, 0.65, 0.65, 0, 0, 0, -0.3, 0.15, 0.45, 0.15),
-        ...eyePair(1.15, 0.4, 0.12, 0.08),
-      ]);
-    case 'frostling':
-      return mergeParts([
-        part(_sphere, 0, 0.5, 0, 0, 0, 0, 0.32, 0.32, 0.32),
-        part(_cone, 0, 0.15, 0, Math.PI, 0, 0, 0.18, 0.3, 0.18),
-        ...eyePair(0.58, 0.32, 0.08, 0.06, [0.2, 0.4, 0.9]),
-      ]);
-    case 'ember':
-      return mergeParts([
-        part(_sphere, 0, 0.42, 0.05, 0, 0, 0, 0.26, 0.32, 0.38),
-        part(_cone, 0, 0.35, -0.18, 0.5, 0, 0, 0.1, 0.3, 0.1),
-        ...eyePair(0.72, 0.4, 0.07, 0.055),
-      ]);
-    case 'grunt':
-    default:
-      return mergeParts([
-        part(_sphere, 0, 0.55, 0, 0, 0, 0, 0.42, 0.48, 0.42),
-        part(_sphere, 0, 0.95, 0.05, 0, 0, 0, 0.3, 0.3, 0.3),
-        part(_cone, -0.22, 1.1, 0, 0, 0, 0.35, 0.12, 0.3, 0.12),
-        part(_cone, 0.22, 1.1, 0, 0, 0, -0.35, 0.12, 0.3, 0.12),
-        part(_box, 0, 0.18, 0, 0, 0, 0, 0.5, 0.22, 0.4),
-        ...eyePair(1.0, 0.38, 0.11, 0.085),
-      ]);
-  }
+export function enemyMeshKey(type, eyeStyle = 'even') {
+  return `${type}:${eyeStyle}`;
 }
 
 export function createEnemyMaterial() {
   return new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true });
+}
+
+/** Untinted textured discs — separate InstancedMesh from tinted body. */
+export function createEnemyEyeMaterial() {
+  return new THREE.MeshBasicMaterial({
+    map: getEnemyEyeTexture(),
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+    transparent: false,
+    toneMapped: false,
+  });
 }
 
 export function buildProjectileGeometry() {

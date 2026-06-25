@@ -6,6 +6,14 @@ Document third-party assets used in GigaZonk. Update when adding images, music, 
 
 Pixabay tracks in `public/music/` — see `public/music/manifest.json`. Verify license on Pixabay at time of use.
 
+## SFX
+
+Pixabay clips in `public/sounds/` — see `public/sounds/manifest.json`.
+
+| Key | File | Source |
+|-----|------|--------|
+| `citizenTeleport` | `pixabay-freesound_community-teleport-90137.mp3` | Pixabay / Freesound Community |
+
 ## Images
 
 | File | Source | License |

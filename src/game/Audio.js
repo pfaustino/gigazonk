@@ -45,6 +45,10 @@ export class Audio {
     }
   }
 
+  citizenTeleportSfx() {
+    this.playSfx('citizenTeleport', 0.95);
+  }
+
   async loadSoundManifest() {
     try {
       const res = await fetch(`${this.musicBase}sounds/manifest.json`);

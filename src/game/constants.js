@@ -34,6 +34,17 @@ export const ARENA_INTERACTABLE_COUNT = Math.max(
   Math.round(ARENA_LOOT_RING_AREA / ARENA_INTERACTABLE_DENSITY)
 );
 export const ARENA_SHRINE_RADIUS = ARENA_SIZE * 0.38;
+/** Citizens in distress scattered at arena start; rescue with F nearby. */
+export const CITIZEN_RESCUE_COUNT = 5;
+export const CITIZEN_RESCUE_RESPAWN_SEC = 60;
+export const CITIZEN_RESCUE_RADIUS = 2.8;
+/** Spawn band — closer than loot so players spot citizens without crossing the whole arena. */
+export const CITIZEN_RESCUE_MIN_RADIUS = 38;
+export const CITIZEN_RESCUE_MAX_RADIUS = 145;
+export const CITIZEN_RESCUE_MIN_SPACING = 10;
+export const CITIZEN_RESCUE_COINS = 10;
+export const CITIZEN_RESCUE_XP = 25;
+export const CITIZEN_RESCUE_TELEPORT_SEC = 0.55;
 export const VILLAGE_SIZE = 80;
 
 /** Keep NPCs, portal path, and spawn hub unobstructed (world XZ). */
@@ -190,7 +201,7 @@ export const ENEMY_SEPARATION_PASSES = 1;
 export const ENEMY_SEPARATION_HEAVY_COUNT = 180;
 /** Only separate enemies within this radius of the player (horde pile zone). */
 export const ENEMY_SEPARATION_PLAYER_RADIUS = 28;
-/** Horde size above which grunt HP bars are hidden (boss/elite still show). */
+/** Above this alive count, enemy HP bar DOM updates run every other frame (still show on damage). */
 export const ENEMY_HP_BAR_HORDE_LIMIT = 32;
 /** Batch kill FX / quest checks above this alive count (explode + pierce lag fix). */
 export const COMBAT_HORDE_FX_LIMIT = 28;

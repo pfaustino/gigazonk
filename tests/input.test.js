@@ -48,4 +48,31 @@ describe('Input touch movement', () => {
     expect(move.z).toBeGreaterThan(0.9);
     expect(move.x).toBe(0);
   });
+
+  it('LMB on UI does not register as forward movement', async () => {
+    stubMatchMedia(false);
+    const canvas = { parentElement: null, classList: { toggle: () => {}, remove: () => {} }, addEventListener: () => {}, contains: () => false, requestPointerLock: () => {} };
+    const uiBtn = { tagName: 'BUTTON' };
+    const listeners = new Map();
+    vi.stubGlobal('window', {
+      matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
+      addEventListener: (type, fn) => {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type).push(fn);
+      },
+      dispatchEvent: () => true,
+    });
+    vi.stubGlobal('document', {
+      addEventListener: () => {},
+      pointerLockElement: null,
+    });
+    const { Input } = await import('../src/game/Input.js');
+    const input = new Input(canvas);
+    const down = listeners.get('pointerdown')?.[0];
+    expect(down).toBeTypeOf('function');
+    down({ pointerType: 'mouse', button: 0, buttons: 1, target: uiBtn });
+    expect(input.isLmbForward()).toBe(false);
+    down({ pointerType: 'mouse', button: 0, buttons: 1, target: canvas });
+    expect(input.isLmbForward()).toBe(true);
+  });
 });

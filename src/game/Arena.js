@@ -15,6 +15,7 @@ import {
   buildFeatureMeshes,
   generateArenaFeatures,
   GROUND_WALL_HEIGHT,
+  isInsideMesaRamp,
   resolveCircleAabb,
   sampleGroundHeight,
   tintFeatureMeshes,
@@ -227,6 +228,7 @@ export class Arena {
           pz = resolved.z;
         } else if (obs.type === 'mesa_wall') {
           if (entityY >= obs.blockBelowY - 0.35) continue;
+          if (obs.mesa && isInsideMesaRamp(px, pz, obs.mesa)) continue;
           const resolved = resolveCircleAabb(px, pz, radius, obs);
           px = resolved.x;
           pz = resolved.z;

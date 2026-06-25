@@ -25,7 +25,6 @@ import {
   ENEMY_SEPARATION_PASSES,
   ENEMY_SEPARATION_HEAVY_COUNT,
   ENEMY_SEPARATION_PLAYER_RADIUS,
-  ENEMY_HP_BAR_HORDE_LIMIT,
   ENEMY_CONTACT_DAMAGE_CAP,
   pickGruntColor,
   BIOME_ENEMY_WEIGHTS,
@@ -623,8 +622,7 @@ export class EnemyManager {
   damageEnemy(enemy, amount, element) {
     if (!enemy.alive || amount <= 0) return null;
     if (enemy.isMesaGuardian) this._applyMesaGuardianHp(enemy);
-    const showHpBar = enemy.isBoss || enemy.type === 'elite' || this.count < ENEMY_HP_BAR_HORDE_LIMIT;
-    if (showHpBar) enemy.hpBarVisible = true;
+    enemy.hpBarVisible = true;
     enemy.hp -= amount;
     enemy.mouthScreamTimer = ENEMY_MOUTH_SCREAM_HIT_SEC;
     if (element === 'fire') enemy.burnTimer = 3;

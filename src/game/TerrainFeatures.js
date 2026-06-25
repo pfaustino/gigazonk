@@ -141,7 +141,7 @@ function generateProceduralWalls() {
   for (let r = 52; r < half; r += 34) {
     const segments = Math.max(14, Math.round(10 + r / 9));
     for (let i = 0; i < segments; i++) {
-      if (Math.random() > 0.93) continue;
+      if (Math.random() > 0.96) continue;
       const angle = (i / segments) * Math.PI * 2 + (Math.random() - 0.5) * 0.55;
       const x = Math.cos(angle) * (r + (Math.random() - 0.5) * 16);
       const z = Math.sin(angle) * (r + (Math.random() - 0.5) * 16);
@@ -156,7 +156,7 @@ function generateProceduralWalls() {
   }
 
   for (let r = 68; r < half; r += 52) {
-    if (Math.random() > 0.94) continue;
+    if (Math.random() > 0.97) continue;
     const span = 14 + Math.random() * 18;
     walls.push({ x: 0, z: r, w: span, d: WALL_THICK });
     walls.push({ x: 0, z: -r, w: span, d: WALL_THICK });
@@ -167,7 +167,7 @@ function generateProceduralWalls() {
   const gridStep = 62;
   for (let gx = -half; gx <= half; gx += gridStep) {
     for (let gz = -half; gz <= half; gz += gridStep) {
-      if (Math.random() > 0.86) continue;
+      if (Math.random() > 0.93) continue;
       const x = gx + (Math.random() - 0.5) * gridStep * 0.65;
       const z = gz + (Math.random() - 0.5) * gridStep * 0.65;
       if (Math.hypot(x, z) < ARENA_SPAWN_PAD_RADIUS + 14) continue;
@@ -179,22 +179,6 @@ function generateProceduralWalls() {
       if (!wallClearOfSpawn(wall)) continue;
       walls.push(wall);
     }
-  }
-
-  // Extra clutter in the mid arena where most combat happens.
-  for (let i = 0; i < 72; i++) {
-    if (Math.random() > 0.90) continue;
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 38 + Math.random() * 95;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    const alongX = Math.random() < 0.5;
-    const len = 9 + Math.random() * 14;
-    const wall = alongX
-      ? { x, z, w: len, d: WALL_THICK }
-      : { x, z, w: WALL_THICK, d: len };
-    if (!wallClearOfSpawn(wall)) continue;
-    walls.push(wall);
   }
 
   return walls;
@@ -233,22 +217,22 @@ function generateProceduralMesas() {
 }
 
 function addMesaWallObstacles(mesa, obstacles) {
-  const { cx, cz, w, d, rampSide, rampLen } = mesa;
+  const { cx, cz, w, d, rampSide } = mesa;
   const hw = w / 2;
   const hd = d / 2;
   const t = WALL_THICK;
-
-  const zMin = rampSide === 'south' ? cz - hd - rampLen : cz - hd;
-  const zMax = rampSide === 'north' ? cz + hd + rampLen : cz + hd;
+  const plateauZMin = cz - hd;
+  const plateauZMax = cz + hd;
 
   if (rampSide !== 'west') {
     obstacles.push({
       type: 'mesa_wall',
       minX: cx - hw - t,
       maxX: cx - hw + t,
-      minZ: zMin,
-      maxZ: zMax,
+      minZ: plateauZMin,
+      maxZ: plateauZMax,
       blockBelowY: mesa.topY,
+      mesa,
     });
   }
   if (rampSide !== 'east') {
@@ -256,9 +240,10 @@ function addMesaWallObstacles(mesa, obstacles) {
       type: 'mesa_wall',
       minX: cx + hw - t,
       maxX: cx + hw + t,
-      minZ: zMin,
-      maxZ: zMax,
+      minZ: plateauZMin,
+      maxZ: plateauZMax,
       blockBelowY: mesa.topY,
+      mesa,
     });
   }
   if (rampSide !== 'north') {
@@ -269,6 +254,7 @@ function addMesaWallObstacles(mesa, obstacles) {
       minZ: cz + hd - t,
       maxZ: cz + hd + t,
       blockBelowY: mesa.topY,
+      mesa,
     });
   }
   if (rampSide !== 'south') {
@@ -279,6 +265,7 @@ function addMesaWallObstacles(mesa, obstacles) {
       minZ: cz - hd - t,
       maxZ: cz - hd + t,
       blockBelowY: mesa.topY,
+      mesa,
     });
   }
 }
@@ -496,6 +483,28 @@ function sampleMesaHeight(x, z, mesa) {
 
   if (inRamp) return topY * THREE.MathUtils.clamp(t, 0, 1);
   return 0;
+}
+
+/** True when (x, z) is on the walkable ramp slope (not plateau or flat ground). */
+export function isInsideMesaRamp(x, z, mesa) {
+  if (!mesa) return false;
+  const { cx, cz, w, d, rampSide, rampLen } = mesa;
+  const hw = w / 2;
+  const hd = d / 2;
+
+  if (rampSide === 'south') {
+    return x >= cx - hw && x <= cx + hw && z >= cz - hd - rampLen && z < cz - hd;
+  }
+  if (rampSide === 'north') {
+    return x >= cx - hw && x <= cx + hw && z > cz + hd && z <= cz + hd + rampLen;
+  }
+  if (rampSide === 'east') {
+    return z >= cz - hd && z <= cz + hd && x > cx + hw && x <= cx + hw + rampLen;
+  }
+  if (rampSide === 'west') {
+    return z >= cz - hd && z <= cz + hd && x >= cx - hw - rampLen && x < cx - hw;
+  }
+  return false;
 }
 
 /** True when (x, z) is on the flat mesa plateau (not the ramp or ground). */

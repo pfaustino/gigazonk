@@ -59,7 +59,7 @@ export class ParticleSystem {
 
     this.hpBarLayer = document.createElement('div');
     this.hpBarLayer.id = 'enemy-hp-bars';
-    this.hpBarLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:6;';
+    this.hpBarLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:20;';
     document.getElementById('ui-layer')?.appendChild(this.hpBarLayer);
     this.enemyHpBars = new Map();
     this._hpVec = new THREE.Vector3();
@@ -72,6 +72,9 @@ export class ParticleSystem {
     if (!layer) return;
     if (this.dmgLayer && !this.dmgLayer.isConnected) layer.appendChild(this.dmgLayer);
     if (this.hpBarLayer && !this.hpBarLayer.isConnected) layer.appendChild(this.hpBarLayer);
+    // Keep combat overlays above HUD siblings (DOM order + z-index).
+    if (this.hpBarLayer?.isConnected) layer.appendChild(this.hpBarLayer);
+    if (this.dmgLayer?.isConnected) layer.appendChild(this.dmgLayer);
   }
 
   reset() {

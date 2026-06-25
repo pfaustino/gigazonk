@@ -10,8 +10,12 @@ export class DevPanel {
     this.root = document.createElement('div');
     this.root.id = 'dev-panel';
     this.root.innerHTML = `
-      <button type="button" class="dev-panel-toggle" id="dev-toggle">DEV</button>
       <div class="dev-panel-body" id="dev-body" hidden>
+        <div class="dev-panel-header">
+          <span class="dev-panel-title">Dev tools</span>
+          <button type="button" class="dev-panel-close" id="dev-close" aria-label="Close dev panel">×</button>
+        </div>
+        <div class="dev-panel-scroll">
         <div class="dev-panel-row"><span>Seed</span><code id="dev-seed"></code></div>
         <div class="dev-panel-row"><span>RNG</span><code id="dev-rng"></code></div>
         <div class="dev-panel-actions">
@@ -59,21 +63,35 @@ export class DevPanel {
           <button type="button" data-cmd="exportErrors">Export errors</button>
         </div>
         <div class="dev-panel-biomes" id="dev-biomes"></div>
+        </div>
       </div>
+      <button type="button" class="dev-panel-toggle" id="dev-toggle">DEV</button>
     `;
     document.body.appendChild(this.root);
 
     this.toggle = this.root.querySelector('#dev-toggle');
     this.body = this.root.querySelector('#dev-body');
+    this.closeBtn = this.root.querySelector('#dev-close');
     this.seedEl = this.root.querySelector('#dev-seed');
     this.rngEl = this.root.querySelector('#dev-rng');
     this.biomesEl = this.root.querySelector('#dev-biomes');
+    this._open = false;
 
-    this.toggle.addEventListener('click', () => {
-      const open = this.body.hidden;
-      this.body.hidden = !open;
-      this.toggle.classList.toggle('open', open);
+    const setOpen = (open) => {
+      this._open = !!open;
+      this.body.hidden = !this._open;
+      this.toggle.classList.toggle('open', this._open);
+      this.root.classList.toggle('dev-panel-open', this._open);
+    };
+
+    this.toggle.addEventListener('click', () => setOpen(!this._open));
+    this.closeBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
     });
+
+    setOpen(false);
 
     this.root.querySelectorAll('.dev-panel-actions').forEach((group) => {
       group.addEventListener('click', (e) => {

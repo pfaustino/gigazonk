@@ -383,5 +383,26 @@
     "target": 3,
     "type": "shrines",
     "reward": 120
+  },
+  {
+    "id": "citizens_1",
+    "desc": "Rescue 1 citizen in distress",
+    "target": 1,
+    "type": "citizens",
+    "reward": 35
+  },
+  {
+    "id": "citizens_5",
+    "desc": "Rescue 5 citizens in a run",
+    "target": 5,
+    "type": "citizens",
+    "reward": 75
+  },
+  {
+    "id": "citizens_15",
+    "desc": "Rescue 15 citizens in a run",
+    "target": 15,
+    "type": "citizens",
+    "reward": 150
   }
 ]

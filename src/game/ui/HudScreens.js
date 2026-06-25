@@ -8,6 +8,7 @@ export function buildHUD(ui) {
   hud.id = 'hud';
   hud.className = 'hud';
   hud.innerHTML = `
+      <button type="button" class="mobile-pause-btn" id="btn-mobile-pause" aria-label="Game menu">☰</button>
       <div class="hud-left">
         <div class="stat-bar">
           <label>Health</label>
@@ -61,6 +62,7 @@ export function buildHUD(ui) {
   quests.innerHTML = '<h3>Quests</h3><div id="quest-list"></div>';
 
   hudRight.append(buffBar, quests);
+  ui._mountMetricsInHud(hudRight);
 
   const synergy = document.createElement('div');
   synergy.className = 'synergy-bar';

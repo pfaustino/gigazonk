@@ -28,6 +28,7 @@ import {
   getActiveVillagePerks,
 } from './VillagePerks.js';
 import { TouchControls } from './TouchControls.js';
+import { initMobileLayout, isMobilePerformanceTier } from '../lib/mobileLayout.js';
 import { checkRunAchievements } from './AchievementSystem.js';
 import { tryCompleteDailyChallenge, syncDailyChallengeDay } from './DailyChallenge.js';
 import {
@@ -98,7 +99,8 @@ export class Game {
     }
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const pixelCap = isMobilePerformanceTier() ? 1.5 : 2;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelCap));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -164,6 +166,8 @@ export class Game {
     this.combat = null;
     this.metrics = new GameMetrics();
     this.touchControls = new TouchControls(this.input);
+    this.ui.setMobilePauseHandler(() => this.openGameMenu());
+    initMobileLayout(() => this._syncTouchControls());
 
     this.timer = new THREE.Timer();
     this.timer.connect(document);
@@ -202,6 +206,12 @@ export class Game {
 
   _hasTouchInput() {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  }
+
+  _syncTouchControls() {
+    const inPlay = (this.state === 'arena' || this.state === 'village') && !this._gameOverActive;
+    const modalBlock = this.ui.isLevelUpOpen() || this.ui.gameMenu.isOpen();
+    this.touchControls.setVisible(inPlay && !modalBlock);
   }
 
   _isTutorialStepReady(step) {
@@ -463,6 +473,7 @@ export class Game {
   transitionTo(next) {
     this.state = next;
     this._applySceneMode(next);
+    this._syncTouchControls();
   }
 
   _scatterArenaInteractables() {
@@ -516,7 +527,6 @@ export class Game {
     saveData.save();
     this.transitionTo('village');
     this.hideCombat();
-    this.touchControls.setVisible(false);
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
     this.player.position.set(0, 0, 5);
@@ -533,6 +543,7 @@ export class Game {
   }
 
   startArena({ keepBiome = false, quickRetry = false, fromVillagePortal = false } = {}) {
+    this._gameOverActive = false;
     this._ensureCombatManagers();
     this._ensureArena();
     saveData.data.runSnapshot = null;
@@ -559,7 +570,6 @@ export class Game {
     }
     this._tutorialShownStep = getTutorialStepIndex() - 1;
     this._tryShowTutorial({ force: true });
-    this.touchControls.setVisible(true);
     this.audio.playMusic('arena');
   }
 
@@ -722,7 +732,6 @@ export class Game {
 
     this.transitionTo('village');
     this.hideCombat();
-    this.touchControls.setVisible(false);
     this.player.position.set(0, 0, 5);
     this.player.mesh.visible = true;
     this.cameraController.reset();
@@ -824,7 +833,6 @@ export class Game {
     this.cameraController.reset();
     this.restoreArenaFromSnapshot(snap);
     this.populateMesaEncounters();
-    this.touchControls.setVisible(true);
     this.audio.playMusic('arena');
   }
 
@@ -1337,10 +1345,12 @@ export class Game {
           this.modalPause = false;
           this.paused = false;
           this.pendingLevelUps = Math.max(0, this.pendingLevelUps - 1);
+          this._syncTouchControls();
           this.flushPendingLevelUp();
         }
       });
       if (!shown) return;
+      this._syncTouchControls();
       this.audio.levelUp();
       this.cameraController.addShake(0.32);
       this.applyHitStop(0.055);
@@ -1380,7 +1390,7 @@ export class Game {
     this.modalPause = true;
     this.paused = true;
     this.input.releaseCameraLook();
-    this.touchControls.setVisible(false);
+    this._syncTouchControls();
     this.ui.hideTutorial();
     const coins = this.bankRunCoins();
     saveData.data.runSnapshot = null;
@@ -1558,6 +1568,14 @@ export class Game {
     this.ui.toast(`Dev: +${amount} Zonk Coins`, 'synergy');
   }
 
+  devClearSkills() {
+    saveData.clearSkillLevels();
+    if (this.state === 'village') {
+      this.ui.showVillageHUD(saveData.data.zonkCoins, saveData.data.reputation);
+    }
+    this.ui.toast('Dev: skill tree cleared', 'synergy');
+  }
+
   devForceLevelUp() {
     if (this.state !== 'arena') return;
     const levels = this.player.addXp(this.player.xpToNext, { ignorePickupMult: true });
@@ -1644,7 +1662,6 @@ export class Game {
     this._charSelectOpen = false;
     this.ui.hideTutorial();
     this.returnToTitle();
-    this.touchControls.setVisible(false);
     this.ui.toast('Dev: tutorial reset — welcome step restored', 'synergy');
     queueMicrotask(() => this._tryShowTutorial({ force: true }));
   }

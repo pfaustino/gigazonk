@@ -57,7 +57,7 @@ export default defineConfig({
         {
           name: 'chromium',
           use: { ...devices['Desktop Chrome'] },
-          testMatch: ['smoke.spec.ts', 'tutorial.spec.ts'],
+          testMatch: ['smoke.spec.ts', 'tutorial.spec.ts', 'mobile-landscape.spec.ts'],
         },
       ],
   webServer: {

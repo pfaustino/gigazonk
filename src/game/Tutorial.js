@@ -25,7 +25,7 @@ export const TUTORIAL_STEPS = [
     phase: 'village',
     title: 'Game Menu',
     action: 'openMenu',
-    body: 'Press Esc (Start on gamepad) to open the menu — tweak settings, pause, or return to the title screen.',
+    body: 'Press Esc (Start on gamepad) or tap ☰ to open the menu — tweak settings, pause, or return to the title screen.',
   },
   {
     id: 'village_quests',
@@ -62,13 +62,13 @@ export const TUTORIAL_STEPS = [
     id: 'arena_menu',
     phase: 'arena',
     title: 'Pause Anytime',
-    body: 'Press Esc (Start on gamepad) mid-run for the game menu — pause, adjust settings, or retreat to Zonka Village.',
+    body: 'Press Esc (Start on gamepad) or tap ☰ mid-run for the game menu — pause, adjust settings, or retreat to Zonka Village.',
   },
   {
     id: 'touch',
     phase: 'arena',
     title: 'Touch Controls',
-    body: 'On mobile, use the left stick to move and the right buttons for dodge, jump, and interact.',
+    body: 'On mobile, use the left stick to move, the right buttons for dodge, jump, and interact. Drag the battlefield to orbit the camera; pinch to zoom.',
   },
   {
     id: 'dodge',

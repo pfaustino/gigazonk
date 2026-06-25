@@ -1,7 +1,10 @@
+import { prefersTouchControls } from '../lib/mobileLayout.js';
+
 /** On-screen touch controls for mobile / tablet play. */
 export class TouchControls {
   constructor(input) {
     this.input = input;
+    this._gameVisible = false;
     this.root = document.createElement('div');
     this.root.id = 'touch-controls';
     this.root.className = 'touch-controls hidden';
@@ -17,8 +20,8 @@ export class TouchControls {
             <div class="cooldown-hand" id="touch-dodge-cooldown-hand"></div>
           </div>
         </button>
-        <button type="button" class="touch-btn" data-action="jump" aria-label="Jump">Jump</button>
-        <button type="button" class="touch-btn" data-action="interact" aria-label="Interact">Use</button>
+        <button type="button" class="touch-btn" data-action="jump" id="touch-btn-jump" aria-label="Jump">Jump</button>
+        <button type="button" class="touch-btn" data-action="interact" id="touch-btn-interact" aria-label="Interact">Use</button>
       </div>
     `;
     document.body.appendChild(this.root);
@@ -27,19 +30,17 @@ export class TouchControls {
     this._moveVector = { x: 0, y: 0 };
     this._bindMoveStick();
     this._bindButtons();
-    this._detectTouchDevice();
+    this.refreshVisibility();
   }
 
-  _detectTouchDevice() {
-    const coarse = window.matchMedia('(pointer: coarse)').matches;
-    const narrow = window.matchMedia('(max-width: 900px)').matches;
-    if (coarse || narrow) this.root.classList.remove('hidden');
+  refreshVisibility() {
+    const show = this._gameVisible && prefersTouchControls();
+    this.root.classList.toggle('hidden', !show);
   }
 
   setVisible(visible) {
-    if (this.root.classList.contains('hidden') && !visible) return;
-    if (!this.root.classList.contains('hidden') && visible) return;
-    this.root.classList.toggle('hidden', !visible);
+    this._gameVisible = visible;
+    this.refreshVisibility();
   }
 
   _bindButtons() {
@@ -81,6 +82,25 @@ export class TouchControls {
       this._moveVector.x = 0;
       this._moveVector.y = 0;
       this.input.setTouchMove(0, 0);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+      window.removeEventListener('touchcancel', onEnd);
+    };
+
+    const onMove = (e) => {
+      if (touchId == null) return;
+      e.preventDefault();
+      for (const t of e.touches) {
+        if (t.identifier !== touchId) continue;
+        setKnob(t.clientX - originX, t.clientY - originY);
+        return;
+      }
+    };
+
+    const onEnd = (e) => {
+      for (const t of e.changedTouches) {
+        if (t.identifier === touchId) reset();
+      }
     };
 
     pad.addEventListener('touchstart', (e) => {
@@ -92,23 +112,11 @@ export class TouchControls {
       originX = rect.left + rect.width / 2;
       originY = rect.top + rect.height / 2;
       this._moveActive = true;
+      this.input.clearPointerButtons();
       setKnob(t.clientX - originX, t.clientY - originY);
+      window.addEventListener('touchmove', onMove, { passive: false });
+      window.addEventListener('touchend', onEnd);
+      window.addEventListener('touchcancel', onEnd);
     }, { passive: false });
-
-    pad.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      for (const t of e.changedTouches) {
-        if (t.identifier !== touchId) continue;
-        setKnob(t.clientX - originX, t.clientY - originY);
-      }
-    }, { passive: false });
-
-    const end = (e) => {
-      for (const t of e.changedTouches) {
-        if (t.identifier === touchId) reset();
-      }
-    };
-    pad.addEventListener('touchend', end);
-    pad.addEventListener('touchcancel', end);
   }
 }

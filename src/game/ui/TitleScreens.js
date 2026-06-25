@@ -28,9 +28,11 @@ export function showTitle(ui, onAction) {
       <div class="title-content">
         <h1>GigaZonk</h1>
         <p class="subtitle">Survive. Zonk. Ascend.</p>
-        <p class="menu-hint" style="margin-bottom:20px">${CONFIRM_HINT}</p>
-        <button class="btn btn-primary" id="btn-play">Play</button>
-        <button class="btn btn-secondary" id="btn-village">Enter Village</button>
+        <p class="menu-hint menu-hint-desktop" style="margin-bottom:20px">${CONFIRM_HINT}</p>
+        <div class="title-actions">
+          <button class="btn btn-primary" id="btn-play">Play</button>
+          <button class="btn btn-secondary" id="btn-village">Enter Village</button>
+        </div>
         <p class="title-stats">
           Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
         </p>
@@ -51,6 +53,7 @@ export function showCharacterSelect(ui, onSelect, onBack) {
   ui._navCleanup = null;
   ui.clear();
   const screen = createScreen(ui.layer);
+  screen.classList.add('char-select-screen');
   const cards = CHARACTERS.map(char => {
     const playable = char.playable !== false;
     const unlocked = playable && saveData.data.unlockedCharacters.includes(char.id);
@@ -70,12 +73,16 @@ export function showCharacterSelect(ui, onSelect, onBack) {
   }).join('');
 
   screen.innerHTML = `
-      <h2 style="color:#f7c948;margin-bottom:8px">Choose Your Zonker</h2>
-      <p style="color:#888;margin-bottom:8px">🪙 ${saveData.data.zonkCoins} Zonk Coins</p>
-      <p style="color:#666;font-size:12px;margin-bottom:16px">↑ ↓ ← → or WASD to select | ${CONFIRM_HINT}</p>
+      <div class="char-select-header">
+        <h2 class="char-select-heading">Choose Your Zonker</h2>
+        <p class="char-select-coins">🪙 ${saveData.data.zonkCoins} Zonk Coins</p>
+        <p class="menu-hint menu-hint-desktop char-select-hint">↑ ↓ ← → or WASD to select | ${CONFIRM_HINT}</p>
+      </div>
       <div class="char-grid">${cards}</div>
-      <button class="btn btn-primary" id="btn-confirm" style="margin-top:20px">Continue</button>
-      <button class="btn btn-secondary" id="btn-back">Back</button>
+      <div class="char-select-actions">
+        <button class="btn btn-primary" id="btn-confirm">Continue</button>
+        <button class="btn btn-secondary" id="btn-back">Back</button>
+      </div>
     `;
 
   const cardEls = [...screen.querySelectorAll('.char-card')];

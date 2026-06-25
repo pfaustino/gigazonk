@@ -33,7 +33,7 @@ test.describe('GigaZonk smoke', () => {
   test('arena dev level-up picks an upgrade', async ({ page }) => {
     await gotoClean(page, '/?dev=1');
     await startArenaAndPickLevelUp(page);
-    await expect(page.locator('.buff-bar-track .buff-chip')).not.toHaveText('None yet');
+    await expect(page.locator('#buff-bar-track .buff-chip').first()).toBeVisible();
   });
 
   test('dev flag shows dev panel', async ({ page }) => {

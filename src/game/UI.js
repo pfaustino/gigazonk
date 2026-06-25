@@ -49,7 +49,18 @@ export class UI {
     this._bossDefeatActive = false;
     this._deferredRewards = [];
     this._bossDefeatComplete = null;
+    this._onMobilePause = null;
     this._ensureMetricsOverlay();
+  }
+
+  setMobilePauseHandler(handler) {
+    this._onMobilePause = handler;
+  }
+
+  _bindMobilePauseButton() {
+    const btn = document.getElementById('btn-mobile-pause');
+    if (!btn) return;
+    btn.onclick = () => this._onMobilePause?.();
   }
 
   _ensureMetricsOverlay() {
@@ -67,6 +78,23 @@ export class UI {
     `;
     this.layer.appendChild(el);
     this._metricsEl = el;
+  }
+
+  /** Stack FPS panel above buffs in arena HUD (avoids top-right overlap). */
+  _mountMetricsInHud(hudRight) {
+    this._ensureMetricsOverlay();
+    if (this._metricsEl.parentElement !== hudRight) {
+      hudRight.prepend(this._metricsEl);
+    }
+    this._metricsEl.classList.add('game-metrics-in-hud');
+  }
+
+  _unmountMetricsToLayer() {
+    if (!this._metricsEl) return;
+    this._metricsEl.classList.remove('game-metrics-in-hud');
+    if (this._metricsEl.parentElement !== this.layer) {
+      this.layer.appendChild(this._metricsEl);
+    }
   }
 
   /** @param {{ visible?: boolean, fps?: number, frameMs?: number, combat?: boolean, enemies?: number, projectiles?: number, gems?: number }} m */
@@ -117,9 +145,12 @@ export class UI {
     this._navCleanup = null;
     document.getElementById('levelup-overlay')?.remove();
     this.layer?.querySelectorAll('.levelup-screen').forEach((s) => s.remove());
+    this.layer?.classList.remove('level-up-open');
+    document.body.classList.remove('level-up-open');
   }
 
   clear() {
+    this._unmountMetricsToLayer();
     const keep = new Set(['damage-numbers', 'enemy-hp-bars', 'game-metrics', 'tutorial-overlay']);
     for (const child of [...this.layer.children]) {
       if (keep.has(child.id)) continue;
@@ -223,6 +254,7 @@ export class UI {
 
   buildHUD() {
     renderHUD(this);
+    this._bindMobilePauseButton();
   }
 
   _rarityBadgeHTML(rarity) {
@@ -987,6 +1019,14 @@ export class UI {
     const nextLine = nextPerk
       ? `Next at ${nextPerk.minRep} rep: ${nextPerk.icon} ${nextPerk.name} — ${nextPerk.desc}`
       : 'All village blessings unlocked!';
+    const pauseBtn = document.createElement('button');
+    pauseBtn.type = 'button';
+    pauseBtn.className = 'mobile-pause-btn';
+    pauseBtn.id = 'btn-mobile-pause';
+    pauseBtn.setAttribute('aria-label', 'Game menu');
+    pauseBtn.textContent = '☰';
+    pauseBtn.onclick = () => this._onMobilePause?.();
+
     const hint = document.createElement('div');
     hint.className = 'controls-hint';
     hint.style.bottom = '60px';
@@ -995,13 +1035,14 @@ export class UI {
       <div>🪙 ${coins} Zonk Coins | ⭐ ${reputation} Reputation</div>
       ${perkLine ? `<div style="margin-top:6px;color:#a8ffcc;font-size:13px">Arena perks: ${perkLine}</div>` : ''}
       <div style="margin-top:6px;color:#888;font-size:12px">${nextLine}</div>
-      <div style="margin-top:8px">Walk to NPCs and press [F] to interact</div>
-      <div>WASD / Hold LMB Forward | RMB Drag Camera | [F] Interact | [Esc] Menu | Wheel zoom</div>
+      <div class="village-hint-desktop">Walk to NPCs and press [F] to interact</div>
+      <div class="village-hint-desktop">WASD / Hold LMB Forward | RMB Drag Camera | [F] Interact | [Esc] Menu | Wheel zoom</div>
+      <div class="village-hint-touch">Use the stick to move. Tap <strong>Use</strong> near NPCs. Drag the game view to orbit; pinch to zoom. ☰ opens the menu.</div>
     `;
     const prompt = document.createElement('div');
     prompt.className = 'interact-prompt hidden';
     prompt.id = 'interact-prompt';
-    this.layer.append(hint, prompt);
+    this.layer.append(pauseBtn, hint, prompt);
     setGameReady(GAME_READY.VILLAGE);
   }
 
@@ -1026,6 +1067,7 @@ export class UI {
   }
 
   removeScreens() {
+    this.layer?.classList.remove('run-summary-open');
     this.dismissLevelUp();
     this._navCleanup?.();
     this._navCleanup = null;

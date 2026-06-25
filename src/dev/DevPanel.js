@@ -51,7 +51,8 @@ export class DevPanel {
         </div>
         <div class="dev-panel-actions">
           <span class="dev-panel-section-label">Meta</span>
-          <button type="button" data-cmd="coins100">+100 coins</button>
+          <button type="button" data-cmd="coins10000">+10,000 coins</button>
+          <button type="button" data-cmd="clearskills">Clear skills</button>
           <button type="button" data-cmd="rep50">+50 rep</button>
           <button type="button" data-cmd="unlockchars">Unlock chars</button>
           <button type="button" data-cmd="resettutorial">Reset tutorial</button>
@@ -155,8 +156,11 @@ export class DevPanel {
       case 'clear':
         this.game.devClearHorde();
         break;
-      case 'coins100':
-        this.game.devAddMetaCoins(100);
+      case 'coins10000':
+        this.game.devAddMetaCoins(10000);
+        break;
+      case 'clearskills':
+        this.game.devClearSkills();
         break;
       case 'level':
         this.game.devForceLevelUp();

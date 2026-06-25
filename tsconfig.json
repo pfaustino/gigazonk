@@ -20,7 +20,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "maxNodeModuleJsDepth": 0
   },
-  "include": ["src", "e2e", "playwright.config.ts"]
+  "include": ["src", "e2e", "playwright.config.ts"],
+  "exclude": ["node_modules", "dist", "tests"]
 }

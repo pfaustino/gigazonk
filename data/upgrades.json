@@ -375,7 +375,7 @@
       "icon": "🌀",
       "baseEffect": {
         "magnetRadius": 2.5,
-        "magnetCooldownMult": -0.22
+        "pickupMult": 0.12
       },
       "rarities": [
         "epic",
@@ -488,7 +488,7 @@
     },
     {
       "id": "lightning",
-      "name": "Lightning Orb",
+      "name": "Chain Lightning",
       "icon": "⚡",
       "baseEffect": {
         "element": "lightning",

@@ -35,7 +35,6 @@ const EFFECT_TAG_MAP = {
   explodeChance: 'Procs',
   pickupMult: 'Utility',
   magnetRadius: 'Utility',
-  magnetCooldownMult: 'Utility',
   coinMult: 'Utility',
   runXpMult: 'Utility',
   killXpMult: 'Utility',

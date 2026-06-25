@@ -1,4 +1,30 @@
-import { CRIT_CHANCE_CAP } from './constants.js';
+import { CRIT_CHANCE_CAP, SYNERGY_NAME } from './constants.js';
+
+/** Short gameplay blurbs for elemental level-up offers and HUD tooltips. */
+export const ELEMENT_OFFER_INFO = {
+  fire: {
+    name: 'Fire',
+    onHit: '3s burn',
+    shotLine: 'Some attacks ignite foes',
+  },
+  ice: {
+    name: 'Ice',
+    onHit: '2s slow',
+    shotLine: 'Some attacks chill foes',
+  },
+  lightning: {
+    name: 'Lightning',
+    onHit: 'chains to nearby foes',
+    shotLine: 'Some attacks arc between enemies',
+  },
+};
+
+export function formatElementOfferDesc(effect) {
+  const info = ELEMENT_OFFER_INFO[effect.element];
+  if (!info) return `${effect.element} element`;
+  const chainLine = effect.lightningChains ? ` +${effect.lightningChains} extra chain jumps` : '';
+  return `${info.shotLine} (${info.onHit}${chainLine}). Adds ${info.name} to your shot pool — collect all three for ${SYNERGY_NAME}.`;
+}
 
 /** Human-readable description for a scaled upgrade effect (level-up cards, tooltips). */
 export function formatOfferDesc(template, effect) {
@@ -42,9 +68,7 @@ export function formatOfferDesc(template, effect) {
   if (effect.pierce) return 'Projectiles penetrate +1 enemy';
   if (effect.doubleJump) return `+${effect.doubleJump} air jump`;
   if (effect.familiars) return `+${effect.familiars} orbiting familiar`;
-  if (effect.element) {
-    return `${effect.element.charAt(0).toUpperCase() + effect.element.slice(1)} element${effect.lightningChains ? `, +${effect.lightningChains} chain jumps` : ''}`;
-  }
+  if (effect.element) return formatElementOfferDesc(effect);
   if (effect.magnetRadius) return `+${effect.magnetRadius.toFixed(1)} magnet radius`;
   if (effect.fireTrail) return `Drop burning oil (+${effect.fireTrail} trail level)`;
   return template.name;

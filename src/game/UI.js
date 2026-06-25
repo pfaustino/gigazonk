@@ -1,5 +1,6 @@
-import { QUESTS, SYNERGY_ELEMENTS } from './constants.js';
+import { QUESTS, SYNERGY_ELEMENTS, DODGE_COOLDOWN_SECONDS, BOSS_DEFEAT_BANNER_MS } from './constants.js';
 import { saveData } from './SaveData.js';
+import { getActiveVillagePerks, getNextVillagePerk, formatVillagePerksHud } from './VillagePerks.js';
 import {
   SKILL_BRANCHES,
   SKILL_MAX_LEVEL,
@@ -43,7 +44,23 @@ export class UI {
     this._runAlertTimer = null;
     this._damageFlashTimer = null;
     this._bossIntroTimer = null;
+    this._bossDefeatTimer = null;
+    this._bossVictoryFlashTimer = null;
+    this._bossDefeatActive = false;
+    this._deferredRewards = [];
+    this._bossDefeatComplete = null;
+    this._onMobilePause = null;
     this._ensureMetricsOverlay();
+  }
+
+  setMobilePauseHandler(handler) {
+    this._onMobilePause = handler;
+  }
+
+  _bindMobilePauseButton() {
+    const btn = document.getElementById('btn-mobile-pause');
+    if (!btn) return;
+    btn.onclick = () => this._onMobilePause?.();
   }
 
   _ensureMetricsOverlay() {
@@ -61,6 +78,23 @@ export class UI {
     `;
     this.layer.appendChild(el);
     this._metricsEl = el;
+  }
+
+  /** Stack FPS panel above buffs in arena HUD (avoids top-right overlap). */
+  _mountMetricsInHud(hudRight) {
+    this._ensureMetricsOverlay();
+    if (this._metricsEl.parentElement !== hudRight) {
+      hudRight.prepend(this._metricsEl);
+    }
+    this._metricsEl.classList.add('game-metrics-in-hud');
+  }
+
+  _unmountMetricsToLayer() {
+    if (!this._metricsEl) return;
+    this._metricsEl.classList.remove('game-metrics-in-hud');
+    if (this._metricsEl.parentElement !== this.layer) {
+      this.layer.appendChild(this._metricsEl);
+    }
   }
 
   /** @param {{ visible?: boolean, fps?: number, frameMs?: number, combat?: boolean, enemies?: number, projectiles?: number, gems?: number }} m */
@@ -111,11 +145,15 @@ export class UI {
     this._navCleanup = null;
     document.getElementById('levelup-overlay')?.remove();
     this.layer?.querySelectorAll('.levelup-screen').forEach((s) => s.remove());
+    this.layer?.classList.remove('level-up-open');
+    document.body.classList.remove('level-up-open');
   }
 
   clear() {
+    this._unmountMetricsToLayer();
+    const keep = new Set(['damage-numbers', 'enemy-hp-bars', 'game-metrics', 'tutorial-overlay']);
     for (const child of [...this.layer.children]) {
-      if (child.id === 'damage-numbers' || child.id === 'enemy-hp-bars' || child.id === 'game-metrics') continue;
+      if (keep.has(child.id)) continue;
       child.remove();
     }
   }
@@ -216,6 +254,7 @@ export class UI {
 
   buildHUD() {
     renderHUD(this);
+    this._bindMobilePauseButton();
   }
 
   _rarityBadgeHTML(rarity) {
@@ -257,7 +296,24 @@ export class UI {
     `;
   }
 
-  pushReward({ icon, name, stats = [], rarity = null, buffTargets = null, player = null }) {
+  isBossDefeatShowing() {
+    return this._bossDefeatActive;
+  }
+
+  pushReward(opts) {
+    if (this._bossDefeatActive) {
+      this._deferredRewards.push(opts);
+      return;
+    }
+    this._pushRewardNow(opts);
+  }
+
+  _flushDeferredRewards() {
+    const pending = this._deferredRewards.splice(0);
+    for (const opts of pending) this._pushRewardNow(opts);
+  }
+
+  _pushRewardNow({ icon, name, stats = [], rarity = null, buffTargets = null, player = null }) {
     if (player) this.renderBuffBar(player);
 
     const track = document.getElementById('reward-strip-track');
@@ -468,7 +524,45 @@ export class UI {
     });
 
     this.renderBuffBar(player);
+    this.updateAbilityCooldowns(player);
     this.updateLowHpVignette(player.hp / player.maxHp);
+  }
+
+  updateAbilityCooldowns(player) {
+    const slot = document.getElementById('ability-dodge');
+    if (!slot) return;
+
+    const remaining = Math.max(0, player.dodgeCooldown);
+    const ratio = Math.min(1, remaining / DODGE_COOLDOWN_SECONDS);
+    const ready = remaining <= 0.05;
+    const deg = ratio * 360;
+
+    slot.classList.toggle('ability-ready', ready);
+    slot.classList.toggle('ability-cooldown', !ready);
+
+    this._applyCooldownRadar({
+      ready,
+      deg,
+      radar: document.getElementById('dodge-cooldown-radar'),
+      sweep: document.getElementById('dodge-cooldown-sweep'),
+      hand: document.getElementById('dodge-cooldown-hand'),
+    });
+    this._applyCooldownRadar({
+      ready,
+      deg,
+      radar: document.getElementById('touch-dodge-cooldown-radar'),
+      sweep: document.getElementById('touch-dodge-cooldown-sweep'),
+      hand: document.getElementById('touch-dodge-cooldown-hand'),
+    });
+
+    const touchBtn = document.getElementById('touch-btn-dodge');
+    if (touchBtn) touchBtn.classList.toggle('on-cooldown', !ready);
+  }
+
+  _applyCooldownRadar({ ready, deg, radar, sweep, hand }) {
+    if (radar) radar.classList.toggle('hidden', ready);
+    if (sweep) sweep.style.setProperty('--cd-deg', `${deg}deg`);
+    if (hand) hand.style.transform = `rotate(${deg}deg)`;
   }
 
   flashDamage(amount = 1, maxHp = 100) {
@@ -728,6 +822,38 @@ export class UI {
     }, durationMs);
   }
 
+  showBossDefeat(bossCount = 1, durationMs = BOSS_DEFEAT_BANNER_MS, onComplete) {
+    const el = document.getElementById('boss-defeat');
+    if (!el) return;
+    const sub = el.querySelector('.boss-defeat-sub');
+    if (sub) sub.textContent = `#${bossCount} · Treasure dropped`;
+    if (this._bossDefeatTimer) clearTimeout(this._bossDefeatTimer);
+    this._bossDefeatActive = true;
+    this._bossDefeatComplete = onComplete ?? null;
+    el.classList.remove('hidden');
+    this._bossDefeatTimer = setTimeout(() => {
+      el.classList.add('hidden');
+      this._bossDefeatActive = false;
+      this._bossDefeatTimer = null;
+      this._flushDeferredRewards();
+      this._bossDefeatComplete?.();
+      this._bossDefeatComplete = null;
+    }, durationMs);
+  }
+
+  flashBossVictory() {
+    const el = document.getElementById('boss-victory-flash');
+    if (!el) return;
+    el.classList.remove('active');
+    void el.offsetWidth;
+    el.classList.add('active');
+    if (this._bossVictoryFlashTimer) clearTimeout(this._bossVictoryFlashTimer);
+    this._bossVictoryFlashTimer = setTimeout(() => {
+      el.classList.remove('active');
+      this._bossVictoryFlashTimer = null;
+    }, 700);
+  }
+
   toast(msg, type = '') {
     const container = document.getElementById('toasts');
     if (!container) return;
@@ -887,19 +1013,36 @@ export class UI {
 
   showVillageHUD(coins, reputation) {
     this.clear();
+    const activePerks = getActiveVillagePerks(reputation);
+    const nextPerk = getNextVillagePerk(reputation);
+    const perkLine = formatVillagePerksHud(activePerks);
+    const nextLine = nextPerk
+      ? `Next at ${nextPerk.minRep} rep: ${nextPerk.icon} ${nextPerk.name} — ${nextPerk.desc}`
+      : 'All village blessings unlocked!';
+    const pauseBtn = document.createElement('button');
+    pauseBtn.type = 'button';
+    pauseBtn.className = 'mobile-pause-btn';
+    pauseBtn.id = 'btn-mobile-pause';
+    pauseBtn.setAttribute('aria-label', 'Game menu');
+    pauseBtn.textContent = '☰';
+    pauseBtn.onclick = () => this._onMobilePause?.();
+
     const hint = document.createElement('div');
     hint.className = 'controls-hint';
     hint.style.bottom = '60px';
     hint.innerHTML = `
       <div style="font-size:16px;color:#f7c948;margin-bottom:8px">🏘️ Zonka Village</div>
       <div>🪙 ${coins} Zonk Coins | ⭐ ${reputation} Reputation</div>
-      <div style="margin-top:8px">Walk to NPCs and press [F] to interact</div>
-      <div>WASD / Hold LMB Forward | RMB Drag Camera | [F] Interact | [Esc] Menu | Wheel zoom</div>
+      ${perkLine ? `<div style="margin-top:6px;color:#a8ffcc;font-size:13px">Arena perks: ${perkLine}</div>` : ''}
+      <div style="margin-top:6px;color:#888;font-size:12px">${nextLine}</div>
+      <div class="village-hint-desktop">Walk to NPCs and press [F] to interact</div>
+      <div class="village-hint-desktop">WASD / Hold LMB Forward | RMB Drag Camera | [F] Interact | [Esc] Menu | Wheel zoom</div>
+      <div class="village-hint-touch">Use the stick to move. Tap <strong>Use</strong> near NPCs. Drag the game view to orbit; pinch to zoom. ☰ opens the menu.</div>
     `;
     const prompt = document.createElement('div');
     prompt.className = 'interact-prompt hidden';
     prompt.id = 'interact-prompt';
-    this.layer.append(hint, prompt);
+    this.layer.append(pauseBtn, hint, prompt);
     setGameReady(GAME_READY.VILLAGE);
   }
 
@@ -924,6 +1067,7 @@ export class UI {
   }
 
   removeScreens() {
+    this.layer?.classList.remove('run-summary-open');
     this.dismissLevelUp();
     this._navCleanup?.();
     this._navCleanup = null;

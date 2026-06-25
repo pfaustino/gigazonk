@@ -140,6 +140,11 @@ export class SaveData {
     return this.data.skillLevels[id] ?? 0;
   }
 
+  clearSkillLevels() {
+    this.data.skillLevels = {};
+    this.save();
+  }
+
   applySkillUpgrade(skillId) {
     const skill = getSkillById(skillId);
     if (!skill) return false;

@@ -136,7 +136,7 @@ export class CombatController {
     }
   }
 
-  _resolveBossKill(killResult, enemy, element) {
+  _resolveBossKill(killResult, enemy, _element) {
     const g = this.game;
     g.player.addKill();
     const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
@@ -155,23 +155,27 @@ export class CombatController {
     g.quests.track('kills');
     g.quests.track('bosses');
     g._runBosses++;
+
+    const killY = killResult.pos.y ?? 1.2;
+    const { x, z } = killResult.pos;
+
     if (enemy?.isMesaGuardian) {
       g.quests.track('guardians');
       g.interactables.removeMesaBeaconForGuardian(enemy);
-    }
-    g.interactables.spawnChest(killResult.pos.x, killResult.pos.z, killResult.pos.y);
-    g.audio.bossChest();
-    g.ui.toast('Boss defeated! Treasure chest dropped!', 'synergy');
-    g.cameraController.addShake(0.35);
-    const color = element === 'fire' ? 0xff6644 : element === 'ice' ? 0x88ccff : element === 'lightning' ? 0xffff44 : 0xf7c948;
-    if (this._killBurstsThisFrame < 4) {
-      g.particles.burst(killResult.pos.x, killResult.pos.z, color, 8);
-      g.particles.burst(killResult.pos.x, killResult.pos.z, 0xf7c948, 10);
-      this._killBurstsThisFrame += 2;
-    }
-    if (!this._frameKillSound) {
-      g.audio.kill();
-      this._frameKillSound = true;
+      const surfaceY = enemy.mesa?.topY ?? killY;
+      g.interactables.spawnMesaCache(x, z, surfaceY);
+      g.audio.mesaTreasureBurstSfx();
+      g.cameraController.addShake(0.42);
+      g.particles.treasureBurstAt(x, surfaceY + 0.35, z);
+      g.ui.toast('Guardian defeated! Mesa treasure unlocked!', 'synergy');
+    } else {
+      g.interactables.spawnChest(x, z, killY);
+      g.ui.showBossDefeat(g._runBosses, undefined, () => g.flushPendingLevelUp());
+      g.ui.flashBossVictory();
+      g.audio.bossKillFanfare();
+      g.applyHitStop(0.14);
+      g.cameraController.addShake(0.72);
+      g.particles.bossDeathBurstAt(x, killY, z);
     }
   }
 

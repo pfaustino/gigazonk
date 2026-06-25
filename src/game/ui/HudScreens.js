@@ -1,4 +1,5 @@
 import { SYNERGY_ELEMENTS } from '../constants.js';
+import { ELEMENT_OFFER_INFO } from '../UpgradeText.js';
 import { setGameReady, GAME_READY } from '../../lib/gameReady.js';
 
 /** Build arena HUD DOM (bars, quests, buff track, synergy, prompts). */
@@ -7,6 +8,7 @@ export function buildHUD(ui) {
   hud.id = 'hud';
   hud.className = 'hud';
   hud.innerHTML = `
+      <button type="button" class="mobile-pause-btn" id="btn-mobile-pause" aria-label="Game menu">☰</button>
       <div class="hud-left">
         <div class="stat-bar">
           <label>Health</label>
@@ -19,6 +21,16 @@ export function buildHUD(ui) {
         <div class="stat-bar">
           <label>Combo</label>
           <div class="bar-track"><div class="bar-fill combo" id="combo-bar"></div></div>
+        </div>
+        <div class="ability-bar" id="ability-bar" aria-label="Abilities">
+          <div class="ability-slot ability-ready" id="ability-dodge" title="Dodge roll — Q or LB (2s cooldown)">
+            <span class="ability-icon" aria-hidden="true">💨</span>
+            <span class="ability-key">Q</span>
+            <div class="cooldown-radar hidden" id="dodge-cooldown-radar" aria-hidden="true">
+              <div class="cooldown-sweep" id="dodge-cooldown-sweep"></div>
+              <div class="cooldown-hand" id="dodge-cooldown-hand"></div>
+            </div>
+          </div>
         </div>
         <div class="hud-stat" id="level-stat">Level 1</div>
         <div class="hud-stat" id="run-coins-stat" style="color:#f7c948">Run 🪙 0</div>
@@ -50,6 +62,7 @@ export function buildHUD(ui) {
   quests.innerHTML = '<h3>Quests</h3><div id="quest-list"></div>';
 
   hudRight.append(buffBar, quests);
+  ui._mountMetricsInHud(hudRight);
 
   const synergy = document.createElement('div');
   synergy.className = 'synergy-bar';
@@ -59,6 +72,8 @@ export function buildHUD(ui) {
     slot.className = 'synergy-slot';
     slot.id = `syn-${e}`;
     slot.textContent = e === 'fire' ? '🔥' : e === 'ice' ? '❄️' : '⚡';
+    const tip = ELEMENT_OFFER_INFO[e];
+    if (tip) slot.title = `${tip.name}: ${tip.onHit} on hit when this element fires`;
     synergy.appendChild(slot);
   });
 
@@ -113,5 +128,22 @@ export function buildHUD(ui) {
     <span class="boss-intro-sub">#1</span>
   `;
   ui.layer.append(bossIntro);
+
+  const bossDefeat = document.createElement('div');
+  bossDefeat.className = 'boss-defeat hidden';
+  bossDefeat.id = 'boss-defeat';
+  bossDefeat.setAttribute('aria-live', 'assertive');
+  bossDefeat.innerHTML = `
+    <span class="boss-defeat-title">ZONK LORD SLAIN</span>
+    <span class="boss-defeat-sub">Treasure dropped</span>
+  `;
+  ui.layer.append(bossDefeat);
+
+  const bossVictoryFlash = document.createElement('div');
+  bossVictoryFlash.id = 'boss-victory-flash';
+  bossVictoryFlash.className = 'boss-victory-flash';
+  bossVictoryFlash.setAttribute('aria-hidden', 'true');
+  ui.layer.append(bossVictoryFlash);
+
   setGameReady(GAME_READY.ARENA_HUD);
 }

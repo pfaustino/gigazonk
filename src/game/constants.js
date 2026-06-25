@@ -36,6 +36,76 @@ export const ARENA_INTERACTABLE_COUNT = Math.max(
 export const ARENA_SHRINE_RADIUS = ARENA_SIZE * 0.38;
 export const VILLAGE_SIZE = 80;
 
+/** Keep NPCs, portal path, and spawn hub unobstructed (world XZ). */
+export const VILLAGE_CLEAR_ZONES = [
+  { x: 0, z: 20, r: 12 },
+  { x: 0, z: 6, r: 7 },
+  { x: -15, z: -10, r: 5.5 },
+  { x: 15, z: -10, r: 5.5 },
+  { x: -12, z: 12, r: 5.5 },
+  { x: 12, z: 12, r: 5.5 },
+  { x: -8, z: 0, r: 4.5 },
+  { x: 8, z: -5, r: 4.5 },
+  { x: 0, z: -18, r: 5.5 },
+];
+
+/** Fixed home slots — west/east rows, never on the north path to the portal. */
+export const VILLAGE_BUILDING_SLOTS = [
+  [-24, -14], [-24, -6], [-24, 2],
+  [24, -14], [24, -6], [24, 2],
+  [-18, -20], [18, -20],
+  [-14, -24], [14, -24],
+  [-20, 6], [20, 6],
+];
+
+/** Reputation unlocks — bonus applied at each arena run start (stacks). */
+export const VILLAGE_REP_PERKS = [
+  {
+    minRep: 10,
+    id: 'well',
+    icon: '💧',
+    name: 'Zonk Well',
+    desc: '+8% max HP this run',
+    maxHpMult: 0.08,
+  },
+  {
+    minRep: 25,
+    id: 'merchant',
+    icon: '🛒',
+    name: 'Bonk Merchant',
+    desc: '+25 run coins at arena start',
+    runCoins: 25,
+  },
+  {
+    minRep: 30,
+    id: 'banner',
+    icon: '🏆',
+    name: 'Victory Banner',
+    desc: '+12% pickup radius',
+    pickupMult: 0.12,
+  },
+  {
+    minRep: 50,
+    id: 'shrine',
+    icon: '🛕',
+    name: 'Ascension Shrine',
+    desc: '+10% XP this run',
+    xpMult: 0.1,
+  },
+  {
+    minRep: 75,
+    id: 'tower',
+    icon: '🗼',
+    name: 'Watch Tower',
+    desc: '+15% damage vs bosses',
+    bossDamageMult: 0.15,
+  },
+];
+
+/** Active quest board contracts — small combat bump when you leave with 2+ quests. */
+export const VILLAGE_QUEST_RALLY_MIN = 2;
+export const VILLAGE_QUEST_RALLY_DAMAGE = 0.05;
+
 export const PLAYER_BASE = {
   speed: 5.5,
   defaultFriction: 30,
@@ -80,6 +150,12 @@ export const ENEMY_MESH_LIFT = 0.9;
 export const ENEMY_FACE_SWAY_DEG = 8;
 /** Sway cycle speed (radians per second of phase). */
 export const ENEMY_FACE_SWAY_SPEED = 2.4;
+/** Mouth sprite row advances per second (5-row sheet, ping-pong chew). */
+export const ENEMY_MOUTH_CHEW_FPS = 10;
+/** Extra distance beyond contact collider before switching to scream row. */
+export const ENEMY_MOUTH_SCREAM_PAD = 1.5;
+/** Scream mouth after taking damage (seconds). */
+export const ENEMY_MOUTH_SCREAM_HIT_SEC = 0.45;
 
 export function getEnemyHpBarWorldY(enemy) {
   const surfaceY = enemy.groundY ?? enemy.feetY ?? 0;
@@ -126,7 +202,12 @@ export const MAX_GEMS = 1200;
 export const GIGA_SPAWN_INTERVAL = 180;
 export const BOSS_SPAWN_INTERVAL = 120;
 export const BOSS_TELEGRAPH_SECONDS = 3;
+/** Boss kill banner — keep visible before level-up / loot reward UI. */
+export const BOSS_DEFEAT_BANNER_MS = 4800;
 export const HIT_STOP_CRIT_SECONDS = 0.045;
+/** Seconds before dodge (Q / LB) can be used again. */
+export const DODGE_COOLDOWN_SECONDS = 2;
+export const DODGE_DURATION_SECONDS = 0.25;
 export const BASE_SPAWN_GROUP_SIZE = 3;
 export const GROUP_CLUSTER_RADIUS = 4.5;
 export const MAX_SPAWN_GROUP_SIZE = 7;

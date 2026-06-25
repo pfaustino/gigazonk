@@ -49,6 +49,8 @@ export function bindGridNavigation(ctx, {
   onFocusChange = null,
   onConfirm,
   onCancel = null,
+  /** When false, mouse hover only moves the focus ring — not onFocusChange (e.g. char pick). */
+  selectionOnMouseFocus = true,
 }) {
   if (!cards.length) return () => {};
 
@@ -56,9 +58,9 @@ export function bindGridNavigation(ctx, {
   const unguardClicks = guardPointerClicks(cards, pointer);
   let index = Math.min(initialIndex, cards.length - 1);
 
-  const updateFocus = () => {
+  const updateFocus = (triggerFocusChange = true) => {
     cards.forEach((card, i) => card.classList.toggle(focusClass, i === index));
-    onFocusChange?.(index, cards[index]);
+    if (triggerFocusChange) onFocusChange?.(index, cards[index]);
   };
 
   const onKeyDown = (e) => {
@@ -95,7 +97,7 @@ export function bindGridNavigation(ctx, {
     pointer.onKeyboardUse();
     if (index !== prev) {
       ctx.audio?.ui();
-      updateFocus();
+      updateFocus(true);
     }
   };
 
@@ -103,11 +105,11 @@ export function bindGridNavigation(ctx, {
     card.addEventListener('mouseenter', () => {
       if (!pointer.allowMouseNav()) return;
       index = i;
-      updateFocus();
+      updateFocus(selectionOnMouseFocus);
     });
   });
 
-  updateFocus();
+  updateFocus(false);
   window.addEventListener('keydown', onKeyDown);
   return () => {
     window.removeEventListener('keydown', onKeyDown);

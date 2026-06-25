@@ -76,14 +76,14 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "typescript.preferences.importModuleSpecifier": "relative",
-  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
   "javascript.suggest.paths": false,
   "typescript.suggest.paths": false,
 
   // ── Vitest (unit only — e2e stays in Playwright sidebar) ────────────────
   "vitest.enable": true,
   "vitest.shellType": "child_process",
-  "vitest.rootConfig": "vitest.config.js",
+  "vitest.rootConfig": "vitest.config.ts",
   "vitest.commandLine": "npx vitest",
   "vitest.exclude": [
     "**/node_modules/**",

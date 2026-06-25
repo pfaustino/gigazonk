@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP, XP_LEVEL_BASE, XP_LEVEL_GROWTH, XP_PICKUP_MULT } from './constants.js';
+import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP, XP_LEVEL_BASE, XP_LEVEL_GROWTH, XP_PICKUP_MULT, DODGE_COOLDOWN_SECONDS, DODGE_DURATION_SECONDS } from './constants.js';
 import { saveData } from './SaveData.js';
 import { applySkillBonusesToPlayer } from './SkillTree.js';
 import { buildPlayerVisual } from './EntityVisuals.js';
@@ -82,8 +82,6 @@ export class Player {
     if (char.startElement) this.elements.add(char.startElement);
     this.lightningChains = 3;
     this.attackTimer = 0;
-    this.magnetCooldown = 0;
-    this.magnetActive = false;
     this.dodgeCooldown = 0;
     this.dodging = false;
     this.dodgeTimer = 0;
@@ -231,13 +229,26 @@ export class Player {
       this.invincible = Math.max(this.invincible, this.dodgeTimer);
       if (this.dodgeTimer <= 0) this.dodging = false;
     } else {
-      if (input.wasPressed('KeyQ') && this.dodgeCooldown <= 0 && hasInput) {
-        this.dodging = true;
-        this.dodgeTimer = 0.25;
-        this.dodgeCooldown = 2;
-        this.dodgeDir = { x: move.x, z: move.z };
-        this.invincible = 0.25;
-        this._onDodge?.();
+      if (input.wasPressed('KeyQ') && this.dodgeCooldown <= 0) {
+        let dx = hasInput ? move.x : input.getLastMoveDir().x;
+        let dz = hasInput ? move.z : input.getLastMoveDir().z;
+        if (!hasInput && (dx !== 0 || dz !== 0)) {
+          const cos = Math.cos(cameraYaw);
+          const sin = Math.sin(cameraYaw);
+          const rx = dx * cos + dz * sin;
+          const rz = -dx * sin + dz * cos;
+          dx = rx;
+          dz = rz;
+        }
+        const len = Math.hypot(dx, dz);
+        if (len > 0.01) {
+          this.dodging = true;
+          this.dodgeTimer = DODGE_DURATION_SECONDS;
+          this.dodgeCooldown = DODGE_COOLDOWN_SECONDS;
+          this.dodgeDir = { x: dx / len, z: dz / len };
+          this.invincible = DODGE_DURATION_SECONDS;
+          this._onDodge?.();
+        }
       }
 
       if (this.knockbackTimer > 0) {
@@ -542,7 +553,6 @@ export class Player {
     if (e.healOnKill) this.healOnKill += mul(e.healOnKill);
     if (e.projectileSpeedMult) this.projectileSpeedMult += mul(e.projectileSpeedMult);
     if (e.magnetRadius) this.magnetRadius += mul(e.magnetRadius);
-    if (e.magnetCooldownMult) this.magnetCooldownMult += e.magnetCooldownMult;
     if (e.fireTrail) this.fireTrailLevel += mul(e.fireTrail);
     if (e.damagePerKill) this.damagePerKill += mul(e.damagePerKill);
     if (e.upgradeBoost) this.upgradeBoost += e.upgradeBoost;

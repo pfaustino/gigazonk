@@ -15,6 +15,9 @@ import {
   ENEMY_MESH_LIFT,
   ENEMY_FACE_SWAY_DEG,
   ENEMY_FACE_SWAY_SPEED,
+  ENEMY_MOUTH_CHEW_FPS,
+  ENEMY_MOUTH_SCREAM_PAD,
+  ENEMY_MOUTH_SCREAM_HIT_SEC,
   ENEMY_SEPARATION_SCALE,
   ENEMY_SEPARATION_QUERY,
   ENEMY_SEPARATION_STRENGTH,
@@ -32,11 +35,14 @@ import { assert } from '../lib/assert.js';
 import {
   ENEMY_MESH_CAPS,
   ENEMY_EYE_STYLES,
-  buildEnemyBodyGeometry,
+  buildEnemyBodyWithMouthGeometry,
   buildEnemyEyeGeometry,
   createEnemyMaterial,
   createEnemyEyeMaterial,
+  createEnemyMouthMaterial,
   enemyMeshKey,
+  mouthColumnForColor,
+  mouthFrameForTime,
 } from './EntityVisuals.js';
 import { isOnMesaPlateau } from './TerrainFeatures.js';
 
@@ -65,21 +71,26 @@ export class EnemyManager {
     this._faceX = 0;
     this._faceZ = 1;
     this._swayPhase = 0;
+    this._mouthTime = 0;
 
     for (const type of Object.keys(ENEMY_TYPES)) {
       const cap = ENEMY_MESH_CAPS[type] || 100;
       const perStyle = Math.max(1, Math.ceil(cap / ENEMY_EYE_STYLES.length));
       for (const eyeStyle of ENEMY_EYE_STYLES) {
         const key = enemyMeshKey(type, eyeStyle);
-        const bodyGeo = buildEnemyBodyGeometry(type);
-        const mat = createEnemyMaterial();
-        const mesh = new THREE.InstancedMesh(bodyGeo, mat, perStyle);
+        const { geometry: bodyGeo, mouthAttrs } = buildEnemyBodyWithMouthGeometry(type, perStyle);
+        const mesh = new THREE.InstancedMesh(
+          bodyGeo,
+          [createEnemyMaterial(), createEnemyMouthMaterial()],
+          perStyle,
+        );
         mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         mesh.frustumCulled = false;
         mesh.castShadow = true;
         mesh.count = 0;
         mesh.userData.enemyType = type;
         mesh.userData.eyeStyle = eyeStyle;
+        mesh.userData.mouthAttrs = mouthAttrs;
         scene.add(mesh);
         this.meshes[key] = mesh;
 
@@ -128,6 +139,7 @@ export class EnemyManager {
     this._threatDmg = 10;
     this.lastGroupAnchor = null;
     this._swayPhase = 0;
+    this._mouthTime = 0;
     this._dirtyMeshes.clear();
     for (const key of Object.keys(this.meshes)) {
       const cap = this._meshCaps[key];
@@ -156,6 +168,11 @@ export class EnemyManager {
     for (const mesh of this._dirtyMeshes) {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      const attrs = mesh.userData.mouthAttrs;
+      if (attrs) {
+        attrs.col.needsUpdate = true;
+        attrs.frame.needsUpdate = true;
+      }
     }
     this._dirtyMeshes.clear();
   }
@@ -189,6 +206,7 @@ export class EnemyManager {
     const maxHp = Math.max(1, threatDmg * hits * hpMult);
     const slot = pool.pop();
     assert(slot !== undefined && slot >= 0, 'ENEMY_SLOT_INVALID');
+    const color = type === 'grunt' ? pickGruntColor() : def.color;
     const enemy = {
       slot,
       type,
@@ -199,7 +217,8 @@ export class EnemyManager {
       speed: def.speed * speedMult,
       damage: def.damage * hpMult,
       xp: def.xp,
-      color: type === 'grunt' ? pickGruntColor() : def.color,
+      color,
+      mouthCol: mouthColumnForColor(color),
       scale: def.scale,
       slowTimer: 0,
       burnTimer: 0,
@@ -224,6 +243,7 @@ export class EnemyManager {
   updateInstance(enemy) {
     const mesh = this._meshFor(enemy);
     const eyeMesh = this._eyeMeshFor(enemy);
+    const mouthAttrs = mesh.userData.mouthAttrs;
     dummy.position.set(0, 0, 0);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);
@@ -241,6 +261,20 @@ export class EnemyManager {
         const swayMax = ENEMY_FACE_SWAY_DEG * (Math.PI / 180);
         const sway = Math.sin(this._swayPhase + enemy.slot * 0.61) * swayMax;
         dummy.rotation.y = baseYaw + sway;
+      }
+      if (mouthAttrs) {
+        const pdx = this._faceX - enemy.x;
+        const pdz = this._faceZ - enemy.z;
+        const playerDist = Math.hypot(pdx, pdz);
+        const biteDist = 0.8 + enemy.scale * 0.4 + ENEMY_MOUTH_SCREAM_PAD;
+        const scream = (enemy.mouthScreamTimer ?? 0) > 0 || playerDist < biteDist;
+        mouthAttrs.col.array[enemy.slot] = enemy.mouthCol ?? 0;
+        mouthAttrs.frame.array[enemy.slot] = mouthFrameForTime(
+          this._mouthTime,
+          enemy.slot,
+          ENEMY_MOUTH_CHEW_FPS,
+          { scream },
+        );
       }
     }
     dummy.updateMatrix();
@@ -470,6 +504,7 @@ export class EnemyManager {
     this._faceX = playerPos.x;
     this._faceZ = playerPos.z;
     this._swayPhase += dt * ENEMY_FACE_SWAY_SPEED;
+    this._mouthTime += dt;
     this._cullDistant(playerPos);
 
     for (const e of this.enemies) {
@@ -482,6 +517,7 @@ export class EnemyManager {
         if (e.hp <= 0) { this.killEnemy(e); continue; }
       }
       if (e.slowTimer > 0) e.slowTimer -= dt;
+      if (e.mouthScreamTimer > 0) e.mouthScreamTimer -= dt;
 
       const slowMult = e.slowTimer > 0 ? 0.5 : 1;
       const dx = playerPos.x - e.x;
@@ -590,6 +626,7 @@ export class EnemyManager {
     const showHpBar = enemy.isBoss || enemy.type === 'elite' || this.count < ENEMY_HP_BAR_HORDE_LIMIT;
     if (showHpBar) enemy.hpBarVisible = true;
     enemy.hp -= amount;
+    enemy.mouthScreamTimer = ENEMY_MOUTH_SCREAM_HIT_SEC;
     if (element === 'fire') enemy.burnTimer = 3;
     if (element === 'ice') enemy.slowTimer = 2;
     if (element === 'lightning') enemy.slowTimer = Math.max(enemy.slowTimer, 0.45);

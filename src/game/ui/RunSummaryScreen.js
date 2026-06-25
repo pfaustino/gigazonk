@@ -29,6 +29,8 @@ export function showRunSummary(ui, stats, onAction) {
     ? `<p class="run-summary-daily">Daily challenge complete! +${stats.dailyBonus}🪙</p>`
     : '';
 
+  ui.layer.classList.add('run-summary-open');
+
   const unlockedCount = saveData.data.unlockedAchievements.length;
 
   const title = stats.deathCause ? 'You Died' : 'Run Complete';
@@ -51,14 +53,23 @@ export function showRunSummary(ui, stats, onAction) {
     <div class="run-summary-build"><h3>Your build</h3><div class="run-summary-buffs">${buffs}</div></div>
     ${achievements ? `<div class="run-summary-new"><h3>New achievements</h3>${achievements}</div>` : ''}
     ${dailyLine}
-    <p class="menu-hint run-summary-hint">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
-    <button class="btn btn-primary" id="btn-retry">Try Again</button>
-    <button class="btn btn-secondary" id="btn-village">Return to Village</button>
+    <p class="menu-hint menu-hint-desktop run-summary-hint">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
+    <div class="run-summary-actions">
+      <button class="btn btn-primary" id="btn-retry">Try Again</button>
+      <button class="btn btn-secondary" id="btn-village">Return to Village</button>
+    </div>
   `;
+
+  const closeSummary = (action) => {
+    ui.layer.classList.remove('run-summary-open');
+    ui._navCleanup?.();
+    ui._navCleanup = null;
+    onAction(action);
+  };
 
   const retry = screen.querySelector('#btn-retry');
   const village = screen.querySelector('#btn-village');
-  retry.onclick = () => { ui._navCleanup?.(); ui._navCleanup = null; onAction('retry'); };
-  village.onclick = () => { ui._navCleanup?.(); ui._navCleanup = null; onAction('village'); };
+  retry.onclick = () => { ui._audio?.ui(); closeSummary('retry'); };
+  village.onclick = () => { ui._audio?.ui(); closeSummary('village'); };
   ui._navCleanup = bindMenuList([retry, village]);
 }

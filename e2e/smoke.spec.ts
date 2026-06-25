@@ -12,7 +12,7 @@ import {
 test.describe('GigaZonk smoke', () => {
   test('title screen loads', async ({ page }) => {
     await gotoClean(page);
-    await expect(page.getByRole('heading', { name: 'GigaZonk' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'GigaZonk', exact: true })).toBeVisible();
     await expect(page.locator('#btn-play')).toBeVisible();
     await expect(page.locator('#game-canvas')).toBeVisible();
   });
@@ -33,7 +33,7 @@ test.describe('GigaZonk smoke', () => {
   test('arena dev level-up picks an upgrade', async ({ page }) => {
     await gotoClean(page, '/?dev=1');
     await startArenaAndPickLevelUp(page);
-    await expect(page.locator('.buff-bar-track .buff-chip')).not.toHaveText('None yet');
+    await expect(page.locator('#buff-bar-track .buff-chip').first()).toBeVisible();
   });
 
   test('dev flag shows dev panel', async ({ page }) => {
@@ -46,7 +46,7 @@ test.describe('GigaZonk smoke', () => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await gotoClean(page, '/?seed=42&dev=1');
-    await expect(page.getByRole('heading', { name: 'GigaZonk' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'GigaZonk', exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 

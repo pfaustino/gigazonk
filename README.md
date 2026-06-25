@@ -20,8 +20,8 @@ npm run deploy
 |-----|--------|
 | WASD / Arrows | Move |
 | Shift | Sprint |
-| Q | Dodge roll (i-frames) |
-| Space | Magnet Pulse (pull XP gems) |
+| Q | Dodge roll (brief invulnerability) |
+| Space | Jump (brief invulnerability in the air) |
 | F | Interact (chests, pots, NPCs, shrines) |
 | Esc | Pause / Menu |
 
@@ -53,7 +53,7 @@ Each arena run randomizes the biome: Zonk Meadows, Bonk Wastes, Frost Zonk, or M
 | **Tri-Zonk Nova** | Collect Fire + Ice + Lightning elements to unleash a massive AoE every 10s |
 | **Ascension Shrines** | Sacrifice 15% HP for permanent run buffs (damage + attack speed) |
 | **Combo Meter** | Kill streaks boost damage up to 2× |
-| **Magnet Pulse** | Active ability on cooldown to vacuum XP gems |
+| **XP Magnet** | Passive gem pull radius; upgrades and loot increase reach |
 | **Village Growth** | Reputation unlocks more buildings in Zonka Village |
 | **Day/Night Cycle** | Nights are darker and enemies hit harder |
 | **Zonk Lords** | Mini-bosses spawn every 2 minutes |

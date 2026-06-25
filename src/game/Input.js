@@ -1,9 +1,23 @@
+import { prefersTouchControls } from '../lib/mobileLayout.js';
+
 const DEADZONE = 0.18;
 const TRIGGER_ON = 0.45;
 const LOOK_SENS = 9;
 const MENU_STICK_THRESHOLD = 0.38;
 const MENU_REPEAT_DELAY = 0.32;
 const MENU_REPEAT_RATE = 0.09;
+
+/** Screen-space move direction for each movement key (matches getMoveVector). */
+const MOVE_KEY_DIRS = {
+  KeyW: { x: 0, z: -1 },
+  ArrowUp: { x: 0, z: -1 },
+  KeyS: { x: 0, z: 1 },
+  ArrowDown: { x: 0, z: 1 },
+  KeyA: { x: -1, z: 0 },
+  ArrowLeft: { x: -1, z: 0 },
+  KeyD: { x: 1, z: 0 },
+  ArrowRight: { x: 1, z: 0 },
+};
 
 export class Input {
   constructor(canvas) {
@@ -24,8 +38,12 @@ export class Input {
     };
     this._stickMove = { x: 0, z: 0 };
     this._touchMove = { x: 0, z: 0 };
+    /** Last movement input direction (WASD / stick) for dodge-without-hold. */
+    this._lastMoveDir = { x: 0, z: -1 };
     this._gpPrev = null;
     this._menuStickTimers = { up: 0, down: 0, left: 0, right: 0 };
+    this._touchCamera = { activeId: null, lastX: 0, lastY: 0, pinchDist: null };
+    this._bindTouchCamera(canvas);
 
     const blockMenu = (e) => {
       e.preventDefault();
@@ -87,6 +105,11 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (!this.keys[e.code]) this.justPressed[e.code] = true;
       this.keys[e.code] = true;
+      const keyDir = MOVE_KEY_DIRS[e.code];
+      if (keyDir) {
+        this._lastMoveDir.x = keyDir.x;
+        this._lastMoveDir.z = keyDir.z;
+      }
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
@@ -106,6 +129,7 @@ export class Input {
       this._touchMove.z = 0;
       this._gpPrev = null;
       this._menuStickTimers = { up: 0, down: 0, left: 0, right: 0 };
+      this._resetTouchCamera();
       this.releaseCameraLook();
     });
 
@@ -127,6 +151,16 @@ export class Input {
       this.pointer.wheel += e.deltaY;
       e.preventDefault();
     }, { passive: false });
+
+    window.addEventListener('touchstart', () => {
+      if (!prefersTouchControls()) return;
+      this.clearPointerButtons();
+    }, { passive: true });
+  }
+
+  clearPointerButtons() {
+    this.pointer.left = false;
+    this.pointer.right = false;
   }
 
   setGameplayEnabled(enabled) {
@@ -136,6 +170,7 @@ export class Input {
       this._stickMove.z = 0;
       this._touchMove.x = 0;
       this._touchMove.z = 0;
+      this._resetTouchCamera();
       this.keys.KeyF = false;
       this.keys.Space = false;
       this.keys.KeyQ = false;
@@ -163,17 +198,106 @@ export class Input {
 
   setCameraLookAllowed(allowed) {
     this.cameraLookAllowed = allowed;
-    if (!allowed) this.releaseCameraLook();
+    if (!allowed) {
+      this._resetTouchCamera();
+      this.releaseCameraLook();
+    }
+  }
+
+  _resetTouchCamera() {
+    this._touchCamera.activeId = null;
+    this._touchCamera.pinchDist = null;
+  }
+
+  _bindTouchCamera(canvas) {
+    const PINCH_ZOOM = 0.35;
+    const touchDist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const canUse = () => prefersTouchControls()
+      && this.cameraLookAllowed
+      && this.gameplayEnabled;
+
+    const onTouchStart = (e) => {
+      if (!canUse()) return;
+      if (e.target !== canvas) return;
+
+      if (e.touches.length >= 2) {
+        this._touchCamera.activeId = null;
+        this._touchCamera.pinchDist = touchDist(e.touches[0], e.touches[1]);
+        e.preventDefault();
+        return;
+      }
+
+      const t = e.changedTouches[0];
+      if (!t) return;
+      this._touchCamera.activeId = t.identifier;
+      this._touchCamera.lastX = t.clientX;
+      this._touchCamera.lastY = t.clientY;
+      this._touchCamera.pinchDist = null;
+      e.preventDefault();
+    };
+
+    const onTouchMove = (e) => {
+      if (!canUse()) return;
+
+      if (e.touches.length >= 2 && this._touchCamera.pinchDist != null) {
+        const dist = touchDist(e.touches[0], e.touches[1]);
+        const delta = dist - this._touchCamera.pinchDist;
+        this._touchCamera.pinchDist = dist;
+        this.pointer.wheel -= delta * PINCH_ZOOM;
+        e.preventDefault();
+        return;
+      }
+
+      const id = this._touchCamera.activeId;
+      if (id == null) return;
+      for (const t of e.touches) {
+        if (t.identifier !== id) continue;
+        this.pointer.deltaX += t.clientX - this._touchCamera.lastX;
+        this.pointer.deltaY += t.clientY - this._touchCamera.lastY;
+        this._touchCamera.lastX = t.clientX;
+        this._touchCamera.lastY = t.clientY;
+        e.preventDefault();
+        return;
+      }
+    };
+
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) this._touchCamera.pinchDist = null;
+      for (const t of e.changedTouches) {
+        if (t.identifier === this._touchCamera.activeId) {
+          this._touchCamera.activeId = null;
+        }
+      }
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
   }
 
   setTouchMove(x, z) {
     this._touchMove.x = x;
     this._touchMove.z = z;
+    if (Math.hypot(x, z) > 0.01) this._rememberMoveDir(x, z);
+  }
+
+  _rememberMoveDir(x, z) {
+    const len = Math.hypot(x, z);
+    if (len < 0.01) return;
+    this._lastMoveDir.x = x / len;
+    this._lastMoveDir.z = z / len;
+  }
+
+  /** Last pressed movement direction (WASD / stick), before camera rotation. */
+  getLastMoveDir() {
+    return { x: this._lastMoveDir.x, z: this._lastMoveDir.z };
   }
 
   touchTap(action) {
     if (action === 'dodge') this.justPressed.KeyQ = true;
-    if (action === 'magnet') this.justPressed.Space = true;
+    if (action === 'jump') this.justPressed.Space = true;
     if (action === 'interact') this.justPressed.KeyF = true;
   }
 
@@ -185,6 +309,7 @@ export class Input {
   }
 
   isLmbForward() {
+    if (prefersTouchControls()) return false;
     return this.pointer.left;
   }
 
@@ -198,16 +323,16 @@ export class Input {
 
     const gx = this._stickMove.x;
     const gz = this._stickMove.z;
-    if (gx !== 0 || gz !== 0) {
-      x += gx;
-      z += gz;
-    }
-
     const tx = this._touchMove.x;
     const tz = this._touchMove.z;
-    if (tx !== 0 || tz !== 0) {
+    const touchActive = Math.hypot(tx, tz) > 0.01;
+
+    if (touchActive) {
       x += tx;
       z += tz;
+    } else if (gx !== 0 || gz !== 0) {
+      x += gx;
+      z += gz;
     }
 
     const len = Math.hypot(x, z);
@@ -241,11 +366,12 @@ export class Input {
     const prev = this._gpPrev ?? {};
     const frameScale = LOOK_SENS * dt * 60;
 
-    if (this.gameplayEnabled) {
+    if (this.gameplayEnabled && !prefersTouchControls()) {
       const lx = this._axis(pad.axes[0]);
       const ly = this._axis(pad.axes[1]);
       this._stickMove.x = lx;
       this._stickMove.z = ly;
+      if (Math.hypot(lx, ly) > DEADZONE) this._rememberMoveDir(lx, ly);
 
       const rx = this._axis(pad.axes[2]);
       const ry = this._axis(pad.axes[3]);
@@ -262,6 +388,9 @@ export class Input {
       if (cur.dpadDown && !prev.dpadDown) this.pointer.wheel += 120;
 
       if (cur.start && !prev.start) this._emitKey('Escape');
+    } else if (this.gameplayEnabled && prefersTouchControls()) {
+      this._stickMove.x = 0;
+      this._stickMove.z = 0;
     } else {
       this._stickMove.x = 0;
       this._stickMove.z = 0;

@@ -56,7 +56,15 @@ describe('Tutorial', () => {
     const coach = TUTORIAL_STEPS.find((s) => s.id === 'village_skills');
     expect(coach?.title).toBe('Coach Zonk');
     expect(coach?.action).toBe('talkTrainer');
-    expect(TUTORIAL_STEPS.length).toBe(17);
+    expect(TUTORIAL_STEPS.length).toBe(18);
+  });
+
+  it('includes citizen rescue arena step after interact', () => {
+    const ids = TUTORIAL_STEPS.map((s) => s.id);
+    const interactIdx = ids.indexOf('interact');
+    const citizenIdx = ids.indexOf('citizen_rescue');
+    expect(citizenIdx).toBe(interactIdx + 1);
+    expect(TUTORIAL_STEPS[citizenIdx]?.title).toBe('Rescue Citizens');
   });
 
   it('maps phases to game states', () => {

@@ -27,6 +27,7 @@ export class QuestSystem {
       coins: 0,
       combo: 0,
       shrines: 0,
+      citizens: 0,
     };
   }
 

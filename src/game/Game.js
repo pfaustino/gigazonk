@@ -14,7 +14,7 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY } from './constants.js';
+import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -48,6 +48,7 @@ import {
   restoreArenaFromSnapshot as applyRunSnapshot,
 } from './RunSnapshot.js';
 import { CombatController } from './CombatController.js';
+import { CitizenRescue } from './CitizenRescue.js';
 
 export class Game {
   constructor(canvas) {
@@ -193,6 +194,7 @@ export class Game {
       dodge: false,
       jump: false,
       interact: false,
+      citizenRescue: false,
       levelup: false,
       rift: false,
       boss: false,
@@ -242,8 +244,10 @@ export class Game {
         return f.dodge;
       case 'interact':
         return f.jump;
-      case 'levelup':
+      case 'citizen_rescue':
         return f.interact;
+      case 'levelup':
+        return f.citizenRescue;
       case 'rift':
         return f.levelup && f.rift;
       case 'boss':
@@ -286,6 +290,7 @@ export class Game {
 
     this._tutorialShownStep = idx;
     this.ui.showTutorial(() => {
+      if (step.id === 'citizen_rescue') this._tutorialFlags.citizenRescue = true;
       advanceTutorialStep();
       queueMicrotask(() => this._tryShowTutorial({ force: true }));
     });
@@ -306,6 +311,8 @@ export class Game {
     this.synergy = new SynergyNova(this.scene);
     this.particles = new ParticleSystem(this.scene);
     this.combat = new CombatController(this);
+    this.citizenRescue = new CitizenRescue(this.scene);
+    this.citizenRescue.onRescued = (citizen) => this._onCitizenRescued(citizen);
     this.synergy.onNova = () => {
       this._runNova = true;
       saveData.recordRunStats({ novaTriggered: true });
@@ -326,9 +333,20 @@ export class Game {
   }
 
   _populateArenaField(showToast = false) {
+    this._ensureCombatManagers();
+    if (this.state !== 'arena' || !this.arena) return;
+
     this.interactables.scatterField(ARENA_SIZE, ARENA_INTERACTABLE_COUNT, this.arena);
     this.interactables.spawnVillagePortal(0, 0);
+    const citizens = this.citizenRescue.scatter(this.arena, CITIZEN_RESCUE_COUNT);
     this.populateMesaEncounters(showToast);
+    if (showToast) {
+      queueMicrotask(() => {
+        if (citizens > 0) {
+          this.ui.toast(`${citizens} citizens in distress nearby — look for orange beacons! Press F to rescue.`, 'synergy');
+        }
+      });
+    }
   }
 
   _deferArenaFieldSetup(showToast = false) {
@@ -434,6 +452,7 @@ export class Game {
       this.projectiles,
       this.gems,
       this.interactables,
+      this.citizenRescue,
       this.familiars,
       this.fireTrail,
       this.zonkDomes,
@@ -618,6 +637,7 @@ export class Game {
     this._runMaxCombo = 0;
     this._runNova = false;
     this._wasInRift = false;
+    this._citizenRespawnTimer = 0;
     this._tutorialMoveDist = 0;
     this._tutorialFlags = this._initTutorialFlags();
     this._hitStopTimer = 0;
@@ -747,6 +767,7 @@ export class Game {
   }
 
   resumeArenaRun() {
+    this._ensureCombatManagers();
     this._ensureArena();
     const snap = saveData.data.runSnapshot;
     if (!snap?.pausedInVillage) return;
@@ -943,6 +964,43 @@ export class Game {
       this._floatHealAcc = 0;
       this._floatHealTimer = 0.22;
     }
+  }
+
+  _onCitizenRescued(citizen) {
+    this.runCoins += CITIZEN_RESCUE_COINS;
+    this.quests.track('citizens');
+    this._tutorialFlags.citizenRescue = true;
+    this._tryShowTutorial();
+    const levelsGained = this.player.addXp(CITIZEN_RESCUE_XP);
+    this.audio.citizenTeleportSfx();
+    this.particles.burst(citizen.x, citizen.z, citizen.color ?? 0x6b4fd4, 16);
+    this.cameraController.addShake(0.1);
+    const remaining = this.citizenRescue.aliveCount;
+    const left = remaining > 0 ? ` (${remaining} left)` : ' — all safe!';
+    this.ui.toast(`Citizen rescued! +${CITIZEN_RESCUE_COINS} coins${left}`, 'synergy');
+    if (levelsGained > 0) this.queueLevelUp(levelsGained);
+  }
+
+  _pickArenaInteractTarget(px, pz) {
+    const nearCitizen = this.citizenRescue.getNearest(px, pz);
+    const nearItem = this.interactables.getNearest(px, pz);
+    if (nearCitizen && nearItem) {
+      const cDist = Math.hypot(nearCitizen.x - px, nearCitizen.z - pz);
+      const iDist = Math.hypot(nearItem.x - px, nearItem.z - pz);
+      if (cDist <= iDist) return { kind: 'citizen', target: nearCitizen };
+      return { kind: 'item', target: nearItem };
+    }
+    if (nearCitizen) return { kind: 'citizen', target: nearCitizen };
+    if (nearItem) return { kind: 'item', target: nearItem };
+    return null;
+  }
+
+  _interactPromptLabel(target, kind) {
+    if (kind === 'citizen') return '[F] Rescue Citizen';
+    if (target.type === 'chest') return '[F] Open Chest';
+    if (target.type === 'mesa_cache') return '[F] Claim Mesa Treasure';
+    if (target.type === 'village_portal') return '[F] Return to Village (bank coins)';
+    return '[F] Ascension Shrine';
   }
 
   _getInteractCallbacks() {
@@ -1143,25 +1201,39 @@ export class Game {
     }
 
     this.interactables.update(dt, this.player.position.x, this.player.position.z);
+    this.citizenRescue.update(dt, this.player.position.x, this.player.position.z);
+    if (this.citizenRescue.citizens.length === 0) {
+      this._citizenRespawnTimer += dt;
+      if (this._citizenRespawnTimer >= CITIZEN_RESCUE_RESPAWN_SEC) {
+        this._citizenRespawnTimer = 0;
+        if (this.citizenRescue.spawnOne(this.arena)) {
+          this.ui.toast('A citizen in distress appeared — follow the orange beacon!', 'synergy');
+        }
+      }
+    } else {
+      this._citizenRespawnTimer = 0;
+    }
     if (!this.paused) {
       const autoPot = this.interactables.getNearestPot(this.player.position.x, this.player.position.z);
       if (autoPot) {
         this._handleInteractResult(this.interactables.interact(autoPot, this.player, this._getInteractCallbacks()));
       }
     }
-    const nearItem = this.interactables.getNearest(this.player.position.x, this.player.position.z);
-    if (!this.paused && nearItem) {
-      const label = nearItem.type === 'chest' ? '[F] Open Chest' :
-        nearItem.type === 'mesa_cache' ? '[F] Claim Mesa Treasure' :
-        nearItem.type === 'village_portal' ? '[F] Return to Village (bank coins)' :
-        '[F] Ascension Shrine';
-      this.ui.showInteractPrompt(true, label);
+    const px = this.player.position.x;
+    const pz = this.player.position.z;
+    const interact = this._pickArenaInteractTarget(px, pz);
+    if (!this.paused && interact) {
+      this.ui.showInteractPrompt(true, this._interactPromptLabel(interact.target, interact.kind));
       if (this.input.wasPressed('KeyF')) {
-        if (nearItem.type === 'village_portal') {
+        if (interact.kind === 'citizen') {
+          if (this.citizenRescue.startRescue(interact.target)) {
+            this.audio.ui();
+          }
+        } else if (interact.target.type === 'village_portal') {
           this.audio.ui();
           this.leaveArenaForVillage();
         } else {
-          this._handleInteractResult(this.interactables.interact(nearItem, this.player, this._getInteractCallbacks()));
+          this._handleInteractResult(this.interactables.interact(interact.target, this.player, this._getInteractCallbacks()));
         }
       }
     } else {
@@ -1208,6 +1280,11 @@ export class Game {
         biome: this.currentBiome?.name,
         night: nightFactor > 0.5,
         runCoins: this.runCoins,
+        citizensAlive: this.citizenRescue?.aliveCount ?? 0,
+        nearestCitizenDist: this.citizenRescue?.getNearestDist(
+          this.player.position.x,
+          this.player.position.z
+        ),
       }
     );
   }

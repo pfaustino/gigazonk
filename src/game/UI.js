@@ -63,6 +63,30 @@ export class UI {
     btn.onclick = () => this._onMobilePause?.();
   }
 
+  _bindHudMobileTabs() {
+    const tabs = document.getElementById('hud-mobile-tabs');
+    const body = document.getElementById('hud-panel-body');
+    if (!tabs || !body || tabs.dataset.bound) return;
+    tabs.dataset.bound = '1';
+
+    const activate = (tab) => {
+      if (!tab || body.classList.contains(`tab-${tab}`)) return;
+      body.classList.remove('tab-buffs', 'tab-quests');
+      body.classList.add(`tab-${tab}`);
+      for (const el of tabs.querySelectorAll('.hud-mobile-tab')) {
+        const active = el.dataset.hudTab === tab;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-selected', active ? 'true' : 'false');
+      }
+    };
+
+    tabs.addEventListener('click', (e) => {
+      const btn = e.target.closest('.hud-mobile-tab');
+      if (!btn) return;
+      activate(btn.dataset.hudTab);
+    });
+  }
+
   _ensureMetricsOverlay() {
     if (this._metricsEl) return;
     const el = document.createElement('div');
@@ -276,6 +300,17 @@ export class UI {
     `).join('');
   }
 
+  _getRewardStripLayout() {
+    const el = document.getElementById('reward-strip') || document.body;
+    const style = getComputedStyle(el);
+    const tileSize = parseFloat(style.getPropertyValue('--reward-tile-size')) || 76;
+    const showcaseScale = parseFloat(style.getPropertyValue('--reward-showcase-scale')) || 2.35;
+    const showcaseBottom = parseFloat(style.getPropertyValue('--reward-showcase-bottom')) || 118;
+    const padLeft = parseFloat(style.getPropertyValue('--reward-strip-pad-left')) || 16;
+    const padRight = parseFloat(style.getPropertyValue('--reward-strip-pad-right')) || 16;
+    return { tileSize, showcaseScale, showcaseBottom, padLeft, padRight };
+  }
+
   _rewardTileHTML(reward, index, total, { hidden = false, large = false } = {}) {
     const age = total - 1 - index;
     const scale = Math.max(0.52, 1 - age * 0.065);
@@ -382,12 +417,12 @@ export class UI {
     flyer.innerHTML = target.innerHTML;
     this.layer.appendChild(flyer);
 
-    const tileSize = 76;
-    const startScale = 2.35;
+    const { tileSize, showcaseScale, showcaseBottom, padLeft, padRight } = this._getRewardStripLayout();
+    const startScale = showcaseScale;
     const startW = tileSize * startScale;
     const startH = tileSize * startScale;
-    const centerX = window.innerWidth * 0.5;
-    const centerY = window.innerHeight - 118;
+    const centerX = padLeft + (window.innerWidth - padLeft - padRight) * 0.5;
+    const centerY = window.innerHeight - showcaseBottom;
     const centerLeft = centerX - startW / 2;
     const centerTop = centerY - startH / 2;
 
@@ -505,6 +540,19 @@ export class UI {
     const night = extras.night ? ' 🌙' : '';
     document.getElementById('time-stat').textContent = `${mins}:${secs.toString().padStart(2, '0')}${inRift ? ' ⚡RIFT' : ''}${night}`;
     document.getElementById('enemy-stat').textContent = `Enemies: ${enemyCount}`;
+
+    const citizenEl = document.getElementById('citizen-stat');
+    if (citizenEl) {
+      const alive = extras.citizensAlive ?? 0;
+      if (alive > 0) {
+        citizenEl.style.display = '';
+        const dist = extras.nearestCitizenDist;
+        const distHint = dist != null ? ` · nearest ${Math.round(dist)}m` : '';
+        citizenEl.textContent = `🆘 Citizens: ${alive}${distHint}`;
+      } else {
+        citizenEl.style.display = 'none';
+      }
+    }
 
     const waveEl = document.getElementById('wave-stat');
     if (waveEl) waveEl.textContent = `Wave ${extras.wave || 1}`;
@@ -667,6 +715,17 @@ export class UI {
       const rect = chip.getBoundingClientRect();
       tip.style.left = `${rect.left + rect.width / 2}px`;
       tip.style.top = `${rect.bottom + 6}px`;
+      tip.style.transform = 'translateX(-50%)';
+      const tipRect = tip.getBoundingClientRect();
+      const margin = 10;
+      let shiftX = 0;
+      if (tipRect.left < margin) shiftX = margin - tipRect.left;
+      else if (tipRect.right > window.innerWidth - margin) {
+        shiftX = (window.innerWidth - margin) - tipRect.right;
+      }
+      if (shiftX !== 0) {
+        tip.style.transform = `translateX(calc(-50% + ${shiftX}px))`;
+      }
     });
 
     buffBar.addEventListener('mouseleave', () => {

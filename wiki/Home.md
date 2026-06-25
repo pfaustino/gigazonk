@@ -166,7 +166,7 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 | `Awards.js` → `UpgradeOffers.js` + `upgradeStatSchema.js` | `UpgradeOffers.js`, `tests/upgradeOffers.test.js` |
 | IDE workflow (extensions, MCP, clean terminal) | `.vscode/`, `.cursor/mcp.json`, `scripts/run-playwright.mjs` |
 
-**Deferred (next phase):** `playwright-three` scene specs, full mobile playtest pass.
+**Deferred (next phase):** `playwright-three` scene specs, device farm mobile QA beyond Playwright landscape emulation.
 
 ### Phase D (ship plan) — implemented
 
@@ -180,6 +180,8 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 | Reputation arena perks (stack at run start) | `VillagePerks.js`, `constants.js` `VILLAGE_REP_PERKS` |
 | Biome-weighted enemy spawns (`frostling`, `ember`) | `EnemyManager.js`, `data/enemies.json` |
 | Touch controls overlay | `TouchControls.js`, `Input.js` |
+| Citizens in distress (arena rescue) | `CitizenRescue.js`, `Game.js` |
+| Mobile landscape layout + canvas camera orbit | `lib/mobileLayout.js`, `TouchControls.js`, `Input.js`, `style.css` |
 | Defer combat managers until arena/village enter | `Game.js` `_ensureCombatManagers()` |
 | Skill tree / quest board / pause-resume e2e | `e2e/smoke.spec.ts`, `window.__gigazonkGame` dev hook |
 

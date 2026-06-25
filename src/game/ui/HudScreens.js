@@ -37,6 +37,7 @@ export function buildHUD(ui) {
         <div class="hud-stat" id="time-stat">0:00</div>
         <div class="hud-stat" id="wave-stat">Wave 1</div>
         <div class="hud-stat" id="enemy-stat">Enemies: 0</div>
+        <div class="hud-stat" id="citizen-stat" style="color:#ff8866;display:none">🆘 Citizens: 0</div>
         <div class="hud-stat" id="biome-stat" style="color:#a89fd4"></div>
       </div>
     `;
@@ -56,12 +57,26 @@ export function buildHUD(ui) {
     `;
   ui._bindBuffTooltips(buffBar);
 
+  const hudTabs = document.createElement('div');
+  hudTabs.className = 'hud-mobile-tabs';
+  hudTabs.id = 'hud-mobile-tabs';
+  hudTabs.setAttribute('role', 'tablist');
+  hudTabs.innerHTML = `
+      <button type="button" class="hud-mobile-tab active" data-hud-tab="buffs" role="tab" aria-selected="true" aria-controls="hud-panel-body">Buffs</button>
+      <button type="button" class="hud-mobile-tab" data-hud-tab="quests" role="tab" aria-selected="false" aria-controls="hud-panel-body">Quests</button>
+    `;
+
+  const hudPanelBody = document.createElement('div');
+  hudPanelBody.className = 'hud-panel-body tab-buffs';
+  hudPanelBody.id = 'hud-panel-body';
+
   const quests = document.createElement('div');
   quests.className = 'quest-panel';
   quests.id = 'quest-panel';
   quests.innerHTML = '<h3>Quests</h3><div id="quest-list"></div>';
 
-  hudRight.append(buffBar, quests);
+  hudPanelBody.append(buffBar, quests);
+  hudRight.append(hudTabs, hudPanelBody);
   ui._mountMetricsInHud(hudRight);
 
   const synergy = document.createElement('div');
@@ -106,6 +121,7 @@ export function buildHUD(ui) {
   ui._rewardQueue = [];
   ui._rewardShowcaseActive = false;
   ui.layer.append(hud, hudRight, synergy, prompt, runAlert, toasts, rewardStrip, hint);
+  ui._bindHudMobileTabs();
 
   const damageFlash = document.createElement('div');
   damageFlash.id = 'damage-flash';

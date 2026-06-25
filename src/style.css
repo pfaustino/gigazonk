@@ -80,10 +80,13 @@ html, body {
 #ui-layer .screen,
 #ui-layer button,
 #ui-layer .btn,
+#ui-layer .hud-mobile-tab,
 #ui-layer .char-card,
 #ui-layer .skill-node,
 #ui-layer .upgrade-card,
-#ui-layer .paypal-donate-slot {
+#ui-layer .paypal-donate-slot,
+#tutorial-overlay,
+#tutorial-overlay * {
   pointer-events: auto;
 }
 
@@ -296,6 +299,17 @@ html, body {
   gap: 8px;
   pointer-events: none;
   z-index: 12;
+}
+
+.hud-mobile-tabs {
+  display: none;
+}
+
+.hud-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 .hud-right-stack .game-metrics,
@@ -959,8 +973,9 @@ html, body {
 .levelup-screen {
   justify-content: center;
   align-items: center;
-  padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
-  overflow: hidden;
+  padding: 12px max(24px, calc(env(safe-area-inset-right) + 10px)) 12px max(24px, calc(env(safe-area-inset-left) + 10px));
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .levelup-layout {
@@ -974,8 +989,7 @@ html, body {
     "cards buffs"
     "footer buffs";
   gap: 12px 16px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   scrollbar-gutter: stable;
 }
 
@@ -1004,6 +1018,7 @@ html, body {
   align-content: start;
   align-items: stretch;
   overflow: visible;
+  padding: 12px 10px 4px;
 }
 
 .levelup-buff-panel {
@@ -1703,12 +1718,20 @@ html, body {
 }
 
 /* Reward strip — earned upgrades & loot this run */
+:root {
+  --reward-tile-size: 76px;
+  --reward-strip-pad-left: 16px;
+  --reward-strip-pad-right: 16px;
+  --reward-showcase-scale: 2.35;
+  --reward-showcase-bottom: 118px;
+}
+
 .reward-strip {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 10px 16px 12px;
+  padding: 10px var(--reward-strip-pad-right) 12px var(--reward-strip-pad-left);
   pointer-events: none;
   background: linear-gradient(to top, rgba(8, 6, 18, 0.92) 0%, rgba(8, 6, 18, 0.55) 70%, transparent 100%);
 }
@@ -1718,11 +1741,13 @@ html, body {
   align-items: flex-end;
   justify-content: flex-end;
   gap: 8px;
-  min-height: 78px;
+  min-height: calc(var(--reward-tile-size) + 14px);
+  max-width: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   scrollbar-width: none;
-  padding-left: 16px;
+  padding: 12px 4px 4px;
+  scroll-padding-inline: 4px;
 }
 
 .reward-strip-track::-webkit-scrollbar {
@@ -1733,12 +1758,12 @@ html, body {
   --tile-scale: 1;
   --tile-opacity: 1;
   flex: 0 0 auto;
-  width: 76px;
-  height: 76px;
+  width: var(--reward-tile-size);
+  height: var(--reward-tile-size);
   opacity: var(--tile-opacity);
   transform: scale(var(--tile-scale));
   transform-origin: bottom center;
-  margin: 0 calc((76px * (var(--tile-scale) - 1)) / -2);
+  margin: 0 calc((var(--reward-tile-size) * (var(--tile-scale) - 1)) / -2);
   background: rgba(24, 16, 48, 0.92);
   border: 2px solid #6b4fd4;
   border-radius: 10px;
@@ -1748,8 +1773,16 @@ html, body {
   align-items: center;
   text-align: center;
   overflow: hidden;
-  transition: opacity 0.35s ease, margin 0.35s ease;
+  transition: opacity 0.35s ease, margin 0.35s ease, transform 0.15s ease, filter 0.15s ease;
   will-change: transform;
+  pointer-events: auto;
+  cursor: help;
+}
+
+.reward-tile:hover {
+  z-index: 4;
+  transform: scale(calc(var(--tile-scale) * 1.08)) translateY(-4px);
+  filter: brightness(1.06);
 }
 
 .reward-tile-hidden {
@@ -2296,6 +2329,10 @@ html, body {
   bottom: 12px;
   right: 12px;
   z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-height: calc(100dvh - 24px);
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 12px;
   pointer-events: auto;
@@ -2309,6 +2346,7 @@ html, body {
   cursor: pointer;
   font-weight: 700;
   font-size: 11px;
+  flex-shrink: 0;
 }
 
 .dev-panel-toggle.open {
@@ -2317,12 +2355,71 @@ html, body {
 }
 
 .dev-panel-body {
-  margin-top: 6px;
-  padding: 10px;
+  margin-bottom: 6px;
+  padding: 0;
   background: rgba(24, 18, 36, 0.94);
   border: 1px solid #3d3058;
   max-width: 280px;
+  max-height: min(70vh, calc(100dvh - 80px));
+  display: none;
+  flex-direction: column;
+  min-height: 0;
   color: #f0e8ff;
+  overflow: hidden;
+}
+
+#dev-panel.dev-panel-open .dev-panel-body {
+  display: flex;
+}
+
+.dev-panel-body[hidden] {
+  display: none !important;
+}
+
+.dev-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #3d3058;
+  background: rgba(24, 18, 36, 0.98);
+  flex-shrink: 0;
+}
+
+.dev-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f7c948;
+}
+
+.dev-panel-close {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid #3d3058;
+  border-radius: 6px;
+  background: #2a2040;
+  color: #f0e8ff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.dev-panel-close:hover {
+  border-color: #f7c948;
+  color: #f7c948;
+}
+
+.dev-panel-scroll {
+  padding: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 
 .dev-panel-row {
@@ -2396,6 +2493,40 @@ html, body {
   color: #f7c948;
   font-size: 10px;
   text-align: right;
+}
+
+body.mobile-touch #dev-panel {
+  top: auto;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  right: max(8px, env(safe-area-inset-right));
+  max-width: min(280px, 44vw);
+}
+
+body.mobile-touch #dev-panel.dev-panel-open {
+  top: max(8px, env(safe-area-inset-top));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
+}
+
+body.mobile-touch #dev-panel.dev-panel-open .dev-panel-body {
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+}
+
+body.mobile-touch #dev-panel.dev-panel-open .dev-panel-scroll {
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 120px);
+}
+
+body.mobile-touch .dev-panel-toggle {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+body.mobile-touch .dev-panel-actions button,
+body.mobile-touch .dev-panel-biomes button {
+  padding: 6px 8px;
+  font-size: 10px;
 }
 
 /* ——— Mobile landscape (same URL, responsive) ——— */
@@ -2508,10 +2639,65 @@ body.mobile-touch .hud {
 }
 
 body.mobile-touch .hud-right-stack {
-  top: max(8px, env(safe-area-inset-top));
-  right: max(48px, env(safe-area-inset-right) + 36px);
-  width: min(148px, 28vw);
-  gap: 5px;
+  top: max(50px, calc(env(safe-area-inset-top) + 42px));
+  right: max(8px, env(safe-area-inset-right));
+  width: min(224px, 48vw);
+  gap: 4px;
+}
+
+body.mobile-touch .hud-mobile-tabs {
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+body.mobile-touch .hud-mobile-tab {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid #4a3a8a;
+  border-radius: 7px 7px 0 0;
+  background: rgba(10, 8, 24, 0.75);
+  color: #8a82b0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+body.mobile-touch .hud-mobile-tab.active {
+  color: #f7c948;
+  background: rgba(24, 16, 48, 0.95);
+  border-color: #6b4fd4;
+  border-bottom-color: transparent;
+}
+
+body.mobile-touch .hud-panel-body.tab-buffs .quest-panel {
+  display: none;
+}
+
+body.mobile-touch .hud-panel-body.tab-quests .buff-bar {
+  display: none;
+}
+
+body.mobile-touch .hud-panel-body.tab-quests .quest-panel {
+  display: block;
+}
+
+body.mobile-touch .quest-panel h3 {
+  display: none;
+}
+
+body.mobile-touch .quest-item {
+  font-size: 10px;
+  padding: 4px 6px;
+}
+
+body.mobile-touch .quest-item--active {
+  padding: 4px 6px;
+  margin: 0 -4px;
 }
 
 body.mobile-touch .hud-right-stack .game-metrics,
@@ -2529,6 +2715,14 @@ body.mobile-touch .game-metrics-in-hud #metrics-gems {
 
 body.mobile-touch .buff-bar {
   padding: 5px 6px;
+  border-radius: 0 0 10px 10px;
+}
+
+body.mobile-touch .hud-panel-body.tab-quests .quest-panel {
+  padding: 6px 8px;
+  border-radius: 0 0 10px 10px;
+  max-height: min(42vh, 220px);
+  overflow-y: auto;
 }
 
 body.mobile-touch .buff-bar h3 {
@@ -2536,12 +2730,27 @@ body.mobile-touch .buff-bar h3 {
 }
 
 body.mobile-touch .buff-bar-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
   min-height: 0;
 }
 
 body.mobile-touch .buff-chip {
-  min-width: 34px;
-  padding: 3px 4px 2px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 2px 1px;
+  gap: 1px;
+  border-radius: 6px;
+}
+
+body.mobile-touch .buff-chip-icon {
+  font-size: 13px;
+}
+
+body.mobile-touch .buff-chip-amount {
+  font-size: 8px;
+  line-height: 1;
 }
 
 body.mobile-touch .stat-bar {
@@ -2582,13 +2791,83 @@ body.mobile-touch .mobile-pause-btn {
 }
 
 body.mobile-touch .interact-prompt {
-  bottom: max(150px, calc(env(safe-area-inset-bottom) + 130px));
+  bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px));
+  font-size: 12px;
+  padding: 7px 14px;
 }
 
 body.mobile-touch .synergy-bar {
-  bottom: max(108px, calc(env(safe-area-inset-bottom) + 92px));
+  bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
   left: 50%;
   transform: translateX(-50%);
+}
+
+body.mobile-touch {
+  --reward-tile-size: 54px;
+  --reward-strip-pad-left: max(112px, calc(env(safe-area-inset-left) + 104px));
+  --reward-strip-pad-right: max(176px, calc(env(safe-area-inset-right) + 168px));
+  --reward-showcase-scale: 1.18;
+  --reward-showcase-bottom: 68px;
+}
+
+body.mobile-touch .reward-strip {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+body.mobile-touch .reward-strip-track {
+  gap: 5px;
+  min-height: calc(var(--reward-tile-size) + 8px);
+  padding: 8px 2px 2px;
+}
+
+body.mobile-touch .reward-tile {
+  border-radius: 8px;
+  padding: 4px 3px 3px;
+}
+
+body.mobile-touch .reward-tile-icon {
+  font-size: 14px;
+  margin-bottom: 1px;
+}
+
+body.mobile-touch .reward-tile-name {
+  font-size: 7px;
+  margin-bottom: 2px;
+}
+
+body.mobile-touch .reward-stat-label {
+  font-size: 5px;
+}
+
+body.mobile-touch .reward-stat-values {
+  font-size: 6px;
+}
+
+body.mobile-touch .reward-tile-large .reward-tile-icon {
+  font-size: 18px;
+  margin-bottom: 3px;
+}
+
+body.mobile-touch .reward-tile-large .reward-tile-name {
+  font-size: 8px;
+  margin-bottom: 3px;
+}
+
+body.mobile-touch .reward-tile-large .reward-stat-label {
+  font-size: 5px;
+}
+
+body.mobile-touch .reward-tile-large .reward-stat-values {
+  font-size: 6px;
+}
+
+body.mobile-touch .reward-flyer {
+  box-shadow: 0 0 16px rgba(247, 201, 72, 0.35), 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+body.mobile-touch .reward-flyer .rarity-badge {
+  font-size: 7px;
+  padding: 1px 4px;
 }
 
 body.mobile-touch .game-metrics:not(.game-metrics-in-hud) {
@@ -2656,7 +2935,7 @@ body.mobile-touch .game-metrics:not(.game-metrics-in-hud) {
   }
 
   body.mobile-touch .hud-right-stack {
-    width: min(132px, 26vw);
+    width: min(212px, 44vw);
   }
 
   body.mobile-touch .buff-bar,
@@ -2664,13 +2943,23 @@ body.mobile-touch .game-metrics:not(.game-metrics-in-hud) {
     padding: 4px 5px;
   }
 
-  body.mobile-touch .quest-panel {
-    display: none;
+  body.mobile-touch {
+    --reward-tile-size: 48px;
+    --reward-strip-pad-left: max(104px, calc(env(safe-area-inset-left) + 96px));
+    --reward-strip-pad-right: max(184px, calc(env(safe-area-inset-right) + 176px));
+    --reward-showcase-scale: 1.08;
+    --reward-showcase-bottom: 62px;
   }
 
   body.mobile-touch .run-alert {
     top: 34%;
     font-size: clamp(2.2rem, 14vw, 4rem);
+  }
+
+  body.mobile-touch .interact-prompt {
+    bottom: max(58px, calc(env(safe-area-inset-bottom) + 50px));
+    font-size: 11px;
+    padding: 6px 12px;
   }
 }
 
@@ -2720,7 +3009,11 @@ body.mobile-touch .levelup-buff-panel .buff-bar h3 {
 }
 
 body.mobile-touch .levelup-buff-panel {
-  max-height: 72px;
+  max-height: none;
+}
+
+body.mobile-touch .levelup-buff-panel .buff-bar-track {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 body.level-up-open #touch-controls {

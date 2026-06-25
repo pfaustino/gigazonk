@@ -52,10 +52,20 @@ export class Input {
 
     const isMouse = (e) => e.pointerType === 'mouse' || e instanceof MouseEvent;
 
+    const isCanvasTarget = (target) => {
+      if (!target) return false;
+      return target === canvas || canvas.contains(target);
+    };
+
     const syncButtons = (e) => {
       if (!isMouse(e) || typeof e.buttons !== 'number') return;
-      this.pointer.left = (e.buttons & 1) !== 0;
-      this.pointer.right = (e.buttons & 2) !== 0;
+      if (isCanvasTarget(e.target)) {
+        this.pointer.left = (e.buttons & 1) !== 0;
+        this.pointer.right = (e.buttons & 2) !== 0;
+      } else {
+        this.pointer.left = false;
+        this.pointer.right = false;
+      }
       if (!this.pointer.right) this.releaseCameraLook();
     };
 

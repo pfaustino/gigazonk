@@ -86,7 +86,13 @@ export const TUTORIAL_STEPS = [
     id: 'interact',
     phase: 'arena',
     title: 'Interact',
-    body: 'Walk over pots to smash them for loot. Press F at chests and shrines to open or activate them.',
+    body: 'Walk over pots to smash them for loot. Press F at chests and shrines to interact.',
+  },
+  {
+    id: 'citizen_rescue',
+    phase: 'arena',
+    title: 'Rescue Citizens',
+    body: 'Orange beacons mark citizens trapped in the arena. Run to a beacon and press F to teleport them to safety — +10 run coins and bonus XP each time. If you rescue them all, another may appear about a minute later.',
   },
   {
     id: 'levelup',

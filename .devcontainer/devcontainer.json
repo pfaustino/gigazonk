@@ -6,9 +6,9 @@
   "mounts": [
     "source=gigazonk-node_modules,target=/workspace/node_modules,type=volume"
   ],
-  "forwardPorts": [5173],
+  "forwardPorts": [5174],
   "portsAttributes": {
-    "5173": {
+    "5174": {
       "label": "Vite dev server",
       "onAutoForward": "notify"
     }

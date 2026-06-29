@@ -1,6 +1,7 @@
 import { SYNERGY_ELEMENTS } from '../constants.js';
 import { ELEMENT_OFFER_INFO } from '../UpgradeText.js';
 import { setGameReady, GAME_READY } from '../../lib/gameReady.js';
+import { createObjectiveDistanceLabel, createBurgerCountdownElement, createGobbleCountdownElement } from './CrazyObjectiveArrow.js';
 
 /** Build arena HUD DOM (bars, quests, buff track, synergy, prompts). */
 export function buildHUD(ui) {
@@ -37,7 +38,6 @@ export function buildHUD(ui) {
         <div class="hud-stat" id="time-stat">0:00</div>
         <div class="hud-stat" id="wave-stat">Wave 1</div>
         <div class="hud-stat" id="enemy-stat">Enemies: 0</div>
-        <div class="hud-stat" id="citizen-stat" style="color:#ff8866;display:none">🆘 Citizens: 0</div>
         <div class="hud-stat" id="biome-stat" style="color:#a89fd4"></div>
       </div>
     `;
@@ -97,6 +97,11 @@ export function buildHUD(ui) {
   prompt.id = 'interact-prompt';
   prompt.textContent = '[F] Interact';
 
+  const citizenDist = createObjectiveDistanceLabel('objective-dist-citizen', 'citizen');
+  const burgerDist = createObjectiveDistanceLabel('objective-dist-burger', 'burger');
+  const burgerCountdown = createBurgerCountdownElement();
+  const gobbleCountdown = createGobbleCountdownElement();
+
   const runAlert = document.createElement('div');
   runAlert.className = 'run-alert hidden';
   runAlert.id = 'run-alert';
@@ -120,7 +125,7 @@ export function buildHUD(ui) {
   ui._rewardSeq = 0;
   ui._rewardQueue = [];
   ui._rewardShowcaseActive = false;
-  ui.layer.append(hud, hudRight, synergy, prompt, runAlert, toasts, rewardStrip, hint);
+  ui.layer.append(hud, hudRight, synergy, prompt, citizenDist, burgerDist, burgerCountdown, gobbleCountdown, runAlert, toasts, rewardStrip, hint);
   ui._bindHudMobileTabs();
 
   const damageFlash = document.createElement('div');

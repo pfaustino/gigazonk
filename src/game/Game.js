@@ -14,7 +14,9 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
-import { ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC } from './constants.js';
+import {
+  ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC, ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, OBJECTIVE_ARROW_HIDE_DIST,
+} from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -49,6 +51,8 @@ import {
 } from './RunSnapshot.js';
 import { CombatController } from './CombatController.js';
 import { CitizenRescue } from './CitizenRescue.js';
+import { ArenaBurger } from './ArenaBurger.js';
+import { ObjectiveArrow3D } from './ObjectiveArrow3D.js';
 
 export class Game {
   constructor(canvas) {
@@ -195,6 +199,7 @@ export class Game {
       jump: false,
       interact: false,
       citizenRescue: false,
+      burgerFrenzy: false,
       levelup: false,
       rift: false,
       boss: false,
@@ -246,8 +251,10 @@ export class Game {
         return f.jump;
       case 'citizen_rescue':
         return f.interact;
-      case 'levelup':
+      case 'arena_burger':
         return f.citizenRescue;
+      case 'levelup':
+        return f.burgerFrenzy;
       case 'rift':
         return f.levelup && f.rift;
       case 'boss':
@@ -291,6 +298,7 @@ export class Game {
     this._tutorialShownStep = idx;
     this.ui.showTutorial(() => {
       if (step.id === 'citizen_rescue') this._tutorialFlags.citizenRescue = true;
+      if (step.id === 'arena_burger') this._tutorialFlags.burgerFrenzy = true;
       advanceTutorialStep();
       queueMicrotask(() => this._tryShowTutorial({ force: true }));
     });
@@ -313,6 +321,10 @@ export class Game {
     this.combat = new CombatController(this);
     this.citizenRescue = new CitizenRescue(this.scene);
     this.citizenRescue.onRescued = (citizen) => this._onCitizenRescued(citizen);
+    this.arenaBurger = new ArenaBurger(this.scene);
+    this.arenaBurger.onEaten = () => this._onBurgerEaten();
+    this.arenaBurger.onEatStart = () => this.audio.burgerChomp();
+    this.objectiveArrow3D = new ObjectiveArrow3D(this.scene);
     this.synergy.onNova = () => {
       this._runNova = true;
       saveData.recordRunStats({ novaTriggered: true });
@@ -453,6 +465,8 @@ export class Game {
       this.gems,
       this.interactables,
       this.citizenRescue,
+      this.arenaBurger,
+      this.objectiveArrow3D,
       this.familiars,
       this.fireTrail,
       this.zonkDomes,
@@ -638,6 +652,9 @@ export class Game {
     this._runNova = false;
     this._wasInRift = false;
     this._citizenRespawnTimer = 0;
+    this._burgerSpawnTimer = 0;
+    this._burgerSpawnedOnce = false;
+    this._gobbleSirenActive = false;
     this._tutorialMoveDist = 0;
     this._tutorialFlags = this._initTutorialFlags();
     this._hitStopTimer = 0;
@@ -649,6 +666,10 @@ export class Game {
     this.player.reset();
     this._activeVillagePerks = applyVillagePerksToRun(this.player, this);
     this.resetRunManagers({ upgrades: true, questsRun: true });
+    if (this._gobbleSirenActive) {
+      this.audio.stopGobbleSiren();
+      this._gobbleSirenActive = false;
+    }
     this._floatHurtAcc = 0;
     this._floatHealAcc = 0;
     this._floatHurtTimer = 0;
@@ -656,6 +677,10 @@ export class Game {
   }
 
   hideCombat() {
+    if (this._gobbleSirenActive) {
+      this.audio.stopGobbleSiren();
+      this._gobbleSirenActive = false;
+    }
     this.resetRunManagers();
   }
 
@@ -966,6 +991,18 @@ export class Game {
     }
   }
 
+  _onBurgerEaten() {
+    this._burgerSpawnTimer = 0;
+    this._tutorialFlags.burgerFrenzy = true;
+    this._tryShowTutorial();
+    this.audio.burgerFrenzy();
+    this.audio.startGobbleSiren();
+    this._gobbleSirenActive = true;
+    this.particles.burst(this.player.position.x, this.player.position.z, 0xffcc44, 22);
+    this.cameraController.addShake(0.14);
+    this.ui.toast(`🍔 GOBBLE MODE! ${ARENA_BURGER_FRENZY_SEC}s — chomp fleeing monsters!`, 'synergy');
+  }
+
   _onCitizenRescued(citizen) {
     this.runCoins += CITIZEN_RESCUE_COINS;
     this.quests.track('citizens');
@@ -1147,7 +1184,10 @@ export class Game {
     }
 
     this.enemies.setThreatDamage(this.player.getEffectiveDamage());
-    this.enemies.update(dt, this.player.position, this.arena);
+    this.enemies.update(dt, this.player.position, this.arena, {
+      fleeFromPlayer: this.player.burgerFrenzyTimer > 0,
+      fleeSpeedMult: ARENA_BURGER_FLEE_SPEED_MULT,
+    });
 
     this.combat.tryAutoFire();
 
@@ -1192,16 +1232,59 @@ export class Game {
     this.enemies.flushInstances();
     this.combat.flushHordeCombat();
 
-    const contact = this.enemies.checkPlayerCollision(
-      this.player.position.x, this.player.position.z, 0.8, diffMult
-    );
-    if (contact.damage > 0) {
-      const dead = this.player.takeDamage(contact.damage);
-      if (dead) { this.gameOver(this._deathCauseFromEnemy(contact.killer)); return; }
+    const gobbling = this.player.burgerFrenzyTimer > 0;
+    if (gobbling) {
+      if (!this._gobbleSirenActive) {
+        this.audio.startGobbleSiren();
+        this._gobbleSirenActive = true;
+      }
+      const eaten = this.enemies.gobbleFleeing(
+        this.player.position.x,
+        this.player.position.z,
+        ARENA_BURGER_GOBBLE_RADIUS
+      );
+      for (const result of eaten) {
+        this.audio.gobbleWaka();
+        this.handleCombatHit(1, result, null, null);
+      }
+    } else if (this._gobbleSirenActive) {
+      this.audio.stopGobbleSiren();
+      this._gobbleSirenActive = false;
+    }
+
+    if (!gobbling) {
+      const contact = this.enemies.checkPlayerCollision(
+        this.player.position.x, this.player.position.z, 0.8, diffMult
+      );
+      if (contact.damage > 0) {
+        const dead = this.player.takeDamage(contact.damage);
+        if (dead) { this.gameOver(this._deathCauseFromEnemy(contact.killer)); return; }
+      }
     }
 
     this.interactables.update(dt, this.player.position.x, this.player.position.z);
     this.citizenRescue.update(dt, this.player.position.x, this.player.position.z);
+    this.arenaBurger.update(
+      dt,
+      this.player.position.x,
+      this.player.position.z,
+      this.arena,
+      this.player
+    );
+    if (!this.arenaBurger.burger && !this.arenaBurger.eating) {
+      this._burgerSpawnTimer += dt;
+      const delay = this._burgerSpawnedOnce
+        ? ARENA_BURGER_RESPAWN_SEC
+        : ARENA_BURGER_FIRST_SPAWN_SEC;
+      if (this._burgerSpawnTimer >= delay) {
+        this._burgerSpawnTimer = 0;
+        if (this.arenaBurger.trySpawn(this.arena)) {
+          this._burgerSpawnedOnce = true;
+          this.audio.burgerAppear();
+          this.ui.toast('🍔 Golden burger! Follow the green arrow — eat it to scare the horde!', 'synergy');
+        }
+      }
+    }
     if (this.citizenRescue.citizens.length === 0) {
       this._citizenRespawnTimer += dt;
       if (this._citizenRespawnTimer >= CITIZEN_RESCUE_RESPAWN_SEC) {
@@ -1280,13 +1363,64 @@ export class Game {
         biome: this.currentBiome?.name,
         night: nightFactor > 0.5,
         runCoins: this.runCoins,
-        citizensAlive: this.citizenRescue?.aliveCount ?? 0,
-        nearestCitizenDist: this.citizenRescue?.getNearestDist(
+        burgerTarget: this.arenaBurger?.getTarget(),
+        burgerDist: this.arenaBurger?.getNearestDist(
           this.player.position.x,
           this.player.position.z
         ),
+        burgerFrenzySec: this.player.burgerFrenzyTimer,
+        cameraYaw: this.cameraController.yaw,
       }
     );
+    const citizenTarget = this.citizenRescue?.getNearestTarget(px, pz);
+    const burgerDist = this.arenaBurger?.getNearestDist(px, pz);
+    const burgerTarget = this.arenaBurger?.getTarget();
+    let burgerCountdownSec = null;
+    if (!this.arenaBurger?.burger && !this.arenaBurger?.eating) {
+      const burgerDelay = this._burgerSpawnedOnce
+        ? ARENA_BURGER_RESPAWN_SEC
+        : ARENA_BURGER_FIRST_SPAWN_SEC;
+      burgerCountdownSec = Math.max(0, burgerDelay - this._burgerSpawnTimer);
+    }
+
+    const burgerForArrow = burgerTarget && (burgerDist ?? Infinity) >= OBJECTIVE_ARROW_HIDE_DIST
+      ? burgerTarget
+      : null;
+    const citizenForArrow = !burgerForArrow && citizenTarget && citizenTarget.dist >= OBJECTIVE_ARROW_HIDE_DIST
+      ? { x: citizenTarget.x, z: citizenTarget.z }
+      : null;
+    const moveSpeed = Math.hypot(this.player.velocity.x, this.player.velocity.z);
+    const frontHeading = moveSpeed > 0.15
+      ? this.player.facing
+      : this.cameraController.yaw + Math.PI;
+    this.objectiveArrow3D?.update(
+      dt,
+      px,
+      this.player.getViewY(),
+      pz,
+      frontHeading,
+      citizenForArrow,
+      burgerForArrow
+    );
+
+    const gobbleSec = this.player.burgerFrenzyTimer > 0 ? this.player.burgerFrenzyTimer : null;
+    const burgerArrowActive = burgerForArrow != null;
+    this.ui.updateObjectiveArrows({
+      burgerCountdownSec,
+      gobbleSec,
+      citizen: !burgerArrowActive && citizenTarget
+        ? {
+          distance: citizenTarget.dist,
+          hideClose: citizenTarget.dist < OBJECTIVE_ARROW_HIDE_DIST,
+        }
+        : null,
+      burger: burgerTarget && burgerDist != null
+        ? {
+          distance: burgerDist,
+          hideClose: burgerDist < OBJECTIVE_ARROW_HIDE_DIST,
+        }
+        : null,
+    });
   }
 
   updateVillage(dt) {

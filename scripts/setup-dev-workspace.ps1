@@ -46,5 +46,5 @@ Write-Host "  1. Open Cursor: $giga"
 Write-Host '  2. Command Palette -> Dev Containers: Reopen in Container (requires Docker Desktop)'
 Write-Host '  3. Reload MCP in Cursor Settings'
 Write-Host '  4. npm run setup:extensions  (if not run above)'
-Write-Host '  5. In container or host: npm run dev  -> http://localhost:5173'
+Write-Host '  5. In container or host: npm run dev  -> http://localhost:5174'
 Write-Host '  6. After commits: npm run gsync  (stage source to Google Drive)'

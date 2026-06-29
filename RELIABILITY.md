@@ -22,7 +22,7 @@
 | Snapshot RNG | `runSeed` + `rngState` in run snapshot restore |
 | Data JSON | `data/enemies.json`, `data/upgrades.json` via `gameData.ts` |
 | TypeScript lib | `src/lib/*.ts` — errors, assert, RNG, dev flags |
-| vite-mcp | Dev server MCP at `http://localhost:5173/__mcp` (console + localStorage) |
+| vite-mcp | Dev server MCP at `http://localhost:5174/__mcp` (console + localStorage) |
 | chrome-devtools-mcp | Chrome console (source maps), network, perf traces (`.cursor/mcp.json`) |
 | Cross-browser e2e | `npm run test:e2e:cross` — Playwright firefox + webkit |
 | Error bridge | `window.__gigazonkErrors` in dev for agents / Playwright |

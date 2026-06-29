@@ -243,7 +243,7 @@
 
   // ── Vite (manual dev server — avoids clashing with Playwright webServer) ──
   "vite.autoStart": false,
-  "vite.port": 5173,
+  "vite.port": 5174,
 
   // ── Todo / comments (Phase markers in rules and code) ───────────────────
   "todo-tree.general.tags": ["TODO", "FIXME", "HACK", "NOTE", "Phase"],

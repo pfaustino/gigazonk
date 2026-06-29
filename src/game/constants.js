@@ -45,6 +45,21 @@ export const CITIZEN_RESCUE_MIN_SPACING = 10;
 export const CITIZEN_RESCUE_COINS = 10;
 export const CITIZEN_RESCUE_XP = 25;
 export const CITIZEN_RESCUE_TELEPORT_SEC = 0.55;
+/** Golden arena burger — follow the arrow, eat it, monsters flee for a few seconds. */
+export const ARENA_BURGER_RADIUS = 2.4;
+export const ARENA_BURGER_MIN_RADIUS = 50;
+export const ARENA_BURGER_MAX_RADIUS = 165;
+export const ARENA_BURGER_FIRST_SPAWN_SEC = 60;
+export const ARENA_BURGER_RESPAWN_SEC = 180;
+export const ARENA_BURGER_EAT_SEC = 1.15;
+export const ARENA_BURGER_FRENZY_SEC = 30;
+export const ARENA_BURGER_GOBBLE_SCALE = 4;
+export const ARENA_BURGER_GOBBLE_RADIUS = 3.4;
+export const ARENA_BURGER_FLEE_SPEED_MULT = 1.25;
+export const OBJECTIVE_ARROW_HIDE_DIST = 28;
+/** Pac-Man power-pellet vulnerable ghost tint. */
+export const ARENA_BURGER_FRENZY_BLUE = 0x2121de;
+export const ARENA_BURGER_FRENZY_BLUE_FLASH = 0x6eb5ff;
 export const VILLAGE_SIZE = 80;
 
 /** Keep NPCs, portal path, and spawn hub unobstructed (world XZ). */

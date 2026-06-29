@@ -4,7 +4,7 @@
       "url": "https://mcp.cursor.com/browser"
     },
     "vite-mcp": {
-      "url": "http://localhost:5173/__mcp"
+      "url": "http://localhost:5174/__mcp"
     },
     "chrome-devtools": {
       "command": "C:\\Users\\pfaus\\AppData\\Local\\cursor-mcp\\chrome-devtools-gigazonk.cmd",

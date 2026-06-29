@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 (Vite default). Production base path: `/gigazonk/`.
+Open http://localhost:5174 (`dev-port.json`). Production base path: `/gigazonk/`.
 
 ### First-time machine setup
 
@@ -55,7 +55,7 @@ Dev panel shows live **seed** and **RNG state** during arena runs.
 
 ## MCP (dev)
 
-With `npm run dev`, vite-mcp exposes browser tools at `http://localhost:5173/__mcp` (requires dev server running).
+With `npm run dev`, vite-mcp exposes browser tools at `http://localhost:5174/__mcp` (requires dev server running).
 
 After clone or `npm install` on **`C:\Dev`**:
 
@@ -75,7 +75,7 @@ Regenerate MCP after dependency updates. Optional: set `GITHUB_TOKEN` in the env
 | `context7` | Up-to-date library docs (Three.js, Vite, Playwright) |
 | `github` | Issues/PRs (when `GITHUB_TOKEN` set at setup) |
 
-Reload MCP in Cursor Settings. In dev container, port 5173 is forwarded to the host.
+Reload MCP in Cursor Settings. In dev container, port 5174 is forwarded to the host.
 
 **Three.js e2e:** dev exposes `window.PLAYWRIGHT_THREE.scene` (`src/main.js`). Import `test`/`expect` from `e2e/helpers/playwrightThree.ts` for scene-aware specs (`@timjen/playwright-three`).
 
@@ -122,7 +122,7 @@ npm run test:e2e:ui       # interactive UI runner
 
 Tests live in `e2e/`. IDE rule: `.cursor/rules/browser-game-testing.mdc`.
 
-**Simple Browser in Cursor:** `Ctrl+Shift+P` → **Simple Browser: Show** → `http://localhost:5173`
+**Simple Browser in Cursor:** `Ctrl+Shift+P` → **Simple Browser: Show** → `http://localhost:5174`
 
 
 ## Manual test scripts

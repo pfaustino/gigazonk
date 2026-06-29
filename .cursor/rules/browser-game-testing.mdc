@@ -104,10 +104,10 @@ npm run test:e2e:cross       # all browsers (stage 4)
 | Flow not in e2e yet | `npm run dev` + cursor-ide-browser MCP |
 | Agent write-then-verify | Playwright MCP (`setup:mcp`) |
 | Three.js scene asserts | `@timjen/playwright-three` + `e2e/helpers/playwrightThree.ts` |
-| Console / localStorage (dev running) | vite-mcp `http://localhost:5173/__mcp` |
+| Console / localStorage (dev running) | vite-mcp `http://localhost:5174/__mcp` |
 | Chrome traces / Lighthouse | chrome-devtools-mcp |
 | Library docs (agent) | context7 MCP |
-| Quick peek in editor | Simple Browser → `http://localhost:5173` |
+| Quick peek in editor | Simple Browser → `http://localhost:5174` |
 | Balance JSON | JSON Crack extension on `data/*.json` |
 | Structured in-game errors | `window.__gigazonkErrors.exportJson()` in dev |
 
@@ -122,7 +122,7 @@ npm run test:e2e:cross       # all browsers (stage 4)
 
 ## Manual / MCP checklist (gaps only)
 
-1. `npm run dev` → `http://localhost:5173`
+1. `npm run dev` → `http://localhost:5174`
 2. `browser_navigate` → snapshot before clicks → screenshot after state change
 3. URL flags: `?dev=1`, `?seed=42`, `?biome=frost`, `?coins=500` (see `DEV.md`)
 

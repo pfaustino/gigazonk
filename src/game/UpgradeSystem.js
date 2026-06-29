@@ -429,6 +429,7 @@ const BUFF_DISPLAY_ORDER = [
   'idleDamage',
   'moveAtkSpeed',
   'hurtSpeedBurst',
+  'burgerFrenzy',
 ];
 
 export function buffDisplayRank(id) {
@@ -639,6 +640,10 @@ export function getActiveBuffs(player) {
 
   const hurtSpdExtra = player.hurtSpeedBurst - (base.hurtSpeedBurst ?? 0);
   if (hurtSpdExtra > 0) add('😤', fmtPct(hurtSpdExtra), 'Hurt speed burst', 'hurtSpeedBurst');
+
+  if (player.burgerFrenzyTimer > 0) {
+    add('🍔', `${Math.ceil(player.burgerFrenzyTimer)}s`, 'Gobble mode — chomp blue ghosts', 'burgerFrenzy');
+  }
 
   return sortByBuffDisplayOrder(buffs);
 }

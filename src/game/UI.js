@@ -20,6 +20,11 @@ import {
 import { showTitle as renderTitle, showCharacterSelect as renderCharacterSelect } from './ui/TitleScreens.js';
 import { showLevelUp as renderLevelUp } from './ui/LevelUpScreen.js';
 import { buildHUD as renderHUD } from './ui/HudScreens.js';
+import {
+  updateObjectiveDistanceLabel,
+  updateBurgerCountdown,
+  updateGobbleCountdown,
+} from './ui/CrazyObjectiveArrow.js';
 import { showRunSummary as renderRunSummary } from './ui/RunSummaryScreen.js';
 import { showTutorialOverlay, hideTutorialOverlay } from './ui/TutorialOverlay.js';
 import { checkSkillAchievement } from './AchievementSystem.js';
@@ -541,19 +546,6 @@ export class UI {
     document.getElementById('time-stat').textContent = `${mins}:${secs.toString().padStart(2, '0')}${inRift ? ' ⚡RIFT' : ''}${night}`;
     document.getElementById('enemy-stat').textContent = `Enemies: ${enemyCount}`;
 
-    const citizenEl = document.getElementById('citizen-stat');
-    if (citizenEl) {
-      const alive = extras.citizensAlive ?? 0;
-      if (alive > 0) {
-        citizenEl.style.display = '';
-        const dist = extras.nearestCitizenDist;
-        const distHint = dist != null ? ` · nearest ${Math.round(dist)}m` : '';
-        citizenEl.textContent = `🆘 Citizens: ${alive}${distHint}`;
-      } else {
-        citizenEl.style.display = 'none';
-      }
-    }
-
     const waveEl = document.getElementById('wave-stat');
     if (waveEl) waveEl.textContent = `Wave ${extras.wave || 1}`;
     const biomeEl = document.getElementById('biome-stat');
@@ -846,6 +838,34 @@ export class UI {
     if (!el) return;
     el.textContent = text;
     el.classList.toggle('hidden', !show);
+  }
+
+  updateObjectiveArrows({
+    citizen = null,
+    burger = null,
+    burgerCountdownSec = null,
+    gobbleSec = null,
+  } = {}) {
+    const burgerOn = burger != null && !burger.hideClose;
+    const citizenOn = !burgerOn && citizen != null && !citizen.hideClose;
+    updateObjectiveDistanceLabel(document.getElementById('objective-dist-citizen'), {
+      active: citizenOn,
+      distance: citizen?.distance ?? null,
+      lane: 0,
+    });
+    updateObjectiveDistanceLabel(document.getElementById('objective-dist-burger'), {
+      active: burgerOn,
+      distance: burger?.distance ?? null,
+      lane: 0,
+    });
+    updateBurgerCountdown(document.getElementById('burger-spawn-countdown'), {
+      active: burgerCountdownSec != null && !burgerOn,
+      secondsRemaining: burgerCountdownSec ?? 0,
+    });
+    updateGobbleCountdown(document.getElementById('gobble-countdown'), {
+      active: gobbleSec != null && gobbleSec > 0,
+      secondsRemaining: gobbleSec ?? 0,
+    });
   }
 
   showRunAlert(durationMs = 2000) {

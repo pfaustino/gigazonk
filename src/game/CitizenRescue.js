@@ -38,10 +38,26 @@ export class CitizenRescue {
   getNearestDist(px, pz) {
     let min = Infinity;
     for (const c of this.citizens) {
-      if (c.rescuing) continue;
-      min = Math.min(min, Math.hypot(c.x - px, c.z - pz));
+      if (c.rescuing || c.rescued || !c.group) continue;
+      min = Math.min(min, Math.hypot(c.group.position.x - px, c.group.position.z - pz));
     }
     return Number.isFinite(min) ? min : null;
+  }
+
+  getNearestTarget(px, pz) {
+    let nearest = null;
+    let minDist = Infinity;
+    for (const c of this.citizens) {
+      if (c.rescuing || c.rescued || !c.group) continue;
+      const x = c.group.position.x;
+      const z = c.group.position.z;
+      const dist = Math.hypot(x - px, z - pz);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = { x, z, dist };
+      }
+    }
+    return nearest;
   }
 
   _disposeCitizen(citizen) {

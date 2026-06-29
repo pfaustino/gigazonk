@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 5173;
+const { port: PORT } = JSON.parse(
+  readFileSync(new URL('./dev-port.json', import.meta.url), 'utf8')
+);
 const baseURL = `http://localhost:${PORT}`;
 
 /** Firefox/WebKit need a display + headed mode for WebGL on Linux CI (Mozilla #1375585). */

@@ -25,7 +25,7 @@ Then open **`C:\Dev\github-projects\GigaZonk`** in Cursor (not the Drive copy).
 ```powershell
 # Host or dev container
 cd C:\Dev\github-projects\GigaZonk
-npm run dev                    # :5173 forwarded from container
+npm run dev                    # :5174 forwarded from container
 
 # After commit + push
 npm run gsync                  # C:\Dev -> Drive staging -> cloud
@@ -37,7 +37,7 @@ npm run gsync                  # C:\Dev -> Drive staging -> cloud
 2. Cursor → **Dev Containers: Reopen in Container**.
 3. `postCreateCommand` runs `npm ci` and Playwright Chromium install.
 4. Container auto-installs extensions from `.devcontainer/devcontainer.json` (Vitest, Playwright, ESLint, markdown, glTF, etc.).
-5. Vite listens on `0.0.0.0:5173` — use `http://localhost:5173` on the host for MCP and browser tools.
+5. Vite listens on `0.0.0.0:5174` — use `http://localhost:5174` on the host for MCP and browser tools.
 
 `node_modules` lives in Docker volume `gigazonk-node_modules` — never synced to Drive.
 
@@ -52,8 +52,8 @@ npm run setup:extensions
 
 | Server | Requirement |
 |--------|-------------|
-| vite-mcp | `npm run dev` + port 5173 forwarded |
-| cursor-ide-browser | `http://localhost:5173` |
+| vite-mcp | `npm run dev` + port 5174 forwarded |
+| cursor-ide-browser | `http://localhost:5174` |
 | chrome-devtools | `npm run setup:mcp` on host; reload MCP |
 | playwright | `@playwright/mcp` via `setup:mcp` |
 | context7 | `@upstash/context7-mcp` via `setup:mcp` |

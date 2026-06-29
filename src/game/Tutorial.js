@@ -92,7 +92,13 @@ export const TUTORIAL_STEPS = [
     id: 'citizen_rescue',
     phase: 'arena',
     title: 'Rescue Citizens',
-    body: 'Orange beacons mark citizens trapped in the arena. Run to a beacon and press F to teleport them to safety — +10 run coins and bonus XP each time. If you rescue them all, another may appear about a minute later.',
+    body: 'Orange beacons mark citizens trapped in the arena — follow the orange Crazy Taxi arrow. Press F at a beacon to teleport them to safety (+10 coins, bonus XP). Rescue them all and another may appear about a minute later.',
+  },
+  {
+    id: 'arena_burger',
+    phase: 'arena',
+    title: 'Golden Burger',
+    body: 'A juicy burger spawns at the 1:00 mark (and every 3 minutes after you eat one). Follow the yellow Crazy Taxi arrow, eat it, then grow huge for 30 seconds — fleeing monsters turn blue, cannot hurt you, and get gobbled on contact!',
   },
   {
     id: 'levelup',

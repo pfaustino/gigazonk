@@ -28,6 +28,8 @@ import {
   ENEMY_CONTACT_DAMAGE_CAP,
   pickGruntColor,
   BIOME_ENEMY_WEIGHTS,
+  ARENA_BURGER_FRENZY_BLUE,
+  ARENA_BURGER_FRENZY_BLUE_FLASH,
 } from './constants.js';
 import { runRandom, runRandomInt } from '../lib/runRandom.js';
 import { assert } from '../lib/assert.js';
@@ -499,7 +501,9 @@ export class EnemyManager {
     return Math.max(0.12, 1 - over * 0.88);
   }
 
-  update(dt, playerPos, terrain = null) {
+  update(dt, playerPos, terrain = null, options = {}) {
+    const fleeFromPlayer = options.fleeFromPlayer === true;
+    const fleeSpeedMult = options.fleeSpeedMult ?? 1;
     this._faceX = playerPos.x;
     this._faceZ = playerPos.z;
     this._swayPhase += dt * ENEMY_FACE_SWAY_SPEED;
@@ -517,6 +521,23 @@ export class EnemyManager {
       }
       if (e.slowTimer > 0) e.slowTimer -= dt;
       if (e.mouthScreamTimer > 0) e.mouthScreamTimer -= dt;
+
+      if (fleeFromPlayer) {
+        if (!e._frenzyTinted) {
+          e._frenzyBaseColor = e.color;
+          e._frenzyTinted = true;
+        }
+        const flash = Math.sin(this._mouthTime * 10 + e.slot * 0.4) > 0;
+        const nextColor = flash ? ARENA_BURGER_FRENZY_BLUE_FLASH : ARENA_BURGER_FRENZY_BLUE;
+        if (e.color !== nextColor) {
+          e.color = nextColor;
+          e._colorDirty = true;
+        }
+      } else if (e._frenzyTinted) {
+        e.color = e._frenzyBaseColor ?? e.color;
+        e._frenzyTinted = false;
+        e._colorDirty = true;
+      }
 
       const slowMult = e.slowTimer > 0 ? 0.5 : 1;
       const dx = playerPos.x - e.x;
@@ -536,8 +557,11 @@ export class EnemyManager {
       const mesaGuardianIdle = e.isMesaGuardian && e.mesa && !e.mesaAwake;
 
       if (!mesaGuardianIdle && dist > 0.1) {
-        const moveX = (dx / dist) * e.speed * slowMult * dt;
-        const moveZ = (dz / dist) * e.speed * slowMult * dt;
+        const dirX = fleeFromPlayer ? -dx / dist : dx / dist;
+        const dirZ = fleeFromPlayer ? -dz / dist : dz / dist;
+        const speedMult = fleeFromPlayer ? fleeSpeedMult : 1;
+        const moveX = dirX * e.speed * slowMult * speedMult * dt;
+        const moveZ = dirZ * e.speed * slowMult * speedMult * dt;
         if (near) {
           this._moveEnemyOnTerrain(e, moveX, moveZ, terrain);
         } else {
@@ -645,13 +669,27 @@ export class EnemyManager {
     this.onBossPhase2?.(enemy);
   }
 
+  /** Gobble fleeing (blue) enemies during burger frenzy. */
+  gobbleFleeing(px, pz, radius) {
+    const eaten = [];
+    for (const e of this.enemies) {
+      if (!e.alive || !e._frenzyTinted) continue;
+      const touch = Math.hypot(e.x - px, e.z - pz) < radius + e.scale * 0.45;
+      if (!touch) continue;
+      const result = this.killEnemy(e);
+      if (result) eaten.push(result);
+    }
+    return eaten;
+  }
+
   /** Sum of touching enemies' contact damage (HP per hit; player i-frames throttle repeats). */
-  checkPlayerCollision(px, pz, radius = 0.8, diffMult = 1) {
+  checkPlayerCollision(px, pz, radius = 0.8, diffMult = 1, { skipFleeing = false } = {}) {
     const nearby = this.getNearby(px, pz, radius + 1);
     let totalDamage = 0;
     let topEnemy = null;
     let topDmg = 0;
     for (const { enemy } of nearby) {
+      if (skipFleeing && enemy._frenzyTinted) continue;
       if (enemy.alive && Math.hypot(enemy.x - px, enemy.z - pz) < radius + enemy.scale * 0.4) {
         const hitDmg = enemy.damage * diffMult;
         totalDamage += hitDmg;

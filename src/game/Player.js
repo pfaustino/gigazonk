@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP, XP_LEVEL_BASE, XP_LEVEL_GROWTH, XP_PICKUP_MULT, DODGE_COOLDOWN_SECONDS, DODGE_DURATION_SECONDS } from './constants.js';
+import { PLAYER_BASE, CHARACTERS, ARENA_SIZE, CRIT_CHANCE_CAP, XP_LEVEL_BASE, XP_LEVEL_GROWTH, XP_PICKUP_MULT, DODGE_COOLDOWN_SECONDS, DODGE_DURATION_SECONDS, ARENA_BURGER_GOBBLE_SCALE } from './constants.js';
 import { saveData } from './SaveData.js';
 import { applySkillBonusesToPlayer } from './SkillTree.js';
 import { buildPlayerVisual } from './EntityVisuals.js';
@@ -75,6 +75,8 @@ export class Player {
     this.moveAtkSpeed = 0;
     this.hurtSpeedBurst = 0;
     this.hurtSpeedTimer = 0;
+    this.burgerFrenzyTimer = 0;
+    this.burgerEatingTimer = 0;
     this.standStillTimer = 0;
     this._lastPosX = 0;
     this._lastPosZ = 0;
@@ -112,6 +114,7 @@ export class Player {
     applySkillBonusesToPlayer(this, m, saveData.data.skillLevels);
     this.xpToNext = this.xpForLevel(this.level);
     this.setCharacter(this.characterId);
+    this.mesh.scale.setScalar(1);
     this.hp = this.maxHp;
     this._captureRunBaseline();
   }
@@ -169,7 +172,8 @@ export class Player {
 
   getEffectiveSpeed() {
     const burst = this.hurtSpeedTimer > 0 ? (1 + this.hurtSpeedBurst) : 1;
-    return this.speed * burst;
+    const frenzy = this.burgerFrenzyTimer > 0 ? 1.12 : 1;
+    return this.speed * burst * frenzy;
   }
 
   getAttackRate() {
@@ -199,8 +203,12 @@ export class Player {
     const prevZ = this.position.z;
 
     if (this.dodgeCooldown > 0) this.dodgeCooldown -= dt;
+    if (this.burgerFrenzyTimer > 0) {
+      this.burgerFrenzyTimer = Math.max(0, this.burgerFrenzyTimer - dt);
+    }
+    const eatingBurger = this.burgerEatingTimer > 0;
 
-    if (input.wasPressed('Space') && !this.dodging) {
+    if (!eatingBurger && input.wasPressed('Space') && !this.dodging) {
       if (!this.jumping) {
         this._startJump(false);
       } else if (this.airJumpsUsed < this.maxAirJumps) {
@@ -228,6 +236,8 @@ export class Player {
       this.position.z += this.dodgeDir.z * 28 * dt;
       this.invincible = Math.max(this.invincible, this.dodgeTimer);
       if (this.dodgeTimer <= 0) this.dodging = false;
+    } else if (eatingBurger) {
+      this.velocity.set(0, 0, 0);
     } else {
       if (input.wasPressed('KeyQ') && this.dodgeCooldown <= 0) {
         let dx = hasInput ? move.x : input.getLastMoveDir().x;
@@ -329,11 +339,16 @@ export class Player {
     const bob = this._getBob();
     this.mesh.position.y = this.worldY + bob;
 
+    const gobbleScale = this.burgerFrenzyTimer > 0 ? ARENA_BURGER_GOBBLE_SCALE : 1;
+    this.mesh.scale.setScalar(gobbleScale);
+    if (this.shadow) {
+      this.shadow.scale.setScalar((0.65 + THREE.MathUtils.clamp(1 - (Math.max(0, this.worldY - this.groundY) + bob) / 10, 0.2, 1) * 0.55) * gobbleScale);
+    }
+
     this.shadow.position.set(this.position.x, this.groundY + 0.02, this.position.z);
     this.shadow.visible = this.mesh.visible;
     const heightAboveGround = Math.max(0, this.worldY - this.groundY) + bob;
     const heightFactor = THREE.MathUtils.clamp(1 - heightAboveGround / 10, 0.2, 1);
-    this.shadow.scale.setScalar(0.65 + heightFactor * 0.55);
     this.shadow.material.opacity = 0.12 + heightFactor * 0.33;
   }
 

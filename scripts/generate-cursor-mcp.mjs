@@ -7,6 +7,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
+const { port: devPort } = JSON.parse(
+  fs.readFileSync(path.join(root, 'dev-port.json'), 'utf8')
+);
 const entry = path.join(
   root,
   'node_modules',
@@ -52,7 +55,7 @@ const mcpServers = {
     url: 'https://mcp.cursor.com/browser',
   },
   'vite-mcp': {
-    url: 'http://localhost:5173/__mcp',
+    url: `http://localhost:${devPort}/__mcp`,
   },
   'chrome-devtools': chromeDevTools,
   playwright: {

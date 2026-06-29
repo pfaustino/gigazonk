@@ -200,7 +200,7 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 
 | Command | Output |
 |---------|--------|
-| `npm run dev` | Vite `:5173`, vite-mcp dev |
+| `npm run dev` | Vite `:5174`, vite-mcp dev |
 | `npm run build` | `dist/` base `/gigazonk/` |
 | `npm run build:itch` | Relative base (`./`) for itch.io |
 | `npm run check:itch` | lint + tsc + vitest + itch build (CI itch deploy gate) |

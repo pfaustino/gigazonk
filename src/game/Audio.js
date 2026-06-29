@@ -49,6 +49,82 @@ export class Audio {
     this.playSfx('citizenTeleport', 0.95);
   }
 
+  burgerAppear() {
+    this.tone(520, 0.12, 'sine', 0.1);
+    this.tone(780, 0.18, 'sine', 0.08);
+  }
+
+  burgerFrenzy() {
+    this.tone(220, 0.08, 'square', 0.1);
+    this.tone(180, 0.1, 'square', 0.08);
+    this.tone(140, 0.14, 'sawtooth', 0.09);
+    this.tone(360, 0.22, 'sine', 0.07);
+  }
+
+  burgerChomp() {
+    this.noise(0.06, 0.12);
+    this.tone(120, 0.05, 'sawtooth', 0.08);
+  }
+
+  /** Pac-Man power-pellet style wowow siren while gobbling fleeing monsters. */
+  startGobbleSiren() {
+    if (!this.enabled || this._gobbleSirenOsc) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 520;
+    gain.gain.value = 0.058;
+
+    const lfo = this.ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 4.8;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 155;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    lfo.start();
+
+    this._gobbleSirenOsc = osc;
+    this._gobbleSirenLfo = lfo;
+    this._gobbleSirenGain = gain;
+  }
+
+  stopGobbleSiren() {
+    for (const node of [this._gobbleSirenOsc, this._gobbleSirenLfo]) {
+      try {
+        node?.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    this._gobbleSirenOsc = null;
+    this._gobbleSirenLfo = null;
+    this._gobbleSirenGain = null;
+  }
+
+  gobbleWaka() {
+    if (!this.enabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(480, now);
+    osc.frequency.exponentialRampToValueAtTime(240, now + 0.075);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
   async loadSoundManifest() {
     try {
       const res = await fetch(`${this.musicBase}sounds/manifest.json`);

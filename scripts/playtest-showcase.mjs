@@ -5,7 +5,7 @@
 import { chromium } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
-const BASE = 'http://localhost:5173/?dev=1&seed=42';
+const BASE = 'http://localhost:5174/?dev=1&seed=42';
 const SHOTS = '.playtest-screenshots';
 const PAUSE_MS = 3500;
 

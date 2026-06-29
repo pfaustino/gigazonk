@@ -181,6 +181,7 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 | Biome-weighted enemy spawns (`frostling`, `ember`) | `EnemyManager.js`, `data/enemies.json` |
 | Touch controls overlay | `TouchControls.js`, `Input.js` |
 | Citizens in distress (arena rescue) | `CitizenRescue.js`, `Game.js` |
+| Golden arena burger (arrow + flee frenzy) | `ArenaBurger.js`, `ObjectiveArrow3D.js`, `Game.js`, `EnemyManager.js` |
 | Mobile landscape layout + canvas camera orbit | `lib/mobileLayout.js`, `TouchControls.js`, `Input.js`, `style.css` |
 | Defer combat managers until arena/village enter | `Game.js` `_ensureCombatManagers()` |
 | Skill tree / quest board / pause-resume e2e | `e2e/smoke.spec.ts`, `window.__gigazonkGame` dev hook |
@@ -200,7 +201,7 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 
 | Command | Output |
 |---------|--------|
-| `npm run dev` | Vite `:5173`, vite-mcp dev |
+| `npm run dev` | Vite `:5174`, vite-mcp dev |
 | `npm run build` | `dist/` base `/gigazonk/` |
 | `npm run build:itch` | Relative base (`./`) for itch.io |
 | `npm run check:itch` | lint + tsc + vitest + itch build (CI itch deploy gate) |

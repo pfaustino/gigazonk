@@ -4,10 +4,12 @@ import { ARENA_SIZE, ARENA_REFERENCE_SIZE, GROUND_TEXTURE_EMISSIVE_INTENSITY, RO
 const _c = new THREE.Color();
 const _b = new THREE.Color();
 
+const _asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+
 /** Volcanic rock photo — walls & mesas. Served from /public/images. */
-export const ROCK_TEXTURE_URL = '/images/pixabay-analogicus-volcanic-rock-3836723.jpg';
-export const GRASS_TEXTURE_URL = '/images/pixabay-publicdomainpictures-grass-84622.jpg';
-export const DIRT_TEXTURE_URL = '/images/pixabay-oleg_mit-soil-5342049.jpg';
+export const ROCK_TEXTURE_URL = _asset('images/pixabay-analogicus-volcanic-rock-3836723.jpg');
+export const GRASS_TEXTURE_URL = _asset('images/pixabay-publicdomainpictures-grass-84622.jpg');
+export const DIRT_TEXTURE_URL = _asset('images/pixabay-oleg_mit-soil-5342049.jpg');
 /** World meters per texture tile on vertical rock surfaces. */
 export const ROCK_TEXTURE_TILE_SIZE = 3.5;
 /** World meters per texture tile on ground planes. */

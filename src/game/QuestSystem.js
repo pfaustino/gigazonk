@@ -28,6 +28,8 @@ export class QuestSystem {
       combo: 0,
       shrines: 0,
       citizens: 0,
+      burgers: 0,
+      gobbles: 0,
     };
   }
 

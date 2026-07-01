@@ -77,6 +77,8 @@ export class Player {
     this.hurtSpeedTimer = 0;
     this.burgerFrenzyTimer = 0;
     this.burgerEatingTimer = 0;
+    this._burgerFrenzyBonusSec = 0;
+    this._burgerRespawnReductionSec = 0;
     this.standStillTimer = 0;
     this._lastPosX = 0;
     this._lastPosZ = 0;
@@ -159,7 +161,59 @@ export class Player {
       projectileSpeedMult: this.projectileSpeedMult,
       jumpPeakMult: this.jumpPeakMult,
       elements: new Set(this.elements),
+      lightningChains: this.lightningChains,
+      damagePerKill: this.damagePerKill,
     };
+  }
+
+  /** Dev / reset — strip run upgrades back to values captured at run start. */
+  restoreRunUpgradesFromBaseline() {
+    const base = this.runBaseline;
+    if (!base) return false;
+
+    this.damage = base.damage;
+    this.speed = base.speed;
+    this.attackRate = base.attackRate;
+    this.maxHp = base.maxHp;
+    this.projectileCount = base.projectileCount;
+    this.projectilePierce = base.projectilePierce;
+    this.pickupRadius = base.pickupRadius;
+    this.area = base.area;
+    this.critChance = base.critChance;
+    this.critDamageMult = base.critDamageMult;
+    this.lifesteal = base.lifesteal;
+    this.thorns = base.thorns;
+    this.familiars = base.familiars;
+    this.maxAirJumps = base.maxAirJumps;
+    this.fireTrailLevel = base.fireTrailLevel;
+    this.hpRegen = base.hpRegen;
+    this.evasion = base.evasion;
+    this.armor = base.armor;
+    this.bossDamageMult = base.bossDamageMult;
+    this.coinMult = base.coinMult;
+    this.killXpMult = base.killXpMult;
+    this.healOnKill = base.healOnKill;
+    this.magnetRadius = base.magnetRadius;
+    this.upgradeBoost = base.upgradeBoost;
+    this.critSplash = base.critSplash;
+    this.idleDamageMult = base.idleDamageMult;
+    this.moveAtkSpeed = base.moveAtkSpeed;
+    this.hurtSpeedBurst = base.hurtSpeedBurst;
+    this.runXpMult = base.runXpMult;
+    this.meleeBonus = base.meleeBonus;
+    this.airDamageMult = base.airDamageMult;
+    this.poisonChance = base.poisonChance;
+    this.bonkChance = base.bonkChance;
+    this.explodeChance = base.explodeChance;
+    this.killDamageBonus = base.killDamageBonus;
+    this.projectileSpeedMult = base.projectileSpeedMult;
+    this.jumpPeakMult = base.jumpPeakMult;
+    this.elements = new Set(base.elements);
+    this.lightningChains = base.lightningChains ?? 3;
+    this.damagePerKill = base.damagePerKill ?? 0;
+    this.hp = Math.min(this.hp, this.maxHp);
+    this.jumpPeak = this.baseJumpPeak * (1 + this.jumpPeakMult);
+    return true;
   }
 
   xpForLevel(lvl) {

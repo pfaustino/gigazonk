@@ -4,7 +4,21 @@ Canonical architecture reference for this repo. Mirrored to the GitHub Wiki (`wi
 
 ## Product summary
 
-Browser horde survival roguelike: village meta loop, procedural arena biomes, instanced enemy hordes, run upgrades, Zonk Rift, meta skill tree. Live: [GitHub Pages `/gigazonk/`](https://pfaustino.github.io/gigazonk/).
+Browser horde survival roguelike: village meta loop, procedural arena biomes, instanced enemy hordes, run upgrades, Zonk Rift, meta skill tree, **golden arena burger / Gobble Mode**, citizen rescue, soul-orb lightning familiars. Live: [GitHub Pages `/gigazonk/`](https://pfaustino.github.io/gigazonk/) and [itch.io](https://pfaustino.itch.io/gigazonk).
+
+## Player-facing highlights
+
+| Feature | Modules |
+|---------|---------|
+| Golden burger → Gobble Mode (arrow, flee ghosts, heal on chomp) | `ArenaBurger.js`, `ObjectiveArrow3D.js`, `EnemyManager.js`, `Game.js` |
+| Citizens in distress (orange beacon rescue) | `CitizenRescue.js` |
+| Soul Orb familiars (orbit + lightning zap) | `Effects.js` `FamiliarManager` |
+| Village reputation perks (burger timers) | `VillagePerks.js`, `constants.js` |
+| Run summary + quest tracking (burgers, gobbles, rescues) | `ui/RunSummaryScreen.js`, `QuestSystem.js`, `data/quests.json` |
+| Tutorial overlay (hide with checkbox; **H** re-enables) | `Tutorial.js`, `ui/TutorialOverlay.js` |
+| Hidden dev playground (easter egg — `?dev=1`, not in player menus) | `DevPanel.js`, `DevBuffPicker.js`, `parseDevFlags.ts` |
+
+Player docs (`docs/itch-description.md`, README) tease the dev sandbox without revealing how to open it.
 
 ## Stack
 
@@ -181,6 +195,8 @@ Shipped in PR [#14](https://github.com/pfaustino/gigazonk/pull/14) (`4b77d4e`).
 | Biome-weighted enemy spawns (`frostling`, `ember`) | `EnemyManager.js`, `data/enemies.json` |
 | Touch controls overlay | `TouchControls.js`, `Input.js` |
 | Citizens in distress (arena rescue) | `CitizenRescue.js`, `Game.js` |
+| Golden arena burger (arrow + flee frenzy) | `ArenaBurger.js`, `ObjectiveArrow3D.js`, `Game.js`, `EnemyManager.js` |
+| Burger village perks (Bistro + Grill at rep 40/55) | `constants.js` `VILLAGE_REP_PERKS`, `VillagePerks.js` |
 | Mobile landscape layout + canvas camera orbit | `lib/mobileLayout.js`, `TouchControls.js`, `Input.js`, `style.css` |
 | Defer combat managers until arena/village enter | `Game.js` `_ensureCombatManagers()` |
 | Skill tree / quest board / pause-resume e2e | `e2e/smoke.spec.ts`, `window.__gigazonkGame` dev hook |
@@ -215,7 +231,8 @@ Deploy on `main`: `deploy-pages.yml` (GitHub Pages), `deploy-itch.yml` (butler �
 
 | Doc | Purpose |
 |-----|---------|
-| `DEV.md` | Dev flags, MCP, manual test scripts |
+| `DEV.md` | Dev flags, MCP, manual test scripts, dev panel / Buffs picker |
+| `docs/itch-description.md` | itch.io page copy (source of truth; `npm run update:itch-description`) |
 | `RELIABILITY.md` | Error handling tiers |
 | `CONTRIBUTING.md` | PR expectations |
 | `SECURITY.md` | Vulnerability reporting |

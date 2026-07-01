@@ -46,12 +46,12 @@ npm run setup:extensions
 
 | Flag | Effect |
 |------|--------|
-| `?dev=1` | Dev panel (also auto in `npm run dev`) |
+| `?dev=1` | Dev panel on live builds (also auto in `npm run dev`) — pauses arena on open; **Buffs…** catalog for stacking upgrades |
 | `?biome=frost` | Force biome on arena start |
 | `?coins=500` | Grant meta coins on load |
 | `?seed=42` | Fixed run seed for repro |
 
-Dev panel shows live **seed** and **RNG state** during arena runs.
+Dev panel: time skips, spawn/clear horde, god mode, lighting sliders, biome picker, error export, and **Dev → Buffs** (add/remove run upgrades, pause, full heal). Player-facing itch/README copy teases this as a discoverable easter egg without documenting the URL flag.
 
 ## MCP (dev)
 
@@ -173,6 +173,17 @@ npm run deploy           # gh-pages manual
 - Personal skills: `~/.cursor/skills/web-game-development/`, `game-balance-tuning/`, `game-ship-release/`
 - MCP: `.cursor/mcp.json` — run `npm run setup:mcp`; add PixelLab in user global `~/.cursor/mcp.json`
 - Extensions: `.vscode/extensions.json` — run `npm run setup:extensions`
+
+## Publishing copy
+
+itch.io page text: `docs/itch-description.md` (source of truth). After edits:
+
+```powershell
+npm run update:itch-description        # long description → clipboard + open edit page
+npm run update:itch-description -- -Short  # short line only
+```
+
+Butler CI deploys the **game build** only; paste description manually on itch. Player copy teases the hidden dev easter egg without documenting `?dev=1`.
 
 ## Performance budget
 

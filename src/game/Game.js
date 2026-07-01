@@ -7,6 +7,7 @@ import { GemManager } from './GemManager.js';
 import { Interactables } from './Interactables.js';
 import { QuestSystem } from './QuestSystem.js';
 import { UpgradeSystem, SYNERGY_NAME, getUpgradePreview } from './UpgradeSystem.js';
+import { buildUpgradeOffer, UPGRADE_TEMPLATES } from './UpgradeOffers.js';
 import { UI } from './UI.js';
 import { Village } from './Village.js';
 import { Arena } from './Arena.js';
@@ -15,7 +16,7 @@ import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
 import {
-  ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC, ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, OBJECTIVE_ARROW_HIDE_DIST,
+  ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC, ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, gobbleHealForType, OBJECTIVE_ARROW_HIDE_DIST,
 } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
@@ -40,6 +41,8 @@ import {
   advanceTutorialStep,
   isTutorialComplete,
   isStepForState,
+  isTutorialHidden,
+  enableTutorialHints,
   skipTutorialStepsUntil,
   resetTutorialProgress,
 } from './Tutorial.js';
@@ -71,6 +74,9 @@ export class Game {
     this.paused = false;
     this.modalPause = false;
     this.menuPause = false;
+    this.devToolsHoldingPause = false;
+    this._devToolsPauseHold = 0;
+    this._devPauseSnapshot = null;
     this.inRift = false;
     this.bossTimer = 0;
     this.bossCount = 0;
@@ -137,6 +143,10 @@ export class Game {
     this._runBosses = 0;
     this._runRiftsEntered = 0;
     this._runMaxCombo = 0;
+    this._runBurgers = 0;
+    this._runGobbles = 0;
+    this._runCitizens = 0;
+    this._objectiveArrowKind = null;
     this._runNova = false;
     this._tutorialShownStep = -1;
     this._charSelectOpen = false;
@@ -275,7 +285,7 @@ export class Game {
   }
 
   _tryShowTutorial({ force = false } = {}) {
-    if (isTutorialComplete() || this.ui.isLevelUpOpen() || this.ui.gameMenu.isOpen()) return;
+    if (isTutorialComplete() || isTutorialHidden() || this.ui.isLevelUpOpen() || this.ui.gameMenu.isOpen()) return;
     const step = getCurrentTutorialStep();
     if (!step || !isStepForState(step, this.state)) return;
     const idx = getTutorialStepIndex();
@@ -649,6 +659,10 @@ export class Game {
     this._runBosses = 0;
     this._runRiftsEntered = 0;
     this._runMaxCombo = 0;
+    this._runBurgers = 0;
+    this._runGobbles = 0;
+    this._runCitizens = 0;
+    this._objectiveArrowKind = null;
     this._runNova = false;
     this._wasInRift = false;
     this._citizenRespawnTimer = 0;
@@ -696,6 +710,7 @@ export class Game {
   }
 
   recoverStuckModalPause() {
+    if (this.devToolsHoldingPause) return;
     if (this.ui.isLevelUpOpen()) {
       if (!this.modalPause || !this.paused) {
         this.modalPause = true;
@@ -971,6 +986,15 @@ export class Game {
     this._tryShowTutorial();
   }
 
+  _checkTutorialHotkey() {
+    if (this.modalPause || this.ui.isLevelUpOpen() || this.ui.gameMenu.isOpen()) return;
+    if (!this.input.wasPressed('KeyH')) return;
+    if (!enableTutorialHints()) return;
+    this.ui.toast('Tutorials re-enabled', 'synergy');
+    this._tutorialShownStep = getTutorialStepIndex() - 1;
+    this._tryShowTutorial({ force: true });
+  }
+
   _flushPlayerFloatNumbers(dt) {
     const px = this.player.position.x;
     const pz = this.player.position.z;
@@ -993,6 +1017,8 @@ export class Game {
 
   _onBurgerEaten() {
     this._burgerSpawnTimer = 0;
+    this._runBurgers += 1;
+    this.quests.track('burgers');
     this._tutorialFlags.burgerFrenzy = true;
     this._tryShowTutorial();
     this.audio.burgerFrenzy();
@@ -1005,6 +1031,7 @@ export class Game {
 
   _onCitizenRescued(citizen) {
     this.runCoins += CITIZEN_RESCUE_COINS;
+    this._runCitizens += 1;
     this.quests.track('citizens');
     this._tutorialFlags.citizenRescue = true;
     this._tryShowTutorial();
@@ -1210,9 +1237,17 @@ export class Game {
       }
     }
 
-    this.familiars.setCount(this.player.familiars);
-    this.familiars.update(dt, this.player.position, this.enemies, (dmg, result) =>
-      this.handleCombatHit(dmg, result, null, null)
+    this.familiars.setCount(this.player.familiars, this.player.getAttackRate());
+    this.familiars.update(
+      dt,
+      this.player.position,
+      this.enemies,
+      this.player.getAttackRate(),
+      {
+        playerY: this.player.mesh.position.y,
+        onHit: (dmg, result) => this.handleCombatHit(dmg, result, 'lightning', null),
+        onZap: () => this.audio.familiarZap(),
+      }
     );
 
     this.fireTrail.update(dt, this.player, this.enemies, this.arena, (dmg, result, el) =>
@@ -1243,8 +1278,33 @@ export class Game {
         this.player.position.z,
         ARENA_BURGER_GOBBLE_RADIUS
       );
-      for (const result of eaten) {
-        this.audio.gobbleWaka();
+      if (eaten.length > 0) {
+        this.cameraController.addShake(0.03 + Math.min(eaten.length * 0.007, 0.055));
+      }
+      let chompLabels = 0;
+      for (let i = 0; i < eaten.length; i++) {
+        const result = eaten[i];
+        const { x, z } = result.pos;
+        const y = (result.pos.y ?? 0) + (result.scale ?? 1) * 0.35;
+        this.particles.gobbleBurstAt(
+          x,
+          z,
+          this.player.position.x,
+          this.player.position.z,
+          y,
+          result.ghostColor ?? 0x6eb5ff,
+          result.scale ?? 1
+        );
+        const healAmt = gobbleHealForType(result.type);
+        this.player.heal(healAmt);
+        if (chompLabels < 8) {
+          this.particles.floatingNumber(x, z, 'CHOMP!', 'chomp', y + 0.35);
+          this.particles.floatingNumber(x, z, healAmt, 'heal', y + 0.55);
+          chompLabels++;
+        }
+        this.audio.gobbleEat(i, eaten.length);
+        this._runGobbles += 1;
+        this.quests.track('gobbles');
         this.handleCombatHit(1, result, null, null);
       }
     } else if (this._gobbleSirenActive) {
@@ -1273,15 +1333,27 @@ export class Game {
     );
     if (!this.arenaBurger.burger && !this.arenaBurger.eating) {
       this._burgerSpawnTimer += dt;
+      const respawnCut = this.player._burgerRespawnReductionSec ?? 0;
       const delay = this._burgerSpawnedOnce
-        ? ARENA_BURGER_RESPAWN_SEC
+        ? Math.max(60, ARENA_BURGER_RESPAWN_SEC - respawnCut)
         : ARENA_BURGER_FIRST_SPAWN_SEC;
       if (this._burgerSpawnTimer >= delay) {
         this._burgerSpawnTimer = 0;
         if (this.arenaBurger.trySpawn(this.arena)) {
           this._burgerSpawnedOnce = true;
           this.audio.burgerAppear();
-          this.ui.toast('🍔 Golden burger! Follow the green arrow — eat it to scare the horde!', 'synergy');
+          const citizensWaiting = this.citizenRescue.aliveCount;
+          if (citizensWaiting > 0) {
+            this.ui.toast(
+              '🍔 Golden burger! Yellow arrow takes priority — rescue citizens after gobble mode!',
+              'synergy'
+            );
+          } else {
+            this.ui.toast(
+              '🍔 Golden burger! Follow the yellow arrow — eat it to scare the horde!',
+              'synergy'
+            );
+          }
         }
       }
     }
@@ -1377,8 +1449,9 @@ export class Game {
     const burgerTarget = this.arenaBurger?.getTarget();
     let burgerCountdownSec = null;
     if (!this.arenaBurger?.burger && !this.arenaBurger?.eating) {
+      const respawnCut = this.player._burgerRespawnReductionSec ?? 0;
       const burgerDelay = this._burgerSpawnedOnce
-        ? ARENA_BURGER_RESPAWN_SEC
+        ? Math.max(60, ARENA_BURGER_RESPAWN_SEC - respawnCut)
         : ARENA_BURGER_FIRST_SPAWN_SEC;
       burgerCountdownSec = Math.max(0, burgerDelay - this._burgerSpawnTimer);
     }
@@ -1389,16 +1462,21 @@ export class Game {
     const citizenForArrow = !burgerForArrow && citizenTarget && citizenTarget.dist >= OBJECTIVE_ARROW_HIDE_DIST
       ? { x: citizenTarget.x, z: citizenTarget.z }
       : null;
-    const moveSpeed = Math.hypot(this.player.velocity.x, this.player.velocity.z);
-    const frontHeading = moveSpeed > 0.15
-      ? this.player.facing
-      : this.cameraController.yaw + Math.PI;
+    const arrowKind = burgerForArrow ? 'burger' : (citizenForArrow ? 'citizen' : null);
+    if (arrowKind && arrowKind !== this._objectiveArrowKind) {
+      if (arrowKind === 'citizen' && this._objectiveArrowKind === 'burger') {
+        this.ui.toast('Orange arrow back — citizens need rescue!', 'synergy');
+      }
+      this._objectiveArrowKind = arrowKind;
+    } else if (!arrowKind) {
+      this._objectiveArrowKind = null;
+    }
     this.objectiveArrow3D?.update(
       dt,
       px,
       this.player.getViewY(),
       pz,
-      frontHeading,
+      this.player.facing,
       citizenForArrow,
       burgerForArrow
     );
@@ -1501,7 +1579,7 @@ export class Game {
   }
 
   updateCameraInput() {
-    if (this.menuPause || this.modalPause) {
+    if (this.menuPause || this.modalPause || this.devToolsHoldingPause) {
       this.input.releaseCameraLook();
     }
     const { dragX, dragY, wheel } = this.input.consumeCameraInput();
@@ -1635,6 +1713,9 @@ export class Game {
       coins,
       bosses: this._runBosses,
       maxCombo: this._runMaxCombo,
+      burgers: this._runBurgers,
+      gobbles: this._runGobbles,
+      citizens: this._runCitizens,
       biome: this.currentBiome?.name,
       bestTime: saveData.data.bestTime,
       buffs: getActiveBuffs(this.player),
@@ -1675,6 +1756,7 @@ export class Game {
     const inWorld = this.state === 'arena' || this.state === 'village';
     const gameplay = inWorld
       && !this.modalPause
+      && !this.paused
       && !this.ui.gameMenu.isOpen()
       && !this.ui.isLevelUpOpen();
     this.input.setGameplayEnabled(gameplay);
@@ -1683,11 +1765,15 @@ export class Game {
       menuNav: this.ui.hasModalScreen() || this.ui.gameMenu.isOpen(),
     });
 
+    if (!this.modalPause && !this.ui.isLevelUpOpen() && !this.ui.gameMenu.isOpen()) {
+      this._checkTutorialHotkey();
+    }
+
     if (this.state === 'arena') {
       this.updateArena(dt);
       this.recoverStuckModalPause();
       this.flushPendingLevelUp();
-      if (this.particles && this.enemies) {
+      if (this.particles && this.enemies && !this.paused) {
         this.particles.update(dt, this.camera, this.renderer, this.enemies.enemies);
       }
     } else if (this.state === 'village') {
@@ -1817,6 +1903,89 @@ export class Game {
   devToggleGodMode() {
     this.player.devGodMode = !this.player.devGodMode;
     this.ui.toast(this.player.devGodMode ? 'Dev: God mode ON' : 'Dev: God mode OFF', 'synergy');
+  }
+
+  beginDevToolsPause() {
+    if (this._devToolsPauseHold === 0) {
+      this._devPauseSnapshot = { paused: this.paused, modalPause: this.modalPause };
+    }
+    this._devToolsPauseHold += 1;
+    if (this.state !== 'arena' || this.ui.isLevelUpOpen()) return;
+    this.devToolsHoldingPause = true;
+    this.paused = true;
+    this.modalPause = false;
+  }
+
+  endDevToolsPause() {
+    this._devToolsPauseHold = Math.max(0, this._devToolsPauseHold - 1);
+    if (this._devToolsPauseHold > 0) return;
+    this.devToolsHoldingPause = false;
+    if (this.state !== 'arena' || this.ui.isLevelUpOpen()) {
+      this._devPauseSnapshot = null;
+      return;
+    }
+    const snap = this._devPauseSnapshot;
+    this._devPauseSnapshot = null;
+    if (!snap) return;
+    this.paused = snap.paused;
+    this.modalPause = snap.modalPause;
+  }
+
+  devSetRunPaused(paused) {
+    if (this.state !== 'arena' || this.ui.isLevelUpOpen()) return;
+    this.paused = !!paused;
+    this.modalPause = false;
+  }
+
+  devToggleRunPause() {
+    if (this.state !== 'arena' || this.ui.isLevelUpOpen()) return null;
+    this.paused = !this.paused;
+    this.modalPause = false;
+    return this.paused;
+  }
+
+  devIsRunPaused() {
+    return this.state === 'arena' && this.paused && !this.ui.isLevelUpOpen();
+  }
+
+  devApplyUpgradeBuff(templateId, rarity = 'legendary') {
+    if (this.state !== 'arena') {
+      this.ui.toast('Start an arena run to apply buffs', 'warning');
+      return false;
+    }
+    if (!this.player?.runBaseline) {
+      this.ui.toast('Run not ready yet', 'warning');
+      return false;
+    }
+    const template = UPGRADE_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return false;
+    const allowed = template.rarities ?? ['legendary'];
+    const pick = allowed.includes(rarity) ? rarity : allowed[allowed.length - 1];
+    const offer = buildUpgradeOffer(template, pick);
+    this.player.applyUpgrade(offer);
+    if (this.familiars) {
+      this.familiars.setCount(this.player.familiars, this.player.getAttackRate());
+    }
+    this.ui.renderBuffBar(this.player);
+    return true;
+  }
+
+  devRemoveAllBuffs() {
+    if (this.state !== 'arena') {
+      this.ui.toast('Start an arena run to manage buffs', 'warning');
+      return false;
+    }
+    if (!this.player?.restoreRunUpgradesFromBaseline()) {
+      this.ui.toast('Run not ready yet', 'warning');
+      return false;
+    }
+    this.upgrades.reset();
+    if (this.familiars) {
+      this.familiars.setCount(this.player.familiars, this.player.getAttackRate());
+    }
+    this.fireTrail?.reset();
+    this.ui.renderBuffBar(this.player);
+    return true;
   }
 
   devToggleMegaDamage() {

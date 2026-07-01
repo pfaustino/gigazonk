@@ -213,6 +213,35 @@ export class ParticleSystem {
     this.burst(x, z, 0xf7c948, 3, y + 0.08, 0.8);
   }
 
+  /** Pac-Man gobble — blue ghost splatter + yellow crumbs pulled toward the player. */
+  gobbleBurstAt(x, z, towardX, towardZ, y = 1, ghostColor = 0x6eb5ff, scale = 1) {
+    const size = 0.55 + scale * 0.22;
+    this.burst(x, z, ghostColor, 5, y, size);
+    this.burst(x, z, 0x2121de, 3, y + 0.06, size * 0.85);
+
+    const dx = towardX - x;
+    const dz = towardZ - z;
+    const len = Math.hypot(dx, dz) || 1;
+    const pullX = (dx / len) * 5.5;
+    const pullZ = (dz / len) * 5.5;
+
+    for (let i = 0; i < 4; i++) {
+      const slot = this._acquireBurst(0xffdd33);
+      if (!slot) break;
+      const spread = (runRandom() - 0.5) * 1.6;
+      slot.mesh.position.set(x, y + 0.15, z);
+      slot.mesh.scale.setScalar(0.45 + scale * 0.12);
+      this.particles.push({
+        mesh: slot.mesh,
+        pool: slot,
+        vx: pullX + spread,
+        vy: 2.2 + runRandom() * 2.5,
+        vz: pullZ + spread,
+        life: 0.35 + runRandom() * 0.2,
+      });
+    }
+  }
+
   _runDelayedBursts(dt) {
     for (let i = this._delayedBursts.length - 1; i >= 0; i--) {
       const job = this._delayedBursts[i];
@@ -229,39 +258,46 @@ export class ParticleSystem {
   }
 
   floatingNumber(x, z, amount, kind = 'hit', y = 1.5) {
-    let n;
-    if (kind === 'hurt') {
-      if (amount < 0.15) return;
-      n = Math.max(1, Math.ceil(amount));
-    } else {
-      n = Math.round(amount);
-      if (n < 1) return;
-    }
-
     let text;
     let fontSize;
     let color;
-    switch (kind) {
-      case 'hurt':
-        text = `-${n}`;
-        fontSize = 18;
-        color = '#ff5c5c';
-        break;
-      case 'heal':
-        text = `+${n}`;
-        fontSize = 18;
-        color = '#4ade80';
-        break;
-      case 'crit':
-        text = String(n);
-        fontSize = 22;
-        color = '#f7c948';
-        break;
-      default:
-        text = String(n);
-        fontSize = 16;
-        color = '#fff';
-        break;
+
+    if (kind === 'chomp') {
+      text = typeof amount === 'string' ? amount : 'CHOMP!';
+      fontSize = 15;
+      color = '#ffdd33';
+    } else {
+      let n;
+      if (kind === 'hurt') {
+        if (amount < 0.15) return;
+        n = Math.max(1, Math.ceil(amount));
+      } else {
+        n = Math.round(amount);
+        if (n < 1) return;
+      }
+
+      switch (kind) {
+        case 'hurt':
+          text = `-${n}`;
+          fontSize = 18;
+          color = '#ff5c5c';
+          break;
+        case 'heal':
+          text = `+${n}`;
+          fontSize = 18;
+          color = '#4ade80';
+          break;
+        case 'crit':
+          text = String(n);
+          fontSize = 22;
+          color = '#f7c948';
+          break;
+        default:
+          text = String(n);
+          fontSize = 16;
+          color = '#fff';
+          break;
+      }
     }
 
     const el = document.createElement('div');

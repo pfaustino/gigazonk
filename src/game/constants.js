@@ -1,5 +1,5 @@
 export const ARENA_SIZE = 1200;
-export const GAME_VERSION = '0.2.2';
+export const GAME_VERSION = '0.2.3';
 
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;
@@ -56,7 +56,25 @@ export const ARENA_BURGER_FRENZY_SEC = 30;
 export const ARENA_BURGER_GOBBLE_SCALE = 4;
 export const ARENA_BURGER_GOBBLE_RADIUS = 3.4;
 export const ARENA_BURGER_FLEE_SPEED_MULT = 1.25;
+/** HP restored per gobbled monster (type overrides below). ~3% of base max HP. */
+export const ARENA_BURGER_GOBBLE_HEAL = 3;
+export const ARENA_BURGER_GOBBLE_HEAL_BY_TYPE = {
+  runner: 2,
+  wisp: 2,
+  brute: 6,
+  elite: 8,
+};
+
+/** HP healed when chomping a fleeing monster during gobble mode. */
+export function gobbleHealForType(type) {
+  return ARENA_BURGER_GOBBLE_HEAL_BY_TYPE[type] ?? ARENA_BURGER_GOBBLE_HEAL;
+}
 export const OBJECTIVE_ARROW_HIDE_DIST = 28;
+/** Orbiting familiars — lightning zaps (fire rate matches player attack rate). */
+export const FAMILIAR_ORBIT_RADIUS = 2.8;
+export const FAMILIAR_ZAP_RANGE = 24;
+export const FAMILIAR_BOLT_LIFE = 0.14;
+export const FAMILIAR_ORBIT_SPEED = 2.4;
 /** Pac-Man power-pellet vulnerable ghost tint. */
 export const ARENA_BURGER_FRENZY_BLUE = 0x2121de;
 export const ARENA_BURGER_FRENZY_BLUE_FLASH = 0x6eb5ff;
@@ -117,6 +135,22 @@ export const VILLAGE_REP_PERKS = [
     name: 'Ascension Shrine',
     desc: '+10% XP this run',
     xpMult: 0.1,
+  },
+  {
+    minRep: 40,
+    id: 'bistro',
+    icon: '🍔',
+    name: 'Golden Bistro',
+    desc: '+5s Gobble Mode duration',
+    burgerFrenzyBonusSec: 5,
+  },
+  {
+    minRep: 55,
+    id: 'grill',
+    icon: '🔥',
+    name: 'Arena Grill',
+    desc: 'Burger respawns 45s sooner',
+    burgerRespawnReductionSec: 45,
   },
   {
     minRep: 75,

@@ -33,4 +33,15 @@ describe('hydrateSave', () => {
     expect(data.tutorialComplete).toBe(false);
     expect(data.dailyChallengeCompleted).toBe(false);
   });
+
+  it('migrates 0.2.2 saves to discover burger quests', () => {
+    const data = hydrateSave({
+      saveVersion: '0.2.2',
+      discoveredQuests: ['kill_50'],
+    });
+    expect(data.saveVersion).toBe('0.2.3');
+    expect(data.discoveredQuests).toEqual(expect.arrayContaining([
+      'burgers_1', 'burgers_3', 'gobbles_10', 'gobbles_25',
+    ]));
+  });
 });

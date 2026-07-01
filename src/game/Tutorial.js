@@ -183,11 +183,28 @@ export function advanceTutorialStep() {
 }
 
 export function shouldShowTutorial() {
-  return !isTutorialComplete() && getCurrentTutorialStep() != null;
+  return !isTutorialComplete() && !isTutorialHidden() && getCurrentTutorialStep() != null;
+}
+
+export function isTutorialHidden() {
+  return saveData.data.tutorialHidden === true;
+}
+
+export function setTutorialHidden(hidden) {
+  saveData.data.tutorialHidden = hidden;
+  saveData.save();
+}
+
+/** Re-show tutorial tips after the player hid them (H hotkey). */
+export function enableTutorialHints() {
+  if (!isTutorialHidden()) return false;
+  setTutorialHidden(false);
+  return true;
 }
 
 export function resetTutorialProgress() {
   saveData.data.tutorialStep = 0;
   saveData.data.tutorialComplete = false;
+  saveData.data.tutorialHidden = false;
   saveData.save();
 }

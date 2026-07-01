@@ -16,13 +16,15 @@ export function showRunSummary(ui, stats, onAction) {
   const buffs = stats.buffs?.length
     ? stats.buffs.map((b) => {
       const label = b.title ?? b.name ?? b.id;
-      const amt = b.amount != null && b.amount !== '' ? ` ${b.amount}` : '';
-      return `<span class="run-summary-buff">${b.icon} ${label}${amt}</span>`;
+      const amt = b.amount != null && b.amount !== '' ? b.amount : '';
+      const tip = amt ? `${label} ${amt}` : label;
+      const chip = amt ? `${b.icon} ${amt}` : `${b.icon} ${label}`;
+      return `<span class="run-summary-buff" title="${tip}">${chip}</span>`;
     }).join('')
     : '<span class="run-summary-muted">No upgrades picked</span>';
 
   const achievements = (stats.newAchievements ?? []).map(
-    (a) => `<div class="run-summary-achievement">${a.icon} ${a.name} (+${a.coins}🪙)</div>`
+    (a) => `<span class="run-summary-achievement">${a.icon} ${a.name} (+${a.coins}🪙)</span>`
   ).join('');
 
   const dailyLine = stats.dailyBonus
@@ -47,11 +49,14 @@ export function showRunSummary(ui, stats, onAction) {
       <div class="run-summary-stat"><span>Best time</span><strong>${best}</strong></div>
       <div class="run-summary-stat"><span>Bosses</span><strong>${stats.bosses ?? 0}</strong></div>
       <div class="run-summary-stat"><span>Max combo</span><strong>${stats.maxCombo ?? 0}</strong></div>
+      <div class="run-summary-stat"><span>Burgers eaten</span><strong>${stats.burgers ?? 0}</strong></div>
+      <div class="run-summary-stat"><span>Monsters gobbled</span><strong>${stats.gobbles ?? 0}</strong></div>
+      <div class="run-summary-stat"><span>Citizens rescued</span><strong>${stats.citizens ?? 0}</strong></div>
       <div class="run-summary-stat"><span>Biome</span><strong>${stats.biome ?? '—'}</strong></div>
       <div class="run-summary-stat"><span>Achievements</span><strong>${unlockedCount}/${ACHIEVEMENTS.length}</strong></div>
     </div>
     <div class="run-summary-build"><h3>Your build</h3><div class="run-summary-buffs">${buffs}</div></div>
-    ${achievements ? `<div class="run-summary-new"><h3>New achievements</h3>${achievements}</div>` : ''}
+    ${achievements ? `<div class="run-summary-new"><h3>New achievements</h3><div class="run-summary-achievements">${achievements}</div></div>` : ''}
     ${dailyLine}
     <p class="menu-hint menu-hint-desktop run-summary-hint">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
     <div class="run-summary-actions">

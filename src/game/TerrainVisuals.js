@@ -88,6 +88,17 @@ export function createGroundTexturedMaterial(texture, color, repeatX, repeatY) {
   return createTiledLambertMaterial(texture, color, repeatX, repeatY, GROUND_TEXTURE_EMISSIVE_INTENSITY);
 }
 
+export function disposeTerrainMaterial(material) {
+  if (!material) return;
+  material.map?.dispose?.();
+  material.dispose?.();
+}
+
+export function setMeshTerrainMaterial(mesh, material) {
+  disposeTerrainMaterial(mesh.material);
+  mesh.material = material;
+}
+
 function lerpColors(colors, i, a, b, t) {
   _c.setHex(a);
   _b.setHex(b);

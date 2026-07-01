@@ -584,7 +584,7 @@ export function getActiveBuffs(player) {
   if (thornExtra > 0) add('🌵', `+${thornExtra}`, 'Thorns', 'thorns');
 
   const famExtra = Math.round(player.familiars) - Math.round(base.familiars);
-  if (famExtra > 0) add('🌀', `+${famExtra}`, 'Familiars', 'familiars');
+  if (famExtra > 0) add('🌀', `+${famExtra}`, 'Lightning familiars', 'familiars');
 
   const jumpExtra = Math.round(player.maxAirJumps) - Math.round(base.maxAirJumps);
   if (jumpExtra > 0) add('🦘', `+${jumpExtra}`, 'Air jumps', 'airJumps');

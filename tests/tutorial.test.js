@@ -8,6 +8,10 @@ import {
   isStepForState,
   isTutorialComplete,
   resetTutorialProgress,
+  shouldShowTutorial,
+  setTutorialHidden,
+  isTutorialHidden,
+  enableTutorialHints,
 } from '../src/game/Tutorial.js';
 
 describe('Tutorial', () => {
@@ -74,5 +78,14 @@ describe('Tutorial', () => {
     expect(isStepForState({ phase: 'title' }, 'title')).toBe(true);
     expect(isStepForState({ phase: 'village' }, 'arena')).toBe(false);
     expect(isStepForState({ phase: 'arena' }, 'arena')).toBe(true);
+  });
+
+  it('hides tutorials when tutorialHidden is set', () => {
+    expect(shouldShowTutorial()).toBe(true);
+    setTutorialHidden(true);
+    expect(shouldShowTutorial()).toBe(false);
+    expect(isTutorialHidden()).toBe(true);
+    expect(enableTutorialHints()).toBe(true);
+    expect(shouldShowTutorial()).toBe(true);
   });
 });

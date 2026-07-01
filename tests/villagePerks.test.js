@@ -11,7 +11,10 @@ describe('VillagePerks', () => {
     expect(getActiveVillagePerks(0)).toHaveLength(0);
     expect(getActiveVillagePerks(10).map((p) => p.id)).toEqual(['well']);
     expect(getActiveVillagePerks(50).map((p) => p.id)).toEqual([
-      'well', 'merchant', 'banner', 'shrine',
+      'well', 'merchant', 'banner', 'shrine', 'bistro',
+    ]);
+    expect(getActiveVillagePerks(75).map((p) => p.id)).toEqual([
+      'well', 'merchant', 'banner', 'shrine', 'bistro', 'grill', 'tower',
     ]);
   });
 

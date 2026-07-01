@@ -181,7 +181,7 @@ export class ArenaBurger {
       }
       if (t >= 1) {
         if (player) {
-          player.burgerFrenzyTimer = ARENA_BURGER_FRENZY_SEC;
+          player.burgerFrenzyTimer = ARENA_BURGER_FRENZY_SEC + (player._burgerFrenzyBonusSec ?? 0);
           player.burgerEatingTimer = 0;
         }
         this.onEaten?.(burger);

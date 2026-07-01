@@ -51,8 +51,9 @@ description: >-
 1. Constants or `data/` first
 2. Manager class second
 3. Wire in `Game.js` last (minimal diff)
-4. Update README differentiators table if player-visible
+4. Update README differentiators and `docs/itch-description.md` if player-visible (do not document `?dev=1` in itch copy — easter egg only)
 5. Save migration if meta progression changes
+6. Run wiki sync after `ARCHITECTURE.md` changes
 
 ## IDE setup
 
@@ -79,7 +80,11 @@ Same order as CI; use **headed/ui** while iterating on UI:
 
 ## Dev tooling
 
-`?dev=1` panel (`src/dev/DevPanel.js`): skip time, spawn horde/boss, force level-up, biome override, error export. Wired in Vite dev and via URL flag.
+`?dev=1` panel (`src/dev/DevPanel.js`, `src/dev/DevBuffPicker.js`): pauses arena on open, time skips, spawn horde/boss, **Buffs** catalog (stack upgrades / remove all), god mode, biome override, error export. Wired in Vite dev and via URL flag on live builds. Player-facing docs tease this as a hidden easter egg without revealing the flag.
+
+## Publishing copy
+
+itch.io long/short description source of truth: `docs/itch-description.md`. After edits: `npm run update:itch-description` (copies to clipboard + opens edit page). Butler deploy does not update page text.
 
 ## Deploy (dual host — always both)
 

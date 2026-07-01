@@ -1,9 +1,20 @@
 import * as THREE from 'three';
-import { VILLAGE_SIZE, VILLAGE_NPCS, VILLAGE_LANDMARKS, VILLAGE_BUILDING_SLOTS } from './constants.js';
+import { VILLAGE_SIZE, VILLAGE_NPCS, VILLAGE_LANDMARKS, VILLAGE_BUILDING_SLOTS, BIOMES, getBiomeRockColor } from './constants.js';
 import { saveData } from './SaveData.js';
 import { isInVillageClearZone } from './VillagePerks.js';
-import { createGrassField, createPathStrip } from './TerrainVisuals.js';
+import {
+  createGroundTexturedMaterial,
+  createGrassField,
+  createPathStrip,
+  GROUND_TEXTURE_TILE_SIZE,
+  loadGroundTextures,
+  setMeshTerrainMaterial,
+} from './TerrainVisuals.js';
 import { GROUND_WALL_HEIGHT, resolveCircleAabb } from './TerrainFeatures.js';
+import { ErrorReporter } from '../lib/ErrorReporter.js';
+
+const GRASS_BIOME = BIOMES.find((b) => b.id === 'grass') ?? BIOMES[0];
+const VILLAGE_PATH_WIDTH = 6;
 
 /** Deterministic footprint from slot index — stable layout between visits. */
 function buildingSizeForSlot(index) {
@@ -31,14 +42,20 @@ export class Village {
     this.landmarkMeshes = [];
 
     const rep = saveData.data.reputation;
+    this._buildId = (this._buildId ?? 0) + 1;
+    const buildId = this._buildId;
 
+    const grassRepeat = VILLAGE_SIZE / GROUND_TEXTURE_TILE_SIZE;
     const grass = createGrassField(VILLAGE_SIZE, 24);
     this.group.add(grass);
     this.grassMesh = grass;
 
-    const path = createPathStrip(6, VILLAGE_SIZE * 0.6);
+    const pathLength = VILLAGE_SIZE * 0.6;
+    const path = createPathStrip(VILLAGE_PATH_WIDTH, pathLength);
     this.group.add(path);
     this.pathMesh = path;
+
+    this._loadGroundTextures(buildId, grassRepeat, pathLength);
 
     const buildingCount = Math.min(
       VILLAGE_BUILDING_SLOTS.length,
@@ -58,6 +75,26 @@ export class Village {
     }
 
     this.addDecorations();
+  }
+
+  _loadGroundTextures(buildId, grassRepeat, pathLength) {
+    loadGroundTextures()
+      .then(([grassTex, dirtTex]) => {
+        if (buildId !== this._buildId || !this.grassMesh || !this.pathMesh) return;
+
+        setMeshTerrainMaterial(
+          this.grassMesh,
+          createGroundTexturedMaterial(grassTex, GRASS_BIOME.ground, grassRepeat, grassRepeat)
+        );
+
+        const pathRepeatX = VILLAGE_PATH_WIDTH / GROUND_TEXTURE_TILE_SIZE;
+        const pathRepeatY = pathLength / GROUND_TEXTURE_TILE_SIZE;
+        setMeshTerrainMaterial(
+          this.pathMesh,
+          createGroundTexturedMaterial(dirtTex, getBiomeRockColor(GRASS_BIOME), pathRepeatX, pathRepeatY)
+        );
+      })
+      .catch((err) => ErrorReporter.capture('ASSET_LOAD', err, { asset: 'villageGroundTextures' }));
   }
 
   addLandmark(def) {

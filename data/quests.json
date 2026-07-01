@@ -404,5 +404,33 @@
     "target": 15,
     "type": "citizens",
     "reward": 150
+  },
+  {
+    "id": "burgers_1",
+    "desc": "Eat 1 golden arena burger",
+    "target": 1,
+    "type": "burgers",
+    "reward": 40
+  },
+  {
+    "id": "burgers_3",
+    "desc": "Eat 3 golden burgers in one run",
+    "target": 3,
+    "type": "burgers",
+    "reward": 90
+  },
+  {
+    "id": "gobbles_10",
+    "desc": "Gobble 10 fleeing monsters in one frenzy",
+    "target": 10,
+    "type": "gobbles",
+    "reward": 55
+  },
+  {
+    "id": "gobbles_25",
+    "desc": "Gobble 25 monsters in one run",
+    "target": 25,
+    "type": "gobbles",
+    "reward": 120
   }
 ]

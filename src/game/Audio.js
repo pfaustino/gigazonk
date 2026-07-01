@@ -109,20 +109,46 @@ export class Audio {
     this._gobbleSirenGain = null;
   }
 
-  gobbleWaka() {
+  gobbleWaka(high = true, volume = 0.1) {
     if (!this.enabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'square';
-    osc.frequency.setValueAtTime(480, now);
-    osc.frequency.exponentialRampToValueAtTime(240, now + 0.075);
-    gain.gain.setValueAtTime(0.1, now);
+    const start = high ? 520 : 380;
+    const end = high ? 260 : 200;
+    osc.frequency.setValueAtTime(start, now);
+    osc.frequency.exponentialRampToValueAtTime(end, now + 0.075);
+    gain.gain.setValueAtTime(volume, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
     osc.connect(gain);
     gain.connect(this.masterGain);
     osc.start(now);
     osc.stop(now + 0.1);
+  }
+
+  gobbleChomp(volume = 0.08) {
+    this.noise(0.045, volume * 0.9);
+    this.tone(95 + Math.random() * 25, 0.04, 'sawtooth', volume * 0.75);
+  }
+
+  familiarZap() {
+    this.tone(880 + Math.random() * 120, 0.04, 'square', 0.07);
+    this.tone(440, 0.06, 'sawtooth', 0.05);
+    this.noise(0.03, 0.05);
+  }
+
+  /** Alternating waka + bite — volume ducks when many chomps land same frame. */
+  gobbleEat(index = 0, batchSize = 1) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const vol = batchSize > 5 ? 0.55 : batchSize > 2 ? 0.78 : 1;
+    const high = index % 2 === 0;
+    this.gobbleWaka(high, 0.1 * vol);
+    if (index % 2 === 1 || batchSize === 1) {
+      this.gobbleChomp(0.08 * vol);
+    }
   }
 
   async loadSoundManifest() {

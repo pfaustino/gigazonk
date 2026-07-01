@@ -8,72 +8,187 @@ import {
   ZONK_DOME_HURT_RADIUS,
   ZONK_DOME_FOLLOWUP_COUNT,
   ZONK_DOME_FOLLOWUP_DELAY,
+  FAMILIAR_ORBIT_RADIUS,
+  FAMILIAR_ZAP_RANGE,
+  FAMILIAR_BOLT_LIFE,
+  FAMILIAR_ORBIT_SPEED,
 } from './constants.js';
 import { runRandom } from '../lib/runRandom.js';
 
+const _targetScratch = [];
+
+function zapCooldown(attackRate) {
+  return 1 / Math.max(0.05, attackRate);
+}
+
+/** Orbiting soul orbs — visible lightning zaps that one-shot the nearest foe. */
 export class FamiliarManager {
   constructor(scene) {
     this.scene = scene;
     this.orbs = [];
+    this.bolts = [];
     this.group = new THREE.Group();
+    this.group.name = 'familiars';
     scene.add(this.group);
     this.angle = 0;
-    this.damageTimer = 0;
   }
 
   reset() {
-    for (const o of this.orbs) {
-      this.group.remove(o);
-      o.geometry?.dispose();
-      o.material?.dispose();
+    for (const orb of this.orbs) {
+      this.group.remove(orb.mesh);
+      orb.mesh.geometry?.dispose();
+      orb.mesh.material?.dispose();
+      for (const child of orb.mesh.children) {
+        child.geometry?.dispose();
+        child.material?.dispose();
+      }
     }
     this.orbs = [];
+    this._clearBolts();
     this.angle = 0;
   }
 
-  setCount(count) {
+  _clearBolts() {
+    for (const bolt of this.bolts) {
+      this.group.remove(bolt.line);
+      bolt.geo.dispose();
+      bolt.mat.dispose();
+    }
+    this.bolts = [];
+  }
+
+  _spawnOrbMesh() {
+    const group = new THREE.Group();
+    const outer = new THREE.Mesh(
+      new THREE.SphereGeometry(0.38, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xa855f7 })
+    );
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffaa })
+    );
+    group.add(outer, core);
+    return group;
+  }
+
+  setCount(count, attackRate = 1.2) {
+    const cd = zapCooldown(attackRate);
     while (this.orbs.length < count) {
-      const geo = new THREE.SphereGeometry(0.3, 8, 8);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x9b59f5 });
-      const mesh = new THREE.Mesh(geo, mat);
+      const mesh = this._spawnOrbMesh();
       this.group.add(mesh);
-      this.orbs.push(mesh);
+      this.orbs.push({
+        mesh,
+        attackTimer: runRandom() * cd,
+        flash: 0,
+      });
     }
     while (this.orbs.length > count) {
-      const o = this.orbs.pop();
-      this.group.remove(o);
-      o.geometry.dispose();
-      o.material.dispose();
+      const orb = this.orbs.pop();
+      this.group.remove(orb.mesh);
+      orb.mesh.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
     }
   }
 
-  update(dt, playerPos, enemyManager, onHit) {
+  _findClosestTarget(ex, ez, enemyManager) {
+    const nearby = enemyManager.getNearby(ex, ez, FAMILIAR_ZAP_RANGE, _targetScratch);
+    let best = null;
+    let bestDist = Infinity;
+    for (const { enemy } of nearby) {
+      if (!enemy.alive || enemy.isBoss || enemy.isMesaGuardian) continue;
+      const d = Math.hypot(enemy.x - ex, enemy.z - ez);
+      if (d < bestDist) {
+        bestDist = d;
+        best = enemy;
+      }
+    }
+    return best;
+  }
+
+  _spawnBolt(fromX, fromY, fromZ, toX, toY, toZ) {
+    const points = [];
+    const segments = 6;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const jag = i > 0 && i < segments ? (runRandom() - 0.5) * 0.55 : 0;
+      points.push(new THREE.Vector3(
+        THREE.MathUtils.lerp(fromX, toX, t) + jag,
+        THREE.MathUtils.lerp(fromY, toY, t) + jag * 0.5,
+        THREE.MathUtils.lerp(fromZ, toZ, t) + jag
+      ));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffff66,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.renderOrder = 40;
+    this.group.add(line);
+    this.bolts.push({ line, geo, mat, life: FAMILIAR_BOLT_LIFE });
+  }
+
+  _updateBolts(dt) {
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const bolt = this.bolts[i];
+      bolt.life -= dt;
+      bolt.mat.opacity = Math.max(0, bolt.life / FAMILIAR_BOLT_LIFE);
+      if (bolt.life <= 0) {
+        this.group.remove(bolt.line);
+        bolt.geo.dispose();
+        bolt.mat.dispose();
+        this.bolts.splice(i, 1);
+      }
+    }
+  }
+
+  update(dt, playerPos, enemyManager, attackRate, { onHit, onZap, playerY = 0 } = {}) {
     const count = this.orbs.length;
     if (count === 0) return;
 
-    this.angle += dt * 2;
-    const radius = 2.5;
+    const cd = zapCooldown(attackRate);
+    this.angle += dt * FAMILIAR_ORBIT_SPEED;
+    const orbitCenterY = playerY + 1.55;
 
     for (let i = 0; i < count; i++) {
+      const orb = this.orbs[i];
       const a = this.angle + (i / count) * Math.PI * 2;
-      this.orbs[i].position.set(
-        playerPos.x + Math.sin(a) * radius,
-        1.5,
-        playerPos.z + Math.cos(a) * radius
-      );
+      const ox = playerPos.x + Math.sin(a) * FAMILIAR_ORBIT_RADIUS;
+      const oz = playerPos.z + Math.cos(a) * FAMILIAR_ORBIT_RADIUS;
+      const oy = orbitCenterY + Math.sin(this.angle * 2 + i) * 0.12;
+      orb.mesh.position.set(ox, oy, oz);
+      orb.mesh.rotation.y += dt * 3.5;
+
+      if (orb.flash > 0) {
+        orb.flash -= dt;
+        const s = 1 + Math.min(orb.flash, 0.12) * 2.5;
+        orb.mesh.scale.setScalar(s);
+      } else {
+        orb.mesh.scale.setScalar(1);
+      }
+
+      orb.attackTimer -= dt;
+      if (orb.attackTimer > 0) continue;
+
+      orb.attackTimer = cd;
+      const target = this._findClosestTarget(ox, oz, enemyManager);
+      if (!target) continue;
+
+      const ty = (target.groundY ?? target.feetY ?? 0) + target.scale * 0.55;
+      this._spawnBolt(ox, oy, oz, target.x, ty, target.z);
+      orb.flash = 0.18;
+      onZap?.();
+
+      const dmg = target.hp + 1;
+      const result = enemyManager.damageEnemy(target, dmg, 'lightning');
+      if (result) onHit?.(dmg, result);
     }
 
-    this.damageTimer -= dt;
-    if (this.damageTimer <= 0) {
-      this.damageTimer = 0.5;
-      for (const orb of this.orbs) {
-        const nearby = enemyManager.getNearby(orb.position.x, orb.position.z, 1.5);
-        for (const { enemy } of nearby) {
-          const result = enemyManager.damageEnemy(enemy, 8, null);
-          if (result) onHit(8, result, null);
-        }
-      }
-    }
+    this._updateBolts(dt);
   }
 }
 

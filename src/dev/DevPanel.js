@@ -1,5 +1,6 @@
 import { BIOMES } from '../game/constants.js';
 import { getActiveRunRng } from '../lib/runRandom.js';
+import { DevBuffPicker } from './DevBuffPicker.js';
 
 /**
  * Dev-only panel (?dev=1 or Vite dev). Wired to Game dev commands.
@@ -30,6 +31,7 @@ export class DevPanel {
         </div>
         <div class="dev-panel-actions">
           <span class="dev-panel-section-label">Cheats</span>
+          <button type="button" id="dev-open-buffs">Buffs…</button>
           <button type="button" data-cmd="god" data-toggle="god">God mode</button>
           <button type="button" data-cmd="mega" data-toggle="mega">Mega dmg</button>
           <button type="button" data-cmd="heal">Full heal</button>
@@ -78,10 +80,17 @@ export class DevPanel {
     this._open = false;
 
     const setOpen = (open) => {
+      const wasOpen = this._open;
       this._open = !!open;
       this.body.hidden = !this._open;
       this.toggle.classList.toggle('open', this._open);
       this.root.classList.toggle('dev-panel-open', this._open);
+      if (!wasOpen && this._open) {
+        this.game.beginDevToolsPause();
+      } else if (wasOpen && !this._open) {
+        this.buffPicker?.closePicker();
+        this.game.endDevToolsPause();
+      }
     };
 
     this.toggle.addEventListener('click', () => setOpen(!this._open));
@@ -100,6 +109,11 @@ export class DevPanel {
         this.runCommand(btn.dataset.cmd);
         this.syncToggleButtons();
       });
+    });
+
+    this.buffPicker = new DevBuffPicker(game);
+    this.root.querySelector('#dev-open-buffs')?.addEventListener('click', () => {
+      this.buffPicker.openPicker();
     });
 
     this._renderBiomes();
@@ -217,6 +231,7 @@ export class DevPanel {
   }
 
   destroy() {
+    this.buffPicker?.destroy();
     this.root.remove();
   }
 }

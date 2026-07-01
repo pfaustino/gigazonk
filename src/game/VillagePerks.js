@@ -43,6 +43,12 @@ export function applyVillagePerksToRun(player, game) {
     }
     if (perk.xpMult) player._skillXpMult = (player._skillXpMult ?? 0) + perk.xpMult;
     if (perk.runCoins && game) game.runCoins += perk.runCoins;
+    if (perk.burgerFrenzyBonusSec) {
+      player._burgerFrenzyBonusSec = (player._burgerFrenzyBonusSec ?? 0) + perk.burgerFrenzyBonusSec;
+    }
+    if (perk.burgerRespawnReductionSec) {
+      player._burgerRespawnReductionSec = (player._burgerRespawnReductionSec ?? 0) + perk.burgerRespawnReductionSec;
+    }
     applied.push(perk);
   }
 

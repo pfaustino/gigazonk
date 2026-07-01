@@ -49,6 +49,17 @@ Butler can succeed while the **Play in browser** embed still serves old JS. CI c
 
 Fix: itch Edit page → delete stale HTML5 upload → Save → re-run **Deploy to itch.io**. There is no butler auto-delete; a leftover manual zip usually caused this.
 
+## itch.io page copy
+
+Source of truth: `docs/itch-description.md`. Update after player-visible features ship:
+
+```powershell
+npm run update:itch-description        # long body → clipboard
+npm run update:itch-description -- -Short
+```
+
+Paste manually on the itch edit page (butler does not sync description text). Do not document `?dev=1` in itch copy — tease the easter egg only.
+
 ## Do not
 
 - Run butler locally unless user asks

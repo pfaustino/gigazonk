@@ -676,8 +676,11 @@ export class EnemyManager {
       if (!e.alive || !e._frenzyTinted) continue;
       const touch = Math.hypot(e.x - px, e.z - pz) < radius + e.scale * 0.45;
       if (!touch) continue;
+      const ghostColor = e._frenzyTinted ? ARENA_BURGER_FRENZY_BLUE_FLASH : e.color;
+      const scale = e.scale;
+      const type = e.type;
       const result = this.killEnemy(e);
-      if (result) eaten.push(result);
+      if (result) eaten.push({ ...result, ghostColor, scale, type });
     }
     return eaten;
   }

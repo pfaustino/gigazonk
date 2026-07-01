@@ -25,14 +25,25 @@ export const DEFAULT_SAVE = {
   unlockedAchievements: [],
   tutorialStep: 0,
   tutorialComplete: false,
+  tutorialHidden: false,
   dailyChallengeDay: 0,
   dailyChallengeCompleted: false,
   runStats: { bosses: 0, rifts: 0, novaTriggered: false, maxCombo: 0 },
   settings: { ...DEFAULT_SETTINGS },
   runSnapshot: null,
   savedAt: null,
-  saveVersion: '0.2.0',
+  saveVersion: '0.2.3',
 };
+
+const BURGER_QUEST_IDS = ['burgers_1', 'burgers_3', 'gobbles_10', 'gobbles_25'];
+
+function migrateSave023(parsed, data) {
+  const version = parsed.saveVersion ?? '0.2.0';
+  if (version >= '0.2.3') return data;
+  const discovered = new Set(data.discoveredQuests);
+  for (const id of BURGER_QUEST_IDS) discovered.add(id);
+  return { ...data, discoveredQuests: [...discovered], saveVersion: '0.2.3' };
+}
 
 function migrateDiscoveredQuests(parsed) {
   const discovered = new Set([
@@ -61,7 +72,7 @@ function migrateSettings(settings = {}) {
 
 /** Merge parsed localStorage JSON into a full save record (exported for tests). */
 export function hydrateSave(parsed) {
-  return {
+  const base = {
     ...DEFAULT_SAVE,
     ...parsed,
     settings: migrateSettings(parsed.settings),
@@ -75,6 +86,7 @@ export function hydrateSave(parsed) {
     unlockedAchievements: parsed.unlockedAchievements ?? DEFAULT_SAVE.unlockedAchievements,
     tutorialStep: parsed.tutorialStep ?? DEFAULT_SAVE.tutorialStep,
     tutorialComplete: parsed.tutorialComplete ?? DEFAULT_SAVE.tutorialComplete,
+    tutorialHidden: parsed.tutorialHidden ?? DEFAULT_SAVE.tutorialHidden,
     dailyChallengeDay: parsed.dailyChallengeDay ?? DEFAULT_SAVE.dailyChallengeDay,
     dailyChallengeCompleted: parsed.dailyChallengeCompleted ?? DEFAULT_SAVE.dailyChallengeCompleted,
     runStats: { ...DEFAULT_SAVE.runStats, ...parsed.runStats },
@@ -85,6 +97,7 @@ export function hydrateSave(parsed) {
     runSnapshot: parsed.runSnapshot ?? null,
     savedAt: parsed.savedAt ?? null,
   };
+  return migrateSave023(parsed, base);
 }
 
 export class SaveData {

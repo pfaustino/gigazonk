@@ -46,12 +46,13 @@ npm run setup:extensions
 
 | Flag | Effect |
 |------|--------|
-| `?dev=1` | Dev panel on live builds (also auto in `npm run dev`) — pauses arena on open; **Buffs…** catalog for stacking upgrades |
+| `?dev=1` | Dev panel on GitHub Pages (also auto in `npm run dev`) |
+| Secret code | Type **`zonkdev`** anywhere (not in text fields) — unlocks dev on itch.io embeds; saved in `localStorage` |
 | `?biome=frost` | Force biome on arena start |
 | `?coins=500` | Grant meta coins on load |
 | `?seed=42` | Fixed run seed for repro |
 
-Dev panel: time skips, spawn/clear horde, god mode, lighting sliders, biome picker, error export, and **Dev → Buffs** (add/remove run upgrades, pause, full heal). Player-facing itch/README copy teases this as a discoverable easter egg without documenting the URL flag.
+Dev panel: time skips, spawn/clear horde, god mode, **Buffs…**, lighting, biome picker. `?dev=1` on GitHub Pages; type **`zonkdev`** on itch.io (persists in `localStorage`). Pauses arena while open.
 
 ## MCP (dev)
 

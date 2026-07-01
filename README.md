@@ -71,7 +71,7 @@ Each arena run randomizes the biome: Zonk Meadows, Bonk Wastes, Frost Zonk, or M
 
 ## Secrets
 
-Player-facing docs tease a hidden developer playground (buff sandbox, cheats, time skips) with **no menu link** — discoverable only by the curious. In dev builds and via URL flags, `?dev=1` opens the panel; that detail stays out of itch.io copy so finding it remains an easter egg.
+Player-facing docs tease a hidden developer playground. **GitHub Pages:** `?dev=1`. **itch.io embed:** type the secret code (documented in `DEV.md` for developers only).
 
 ## Performance
 

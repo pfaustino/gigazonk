@@ -16,7 +16,7 @@ Browser horde survival roguelike: village meta loop, procedural arena biomes, in
 | Village reputation perks (burger timers) | `VillagePerks.js`, `constants.js` |
 | Run summary + quest tracking (burgers, gobbles, rescues) | `ui/RunSummaryScreen.js`, `QuestSystem.js`, `data/quests.json` |
 | Tutorial overlay (hide with checkbox; **H** re-enables) | `Tutorial.js`, `ui/TutorialOverlay.js` |
-| Hidden dev playground (easter egg — `?dev=1`, not in player menus) | `DevPanel.js`, `DevBuffPicker.js`, `parseDevFlags.ts` |
+| Hidden dev playground (`?dev=1` on Pages; secret keyboard code on itch) | `DevPanel.js`, `DevBuffPicker.js`, `devUnlock.ts`, `parseDevFlags.ts` |
 
 Player docs (`docs/itch-description.md`, README) tease the dev sandbox without revealing how to open it.
 

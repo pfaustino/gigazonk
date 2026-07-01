@@ -80,7 +80,7 @@ Same order as CI; use **headed/ui** while iterating on UI:
 
 ## Dev tooling
 
-`?dev=1` panel (`src/dev/DevPanel.js`, `src/dev/DevBuffPicker.js`): pauses arena on open, time skips, spawn horde/boss, **Buffs** catalog (stack upgrades / remove all), god mode, biome override, error export. Wired in Vite dev and via URL flag on live builds. Player-facing docs tease this as a hidden easter egg without revealing the flag.
+`?dev=1` panel (`src/dev/DevPanel.js`, `src/dev/DevBuffPicker.js`): pauses arena on open. GitHub Pages: `?dev=1`. itch.io embed: type secret code `zonkdev` (see `devUnlock.ts`). Player-facing docs tease this without revealing the code.
 
 ## Publishing copy
 

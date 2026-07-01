@@ -21,6 +21,7 @@ import {
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
+import { isDevEnabled, installDevSecretListener } from '../lib/devUnlock.js';
 import { ErrorReporter } from '../lib/ErrorReporter.js';
 import { DevPanel } from '../dev/DevPanel.js';
 import { RunRng } from '../lib/RunRng.js';
@@ -193,8 +194,11 @@ export class Game {
     });
     this.audio.loadSoundManifest();
 
-    if (import.meta.env.DEV || this._devFlags.dev) {
-      this.devPanel = new DevPanel(this);
+    if (import.meta.env.DEV || isDevEnabled()) {
+      this.enableDevPanel();
+    }
+    if (!import.meta.env.DEV && !isDevEnabled()) {
+      this._devUnlockCleanup = installDevSecretListener(() => this.enableDevPanel({ announce: true }));
     }
     this.animate();
     if (shouldShowTutorial()) {
@@ -1903,6 +1907,14 @@ export class Game {
   devToggleGodMode() {
     this.player.devGodMode = !this.player.devGodMode;
     this.ui.toast(this.player.devGodMode ? 'Dev: God mode ON' : 'Dev: God mode OFF', 'synergy');
+  }
+
+  enableDevPanel({ announce = false } = {}) {
+    if (this.devPanel) return;
+    this.devPanel = new DevPanel(this);
+    if (announce) {
+      this.ui.toast('Dev access granted. Shhh.', 'synergy');
+    }
   }
 
   beginDevToolsPause() {

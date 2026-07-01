@@ -78,7 +78,7 @@ Works on phones and tablets in **landscape**. Virtual stick and action buttons a
 
 ### Hidden depths
 
-Some veteran Zonkers swear there is a **secret developer playground** buried in the game — buff sandbox, time warps, cheat toggles — with no button on any menu. We did not put up a neon sign. If you stumble onto something suspiciously overpowered, you found it the hard way. (Keep it between us.)
+Some veteran Zonkers swear there is a **secret developer playground** buried in the game — buff sandbox, time warps, cheat toggles — with no button on any menu. We did not put up a neon sign. Try poking at the title screen, the URL bar, or the keyboard if you are stubborn enough. If you stumble onto something suspiciously overpowered, you found it the hard way. (Keep it between us.)
 
 ### Play in Browser
 

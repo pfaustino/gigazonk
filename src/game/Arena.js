@@ -20,6 +20,7 @@ import {
   sampleGroundHeight,
   tintFeatureMeshes,
 } from './TerrainFeatures.js';
+import { arenaTreesEnabledForBiome, InstancedTreeField } from './InstancedTreeField.js';
 import { InstancedRockField } from './InstancedRockField.js';
 import { ObstacleGrid } from './ObstacleGrid.js';
 import { MesaHeightIndex } from './MesaHeightIndex.js';
@@ -144,6 +145,8 @@ export class Arena {
     this.rockField = new InstancedRockField(this.group, this.mesas, getBiomeRockColor(this.biome));
     this.rocks = [];
     this.obstacles.push(...this.rockField.obstacles);
+    this.treeField = null;
+    this._syncTreeField(this.biome);
 
     const borderGeo = new THREE.RingGeometry(this.halfSize - 1, this.halfSize, 64);
     const borderMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
@@ -156,11 +159,25 @@ export class Arena {
     this.obstacleGrid.rebuild(this.obstacles);
   }
 
+  _syncTreeField(biome) {
+    this.treeField?.dispose();
+    this.treeField = null;
+    if (!arenaTreesEnabledForBiome(biome?.id)) return;
+
+    const trunk = 0x5c3a1e;
+    const foliage = biome?.accent ?? 0x2d6b2d;
+    this.treeField = new InstancedTreeField(this.group, this.mesas, {
+      trunkColor: trunk,
+      foliageColor: foliage,
+    });
+  }
+
   setBiome(biome) {
     this.biome = biome;
     const rockColor = getBiomeRockColor(biome);
     this.rockField?.setRockColor(rockColor);
     tintFeatureMeshes(this.featureMeshes, rockColor);
+    this._syncTreeField(biome);
     this._applyGroundTextures();
     this._applyTerrainColors(biome);
   }

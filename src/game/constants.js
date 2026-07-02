@@ -23,6 +23,11 @@ export const ARENA_ROCK_COUNT = 300;
 /** Scatter rocks in the combat band (not the full 1200-unit arena plane). */
 export const ARENA_ROCK_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_ROCK_MAX_RADIUS = 260;
+/** Outer meadow ring — Zonk Meadows only; visual décor, no collision. */
+export const ARENA_TREE_COUNT = 72;
+export const ARENA_TREE_MIN_RADIUS = 200;
+export const ARENA_TREE_MAX_RADIUS = 340;
+export const ARENA_TREE_MAX_GROUND_Y = 0.35;
 export const ARENA_LOOT_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_LOOT_MAX_RADIUS = ARENA_SIZE * 0.5 - 24;
 export const ARENA_LOOT_RING_AREA =

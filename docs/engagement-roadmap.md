@@ -39,9 +39,13 @@ Goal: more pacing spikes, meaningful mid-run choices, and runs that feel differe
 | Village run contracts | `QuestSystem.js`, `Village.js`, `data/quests.json` | Medium — meta economy balance |
 | Shrine gambles (HP for legendary, etc.) | `Interactables.js`, UI modal | Medium — feel-bad runs if tuned wrong |
 
+## Status
+
+**Phase 1 in progress:** run modifiers (boon + curse) at arena portal — see `feat/run-modifiers` branch.
+
 ## Explicitly not on this branch yet
 
-No gameplay code changes until a Phase 1 item is picked and scoped to a child branch (e.g. `feat/run-modifiers`).
+Other Phase 1 items (mini-events, boss hazards, near-miss juice) wait for separate child branches.
 
 ## Suggested child branches
 

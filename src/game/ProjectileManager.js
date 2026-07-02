@@ -10,6 +10,42 @@ const ELEMENT_COLORS = {
   ice: 0x66ccff,
   lightning: 0xffee44,
 };
+/** Instanced bolt size — gameplay blast radius is separate (BlastRadiusFx on hit). */
+const PROJECTILE_VISUAL_SCALE = 1;
+
+/** World distance at which a projectile detonates on an enemy (blast shell + body). */
+export function enemyHitReach(area, enemyScale = 1) {
+  return area + enemyScale * 0.4;
+}
+
+/** Blast center on the approach shell — where the sphere meets the target, not the enemy core. */
+export function blastOriginAtRadius(px, pz, enemyX, enemyZ, area, enemyScale = 1) {
+  const dx = px - enemyX;
+  const dz = pz - enemyZ;
+  const dist = Math.hypot(dx, dz) || 0.001;
+  const reach = enemyHitReach(area, enemyScale);
+  const nx = dx / dist;
+  const nz = dz / dist;
+  return { x: enemyX + nx * reach, z: enemyZ + nz * reach };
+}
+
+export function isWithinEnemyHitReach(px, pz, enemyX, enemyZ, area, enemyScale = 1) {
+  return Math.hypot(enemyX - px, enemyZ - pz) <= enemyHitReach(area, enemyScale);
+}
+
+/** Enemies whose bodies overlap the blast sphere centered at (originX, originZ). */
+export function collectBlastVictims(originX, originZ, area, enemies, hitSet = null) {
+  const victims = [];
+  for (const enemy of enemies) {
+    if (!enemy?.alive) continue;
+    if (hitSet?.has(enemy)) continue;
+    const dist = Math.hypot(enemy.x - originX, enemy.z - originZ);
+    if (dist <= enemyHitReach(area, enemy.scale ?? 1)) {
+      victims.push(enemy);
+    }
+  }
+  return victims;
+}
 
 export class ProjectileManager {
   constructor(scene) {
@@ -84,12 +120,68 @@ export class ProjectileManager {
     p.vz = Math.cos(newAngle) * p.speed;
   }
 
-  _getCollisionTargets(p, enemyManager) {
+  _findDetonationAnchor(p, enemyManager) {
     if (p.targetEnemy?.alive && !p.hitEnemies.has(p.targetEnemy)) {
-      const enemy = p.targetEnemy;
-      return [{ enemy, dist: Math.hypot(enemy.x - p.px, enemy.z - p.pz) }];
+      const te = p.targetEnemy;
+      if (isWithinEnemyHitReach(p.px, p.pz, te.x, te.z, p.area, te.scale)) {
+        return te;
+      }
+      return null;
     }
-    return enemyManager.getNearby(p.px, p.pz, p.area + 0.8, this._nearbyScratch);
+
+    const nearby = enemyManager.getNearby(p.px, p.pz, p.area + 0.8, this._nearbyScratch);
+    let best = null;
+    let bestDist = Infinity;
+    for (const { enemy, dist } of nearby) {
+      if (!enemy.alive || p.hitEnemies.has(enemy)) continue;
+      if (!isWithinEnemyHitReach(p.px, p.pz, enemy.x, enemy.z, p.area, enemy.scale)) continue;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = enemy;
+      }
+    }
+    return best;
+  }
+
+  _detonate(p, enemyManager, onHit, onBlast) {
+    const anchor = this._findDetonationAnchor(p, enemyManager);
+    if (!anchor) return false;
+
+    const origin = blastOriginAtRadius(p.px, p.pz, anchor.x, anchor.z, p.area, anchor.scale);
+    const nearby = enemyManager.getNearby(origin.x, origin.z, p.area + 0.8, this._nearbyScratch);
+    const candidates = nearby.map((entry) => entry.enemy);
+    const victims = collectBlastVictims(origin.x, origin.z, p.area, candidates, p.hitEnemies);
+    if (victims.length === 0) return false;
+
+    const allowProcs = p.hitEnemies.size === 0;
+    let chainX = anchor.x;
+    let chainZ = anchor.z;
+
+    for (const enemy of victims) {
+      p.hitEnemies.add(enemy);
+      if (p.targetEnemy === enemy) p.targetEnemy = null;
+      const result = enemyManager.damageEnemy(enemy, p.damage, p.element);
+      onHit(p.damage, result, p.element, enemy, p.isCrit, { skipProcs: !allowProcs });
+      chainX = enemy.x;
+      chainZ = enemy.z;
+    }
+
+    onBlast?.(origin.x, p.py, origin.z, p.area, p.element);
+
+    if (p.element === 'lightning') {
+      this.chainLightning(
+        chainX,
+        chainZ,
+        p.damage * 0.6,
+        enemyManager,
+        onHit,
+        p.lightningChains,
+        new Set(victims)
+      );
+    }
+
+    this.remove(p);
+    return true;
   }
 
   updateInstance(p) {
@@ -102,7 +194,7 @@ export class ProjectileManager {
       dummy.scale.set(0, 0, 0);
     } else {
       dummy.position.set(p.px, p.py, p.pz);
-      dummy.scale.set(p.area, p.area, p.area);
+      dummy.scale.setScalar(PROJECTILE_VISUAL_SCALE);
       dummy.rotation.y = Math.atan2(p.vx, p.vz);
     }
     dummy.updateMatrix();
@@ -111,18 +203,20 @@ export class ProjectileManager {
     this.mesh.setColorAt(p.slot, _color.setHex(tint));
   }
 
-  update(dt, enemyManager, arena, onHit) {
+  update(dt, enemyManager, arena, onHit, onBlast = null) {
     for (const p of this.projectiles) {
       if (!p.alive) continue;
       p.life -= dt;
       if (p.life <= 0) { this.remove(p); continue; }
 
-      if (p.targetEnemy) {
-        if (!p.targetEnemy.alive) {
-          p.targetEnemy = null;
-        } else if (!p.hitEnemies.has(p.targetEnemy)) {
-          this._steerToward(p, p.targetEnemy.x, p.targetEnemy.z, dt);
+      if (p.targetEnemy?.alive && !p.hitEnemies.has(p.targetEnemy)) {
+        const te = p.targetEnemy;
+        const dist = Math.hypot(te.x - p.px, te.z - p.pz);
+        if (dist > enemyHitReach(p.area, te.scale)) {
+          this._steerToward(p, te.x, te.z, dt);
         }
+      } else if (p.targetEnemy && !p.targetEnemy.alive) {
+        p.targetEnemy = null;
       }
 
       p.px += p.vx * dt;
@@ -134,36 +228,10 @@ export class ProjectileManager {
         continue;
       }
 
-      const nearby = this._getCollisionTargets(p, enemyManager);
-      for (const { enemy } of nearby) {
-        if (!enemy.alive || p.hitEnemies.has(enemy)) continue;
-        if (Math.hypot(enemy.x - p.px, enemy.z - p.pz) < p.area + enemy.scale * 0.4) {
-          const allowProcs = p.hitEnemies.size === 0;
-          p.hitEnemies.add(enemy);
-          if (p.targetEnemy === enemy) p.targetEnemy = null;
-          const hitX = enemy.x;
-          const hitZ = enemy.z;
-          const result = enemyManager.damageEnemy(enemy, p.damage, p.element);
-          onHit(p.damage, result, p.element, enemy, p.isCrit, { skipProcs: !allowProcs });
-
-          if (p.element === 'lightning') {
-            this.chainLightning(
-              hitX,
-              hitZ,
-              p.damage * 0.6,
-              enemyManager,
-              onHit,
-              p.lightningChains,
-              new Set([enemy])
-            );
-          }
-
-          if (p.hitEnemies.size >= p.pierce + 1) {
-            this.remove(p);
-            break;
-          }
-        }
+      if (this._detonate(p, enemyManager, onHit, onBlast)) {
+        continue;
       }
+
       this.updateInstance(p);
     }
     this._compactDead();

@@ -202,14 +202,14 @@ export class CombatController {
 
   handleCombatHit(damage, killResult, element, enemy, opts = {}) {
     const g = this.game;
-    const { skipProcs = false, isCrit = false } = opts;
+    const { skipProcs = false, isCrit = false, source = null } = opts;
     const horde = this._inHordeCombat();
     const critHit = isCrit || damage > g.player.damage * g.player.getComboMult() * (g.player.getCritMultiplier() - 0.05);
     const showFx = enemy && this._dmgNumbersThisFrame < this._dmgNumberCap()
       && (!skipProcs || isCrit || killResult || !horde);
 
     if (showFx) {
-      g.particles.damageNumber(enemy.x, enemy.z, damage, critHit);
+      g.particles.damageNumber(enemy.x, enemy.z, damage, { isCrit: critHit, element, source });
       this._dmgNumbersThisFrame++;
       if (isCrit && damage >= 1 && !horde && !this._frameHitStop) {
         g.applyHitStop();
@@ -247,7 +247,7 @@ export class CombatController {
     if (alive && g.player.bonkChance > 0 && runRandom() < g.player.bonkChance) {
       const bonkDmg = damage * 19;
       const result = g.enemies.damageEnemy(enemy, bonkDmg, null);
-      this.handleCombatHit(bonkDmg, result, null, enemy, { skipProcs: true, isCrit: true });
+      this.handleCombatHit(bonkDmg, result, null, enemy, { skipProcs: true, isCrit: true, source: 'bonk' });
     }
 
     if (g.player.explodeChance > 0 && runRandom() < g.player.explodeChance) {

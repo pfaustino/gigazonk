@@ -81,14 +81,17 @@ export function applySkillBonusesToPlayer(player, charMods, skillLevels) {
   player.area = PLAYER_BASE.area * (1 + (b.areaMult ?? 0));
   player.lifesteal = (m.lifesteal || 0) + (b.lifesteal ?? 0);
   player.thorns = (m.thorns || 0) + (b.thorns ?? 0);
+  player.evasion = (m.evasion || 0) + (b.evasion ?? 0);
+  player.armor = (m.armor || 0) + (b.armor ?? 0);
   player.hpRegen = b.hpRegen ?? 0;
   player.coinMult = b.coinMult ?? 0;
-  player.evasion = b.evasion ?? 0;
-  player.armor = b.armor ?? 0;
   player.bossDamageMult = b.bossDamageMult ?? 0;
   player.damagePerKill = b.damagePerKill ?? 0;
   player.healOnKill = b.healOnKill ?? 0;
   player.comboMultBonus = (m.comboMult || 1) + (b.comboMultBonus ?? 0);
+  player.dodgeCooldownMult = m.dodgeCooldownMult ?? 1;
+  player.lightningChains = 3 + (m.lightningChainBonus ?? 0);
+  player.hurtSpeedBurst = (m.hurtSpeedBurst || 0) + (b.hurtSpeedBurst ?? 0);
   player.level = 1 + (b.startLevel ?? 0);
   player._skillXpMult = b.xpMult ?? 0;
 }

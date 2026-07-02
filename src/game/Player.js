@@ -85,6 +85,7 @@ export class Player {
     this.elements = new Set();
     if (char.startElement) this.elements.add(char.startElement);
     this.lightningChains = 3;
+    this.dodgeCooldownMult = 1;
     this.attackTimer = 0;
     this.dodgeCooldown = 0;
     this.dodging = false;
@@ -308,7 +309,7 @@ export class Player {
         if (len > 0.01) {
           this.dodging = true;
           this.dodgeTimer = DODGE_DURATION_SECONDS;
-          this.dodgeCooldown = DODGE_COOLDOWN_SECONDS;
+          this.dodgeCooldown = DODGE_COOLDOWN_SECONDS * (this.dodgeCooldownMult || 1);
           this.dodgeDir = { x: dx / len, z: dz / len };
           this.invincible = DODGE_DURATION_SECONDS;
           this._onDodge?.();

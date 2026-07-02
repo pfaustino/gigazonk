@@ -16,6 +16,36 @@ export const POT_REWARD_UI_DELAY_MS = 1000;
 export const CHEST_REWARD_UI_DELAY_MS = 1050;
 export const MESA_REWARD_UI_DELAY_MS = 1350;
 
+const DAMAGE_NUMBER_STYLES = {
+  hit: { color: '#e2e6f0', fontSize: 14, glow: '0 0 4px #8899bb' },
+  crit: { color: '#f7c948', fontSize: 66, glow: '0 0 8px #f7c948,0 0 14px #ff8844' },
+  bonk: { color: '#ff9933', fontSize: 22, glow: '0 0 10px #ff6600', format: (n) => `BONK ${n}` },
+  fire: { color: '#ff6644', fontSize: 14, glow: '0 0 6px #ff4400' },
+  'crit-fire': { color: '#ffaa44', fontSize: 63, glow: '0 0 8px #ff6600' },
+  ice: { color: '#77ccff', fontSize: 14, glow: '0 0 6px #4488ff' },
+  'crit-ice': { color: '#aaeeff', fontSize: 63, glow: '0 0 8px #66bbff' },
+  lightning: { color: '#ffe044', fontSize: 14, glow: '0 0 6px #ffcc00' },
+  'crit-lightning': { color: '#fff6aa', fontSize: 63, glow: '0 0 8px #ffee44' },
+  thorn: { color: '#6bc96b', fontSize: 13, glow: '0 0 5px #3a8a3a', format: (n) => `🌵${n}` },
+  hurt: { color: '#ff5c5c', fontSize: 18, glow: '0 0 5px #ff2222', format: (n) => `-${n}` },
+  heal: { color: '#4ade80', fontSize: 18, glow: '0 0 5px #22aa55', format: (n) => `+${n}` },
+  chomp: { color: '#ffdd33', fontSize: 15, glow: '0 0 6px #ffaa00' },
+};
+
+/** Map combat metadata to a floating-number style id. */
+export function resolveDamageNumberKind({ isCrit = false, element = null, source = null } = {}) {
+  if (source === 'bonk') return 'bonk';
+  if (source === 'thorn') return 'thorn';
+  if (isCrit && element === 'fire') return 'crit-fire';
+  if (isCrit && element === 'ice') return 'crit-ice';
+  if (isCrit && element === 'lightning') return 'crit-lightning';
+  if (isCrit) return 'crit';
+  if (element === 'fire') return 'fire';
+  if (element === 'ice') return 'ice';
+  if (element === 'lightning') return 'lightning';
+  return 'hit';
+}
+
 export class ParticleSystem {
   constructor(scene) {
     this.scene = scene;
@@ -242,6 +272,44 @@ export class ParticleSystem {
     }
   }
 
+  /** Green spikes from the player toward enemies in thorn range. */
+  thornSpikesFromPlayer(px, py, pz, enemies, maxSpikes = 14) {
+    let spawned = 0;
+    for (const enemy of enemies) {
+      if (!enemy?.alive) continue;
+      const ex = enemy.x;
+      const ez = enemy.z;
+      const dx = ex - px;
+      const dz = ez - pz;
+      const dist = Math.hypot(dx, dz) || 1;
+      const nx = dx / dist;
+      const nz = dz / dist;
+      const spikes = Math.min(3, maxSpikes - spawned);
+      for (let i = 0; i < spikes; i++) {
+        if (spawned >= maxSpikes) return;
+        const slot = this._acquireBurst(i === 1 ? 0x6bc96b : 0x4a8a3a);
+        if (!slot) return;
+        const spread = (i - 1) * 0.22;
+        const ox = -nz * spread;
+        const oz = nx * spread;
+        slot.mesh.position.set(px + ox, py + 0.45, pz + oz);
+        slot.mesh.rotation.set(0.45, Math.atan2(dx, dz), 0);
+        const len = 0.45 + runRandom() * 0.35;
+        slot.mesh.scale.set(0.07, len, 0.07);
+        const speed = 11 + runRandom() * 5;
+        this.particles.push({
+          mesh: slot.mesh,
+          pool: slot,
+          vx: nx * speed,
+          vy: 1.4 + runRandom() * 0.6,
+          vz: nz * speed,
+          life: 0.16 + runRandom() * 0.1,
+        });
+        spawned++;
+      }
+    }
+  }
+
   _runDelayedBursts(dt) {
     for (let i = this._delayedBursts.length - 1; i >= 0; i--) {
       const job = this._delayedBursts[i];
@@ -253,19 +321,23 @@ export class ParticleSystem {
     }
   }
 
-  damageNumber(x, z, amount, isCrit = false) {
-    this.floatingNumber(x, z, amount, isCrit ? 'crit' : 'hit');
+  damageNumber(x, z, amount, opts = {}) {
+    const options = typeof opts === 'boolean' ? { isCrit: opts } : opts;
+    const kind = resolveDamageNumberKind(options);
+    this.floatingNumber(x, z, amount, kind, 1.5);
   }
 
   floatingNumber(x, z, amount, kind = 'hit', y = 1.5) {
     let text;
     let fontSize;
     let color;
+    let glow;
 
     if (kind === 'chomp') {
       text = typeof amount === 'string' ? amount : 'CHOMP!';
-      fontSize = 15;
-      color = '#ffdd33';
+      fontSize = DAMAGE_NUMBER_STYLES.chomp.fontSize;
+      color = DAMAGE_NUMBER_STYLES.chomp.color;
+      glow = DAMAGE_NUMBER_STYLES.chomp.glow;
     } else {
       let n;
       if (kind === 'hurt') {
@@ -276,39 +348,23 @@ export class ParticleSystem {
         if (n < 1) return;
       }
 
-      switch (kind) {
-        case 'hurt':
-          text = `-${n}`;
-          fontSize = 18;
-          color = '#ff5c5c';
-          break;
-        case 'heal':
-          text = `+${n}`;
-          fontSize = 18;
-          color = '#4ade80';
-          break;
-        case 'crit':
-          text = String(n);
-          fontSize = 22;
-          color = '#f7c948';
-          break;
-        default:
-          text = String(n);
-          fontSize = 16;
-          color = '#fff';
-          break;
-      }
+      const style = DAMAGE_NUMBER_STYLES[kind] || DAMAGE_NUMBER_STYLES.hit;
+      fontSize = style.fontSize;
+      color = style.color;
+      glow = style.glow;
+      text = style.format ? style.format(n) : String(n);
     }
 
     const el = document.createElement('div');
     el.textContent = text;
     el.style.cssText = `
       position:absolute;font-weight:800;font-size:${fontSize}px;
-      color:${color};text-shadow:0 0 4px #000,1px 1px 0 #000;
+      color:${color};text-shadow:0 0 4px #000,1px 1px 0 #000,${glow};
       pointer-events:none;transition:none;
     `;
     this.dmgLayer.appendChild(el);
-    this.damageNumbers.push({ el, x, z, y, life: 0.7, isCrit: kind === 'crit' });
+    const isCritKind = kind === 'crit' || kind.startsWith('crit-') || kind === 'bonk';
+    this.damageNumbers.push({ el, x, z, y, life: 0.7, isCrit: isCritKind });
   }
 
   updateEnemyHpBars(enemies, camera, renderer) {

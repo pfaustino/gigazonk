@@ -136,21 +136,21 @@ export class Interactables {
     });
   }
 
-  spawnPot(x, z) {
+  spawnPot(x, z, surfaceY = 0) {
     const geo = new THREE.CylinderGeometry(0.4, 0.5, 0.7, 8);
     const mat = new THREE.MeshLambertMaterial({ color: 0xcc8844 });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, 0.35, z);
+    mesh.position.set(x, surfaceY + 0.35, z);
     mesh.castShadow = true;
     this.group.add(mesh);
-    this.items.push({ type: 'pot', mesh, x, z, broken: false, radius: 1.5 });
+    this.items.push({ type: 'pot', mesh, x, z, surfaceY, broken: false, radius: 1.5 });
   }
 
-  spawnShrine(x, z) {
+  spawnShrine(x, z, surfaceY = 0) {
     const geo = new THREE.ConeGeometry(0.6, 1.5, 6);
     const mat = new THREE.MeshLambertMaterial({ color: 0x9b59f5, emissive: 0x4a2080 });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, 0.75, z);
+    mesh.position.set(x, surfaceY + 0.75, z);
     this.group.add(mesh);
     this.items.push({ type: 'shrine', mesh, x, z, used: false, radius: 2.5 });
   }
@@ -295,6 +295,10 @@ export class Interactables {
     return { x, z };
   }
 
+  _surfaceY(arena, x, z) {
+    return arena?.getGroundHeight?.(x, z) ?? 0;
+  }
+
   scatterField(_size, count, arena = null) {
     const radialBands = 10;
     const perBand = Math.ceil(count / radialBands);
@@ -319,18 +323,20 @@ export class Interactables {
           if (!arena || isLootSpotClear(x, z, arena.obstacles, arena.mesas)) break;
           ({ x, z } = this._pickScatterPoint(bandMin, bandMax, angle + runRandom() * 0.8));
         }
-        if (runRandom() < 0.7) this.spawnPot(x, z);
-        else this.spawnChest(x, z);
+        if (runRandom() < 0.7) {
+          this.spawnPot(x, z, this._surfaceY(arena, x, z));
+        } else {
+          this.spawnChest(x, z, this._surfaceY(arena, x, z));
+        }
         placed++;
       }
     }
     const shrineCount = 3;
     for (let i = 0; i < shrineCount; i++) {
       const angle = (i / shrineCount) * Math.PI * 2;
-      this.spawnShrine(
-        Math.cos(angle) * ARENA_SHRINE_RADIUS,
-        Math.sin(angle) * ARENA_SHRINE_RADIUS
-      );
+      const x = Math.cos(angle) * ARENA_SHRINE_RADIUS;
+      const z = Math.sin(angle) * ARENA_SHRINE_RADIUS;
+      this.spawnShrine(x, z, this._surfaceY(arena, x, z));
     }
   }
 

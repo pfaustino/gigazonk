@@ -23,6 +23,14 @@ export const ARENA_ROCK_COUNT = 300;
 /** Scatter rocks in the combat band (not the full 1200-unit arena plane). */
 export const ARENA_ROCK_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_ROCK_MAX_RADIUS = 260;
+/** Outer meadow ring — Zonk Meadows only; visual décor, no collision. */
+export const ARENA_TREE_COUNT = 72;
+export const ARENA_TREE_MIN_RADIUS = 200;
+export const ARENA_TREE_MAX_RADIUS = 340;
+export const ARENA_TREE_MAX_GROUND_Y = 0.35;
+/** Gentle walkable hills — amplitude in world meters; flat spawn pad in center. */
+export const ARENA_RELIEF_AMPLITUDE = 2.2;
+export const ARENA_RELIEF_SPAWN_BLEND = 18;
 export const ARENA_LOOT_MIN_RADIUS = ARENA_SPAWN_PAD_RADIUS + 5;
 export const ARENA_LOOT_MAX_RADIUS = ARENA_SIZE * 0.5 - 24;
 export const ARENA_LOOT_RING_AREA =
@@ -75,6 +83,8 @@ export const FAMILIAR_ORBIT_RADIUS = 2.8;
 export const FAMILIAR_ZAP_RANGE = 24;
 export const FAMILIAR_BOLT_LIFE = 0.14;
 export const FAMILIAR_ORBIT_SPEED = 2.4;
+/** Chip damage per zap vs Zonk Lords (× player damage after boss bonuses); trash still one-shot. */
+export const FAMILIAR_BOSS_DAMAGE_MULT = 0.65;
 /** Pac-Man power-pellet vulnerable ghost tint. */
 export const ARENA_BURGER_FRENZY_BLUE = 0x2121de;
 export const ARENA_BURGER_FRENZY_BLUE_FLASH = 0x6eb5ff;
@@ -187,6 +197,12 @@ export const CRIT_CHANCE_CAP = 0.75;
 
 /** Max HP removed per contact tick when many enemies overlap (before armor). */
 export const ENEMY_CONTACT_DAMAGE_CAP = 28;
+/** Thorn aura — steady DPS on enemies within this radius (meters). */
+export const THORN_CONTACT_RADIUS = 2;
+/** Visual spike burst cadence while thorns are damaging nearby enemies. */
+export const THORN_VFX_INTERVAL = 0.22;
+/** Batched floating damage number for thorn aura ticks. */
+export const THORN_FLOAT_INTERVAL = 0.5;
 /** Enemy `damage` in data/enemies.json = HP per contact hit (player i-frames apply). */
 
 /** Level N→N+1 XP = floor(XP_LEVEL_BASE * XP_LEVEL_GROWTH^(N-1)). Tune with XP_PICKUP_MULT. */
@@ -315,44 +331,72 @@ export const CHARACTERS = [
     id: 'fox',
     name: 'Zonka',
     icon: '🦊',
-    desc: 'Nimble trickster. Blazing speed and rapid attacks.',
+    desc: 'Nimble trickster — outspeed the horde and slip between hits.',
+    perks: ['+20% move speed', '+10% attack rate', '12% evasion', '25% faster dodge (Q)'],
     color: 0xff8844,
     unlockCost: 0,
     playable: true,
-    mods: { speedMult: 1.2, hpMult: 0.9, attackRateMult: 1.1 },
+    mods: {
+      speedMult: 1.2,
+      hpMult: 0.9,
+      attackRateMult: 1.1,
+      evasion: 0.12,
+      dodgeCooldownMult: 0.75,
+    },
     startElement: null,
   },
   {
     id: 'knight',
     name: 'Bonk Knight',
     icon: '⚔️',
-    desc: 'Armored stalwart. High HP, thorn aura, crushing blows.',
+    desc: 'Armored bastion — soak hits and punish anything that touches you.',
+    perks: ['+35% max HP', '+20% damage', '8 thorn DPS aura', '15% damage reduction'],
     color: 0x8899aa,
     unlockCost: 0,
     playable: true,
-    mods: { speedMult: 0.85, hpMult: 1.35, damageMult: 1.2, thorns: 5 },
+    mods: {
+      speedMult: 0.85,
+      hpMult: 1.35,
+      damageMult: 1.2,
+      thorns: 8,
+      armor: 0.15,
+    },
     startElement: null,
   },
   {
     id: 'mage',
     name: 'Storm Witch',
     icon: '🔮',
-    desc: 'Elemental savant. Starts with lightning, +crit.',
+    desc: 'Lightning prodigy — forks bolts early and crits often.',
+    perks: ['Starts with Lightning', '+10% crit chance', '+1 bolt fork', 'Glass cannon (−15% HP)'],
     color: 0x66ccff,
     unlockCost: 150,
     playable: true,
-    mods: { speedMult: 0.95, hpMult: 0.85, critChance: 0.1 },
+    mods: {
+      speedMult: 0.95,
+      hpMult: 0.85,
+      critChance: 0.1,
+      lightningChainBonus: 1,
+    },
     startElement: 'lightning',
   },
   {
     id: 'berserker',
     name: 'Rage Boar',
     icon: '🐗',
-    desc: 'Unstoppable fury. Combo bonus doubled, lifesteal.',
+    desc: 'Snowballing fury — combos and lifesteal keep you in the fight.',
+    perks: ['Combo damage bonus ×2', '5% lifesteal', '+15% damage', 'Speed surge when hurt'],
     color: 0xcc4444,
     unlockCost: 200,
     playable: true,
-    mods: { speedMult: 1.05, hpMult: 1.1, damageMult: 1.15, lifesteal: 0.03, comboMult: 2 },
+    mods: {
+      speedMult: 1.05,
+      hpMult: 1.1,
+      damageMult: 1.15,
+      lifesteal: 0.05,
+      comboMult: 2,
+      hurtSpeedBurst: 0.2,
+    },
     startElement: null,
   },
 ];

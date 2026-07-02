@@ -62,11 +62,15 @@ export function showCharacterSelect(ui, onSelect, onBack) {
     const status = !playable
       ? 'Coming soon'
       : (unlocked ? (selected ? 'SELECTED' : 'Click to select') : `🔒 ${char.unlockCost} coins`);
+    const perks = char.perks?.length
+      ? `<ul class="char-perks">${char.perks.map((p) => `<li>${p}</li>`).join('')}</ul>`
+      : '';
     return `
         <div class="char-card ${cardClass} ${selected ? 'selected' : ''}" data-id="${char.id}" data-playable="${playable ? '1' : '0'}">
           <div class="char-icon">${char.icon}</div>
           <h4>${char.name}</h4>
           <p>${char.desc}</p>
+          ${perks}
           <div class="char-status">${status}</div>
         </div>
       `;

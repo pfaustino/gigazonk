@@ -2271,6 +2271,25 @@ html, body {
 .char-icon { font-size: 40px; margin-bottom: 8px; }
 .char-card h4 { color: #f7c948; margin-bottom: 6px; }
 .char-card p { font-size: 11px; color: #999; line-height: 1.4; margin-bottom: 8px; }
+.char-perks {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  text-align: left;
+}
+.char-perks li {
+  font-size: 10px;
+  color: #b8c8d8;
+  line-height: 1.35;
+  padding-left: 10px;
+  position: relative;
+}
+.char-perks li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #f7c948;
+}
 .char-status { font-size: 11px; color: #6b4fd4; font-weight: 700; }
 
 .quest-board {

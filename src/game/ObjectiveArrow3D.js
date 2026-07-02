@@ -11,8 +11,8 @@ export class ObjectiveArrow3D {
     this.root = new THREE.Group();
     this.root.name = 'objective-arrows-3d';
     scene.add(this.root);
-    this.citizenArrow = this._buildArrow(0xffcc22, 0x2db84a);
-    this.burgerArrow = this._buildArrow(0xffdd33, 0x2db84a);
+    this.citizenArrow = this._buildArrow(0xffcc22);
+    this.burgerArrow = this._buildArrow(0xffdd33);
     this.root.add(this.citizenArrow, this.burgerArrow);
     this.citizenArrow.visible = false;
     this.burgerArrow.visible = false;
@@ -25,17 +25,14 @@ export class ObjectiveArrow3D {
     this._time = 0;
   }
 
-  /**
-   * Flat arrow in the XZ plane, tip along +Z. Green trim on wing edges only (not a vest).
-   */
-  _buildArrow(bodyColor, accentColor) {
+  /** Flat arrow in the XZ plane, tip along +Z. */
+  _buildArrow(bodyColor) {
     const group = new THREE.Group();
     const yellow = new THREE.MeshLambertMaterial({
       color: bodyColor,
       emissive: bodyColor,
       emissiveIntensity: 0.1,
     });
-    const green = new THREE.MeshLambertMaterial({ color: accentColor });
 
     const shape = new THREE.Shape();
     shape.moveTo(0, 1.15);
@@ -61,13 +58,6 @@ export class ObjectiveArrow3D {
     body.position.y = 0.11;
     body.castShadow = true;
     group.add(body);
-
-    for (const side of [-1, 1]) {
-      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.55), green);
-      trim.position.set(side * 0.52, 0.12, 0.38);
-      trim.rotation.x = -Math.PI / 2;
-      group.add(trim);
-    }
 
     group.scale.setScalar(2.2);
     return group;

@@ -16,12 +16,17 @@ import {
   generateArenaFeatures,
   GROUND_WALL_HEIGHT,
   isInsideMesaRamp,
+  repositionFeatureMeshesToTerrain,
   resolveCircleAabb,
   sampleGroundHeight,
   tintFeatureMeshes,
 } from './TerrainFeatures.js';
-import { arenaTreesEnabledForBiome, InstancedTreeField } from './InstancedTreeField.js';
 import { InstancedRockField } from './InstancedRockField.js';
+import { arenaTreesEnabledForBiome, InstancedTreeField } from './InstancedTreeField.js';
+import {
+  applyTerrainReliefToGeometry,
+  initTerrainRelief,
+} from './TerrainRelief.js';
 import { ObstacleGrid } from './ObstacleGrid.js';
 import { MesaHeightIndex } from './MesaHeightIndex.js';
 
@@ -157,6 +162,14 @@ export class Arena {
 
     this.obstacleGrid = new ObstacleGrid(24);
     this.obstacleGrid.rebuild(this.obstacles);
+    this.applyTerrainRelief(0);
+  }
+
+  /** Rebuild ground hills from run seed — mesh + gameplay height share TerrainRelief. */
+  applyTerrainRelief(seed) {
+    initTerrainRelief(seed);
+    applyTerrainReliefToGeometry(this.groundGeo);
+    repositionFeatureMeshesToTerrain(this.featureMeshes);
   }
 
   _syncTreeField(biome) {

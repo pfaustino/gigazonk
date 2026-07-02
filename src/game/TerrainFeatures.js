@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sampleBaseTerrainHeight } from './TerrainRelief.js';
 import {
   ARENA_LOOT_MAX_RADIUS,
   ARENA_SIZE,
@@ -439,8 +440,8 @@ export function generateArenaFeatures() {
 }
 
 export function sampleGroundHeight(x, z, mesas, mesaIndex = null) {
+  let h = sampleBaseTerrainHeight(x, z);
   const candidates = mesaIndex ? mesaIndex.query(x, z) : mesas;
-  let h = 0;
   for (const mesa of candidates) {
     h = Math.max(h, sampleMesaHeight(x, z, mesa));
   }
@@ -561,7 +562,9 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
     if (f.kind === 'wall') {
       const geo = new THREE.BoxGeometry(f.w, WALL_HEIGHT, f.d);
       const mesh = new THREE.Mesh(geo, wallMat.clone());
-      mesh.position.set(f.x, WALL_HEIGHT / 2, f.z);
+      const baseY = sampleWallBaseY(f.x, f.z, f.w, f.d);
+      mesh.position.set(f.x, baseY + WALL_HEIGHT / 2, f.z);
+      mesh.userData.terrainAnchor = { kind: 'wall', x: f.x, z: f.z, w: f.w, d: f.d };
       mesh.userData.rockTexRepeat = {
         x: Math.max(f.w, f.d) / tile,
         y: WALL_HEIGHT / tile,
@@ -594,6 +597,28 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
   return meshes;
 }
 
+function sampleWallBaseY(x, z, w, d) {
+  const hw = w / 2;
+  const hd = d / 2;
+  return (
+    sampleBaseTerrainHeight(x - hw, z - hd) +
+    sampleBaseTerrainHeight(x + hw, z - hd) +
+    sampleBaseTerrainHeight(x + hw, z + hd) +
+    sampleBaseTerrainHeight(x - hw, z + hd)
+  ) / 4;
+}
+
+/** Re-seat wall meshes after terrain relief changes (per-run seed). */
+export function repositionFeatureMeshesToTerrain(meshes) {
+  if (!meshes?.length) return;
+  for (const mesh of meshes) {
+    const anchor = mesh.userData.terrainAnchor;
+    if (anchor?.kind !== 'wall') continue;
+    const baseY = sampleWallBaseY(anchor.x, anchor.z, anchor.w, anchor.d);
+    mesh.position.y = baseY + WALL_HEIGHT / 2;
+  }
+}
+
 export function applyRockTextureToFeatureMeshes(meshes, texture, rockColor) {
   if (!texture || !meshes?.length) return;
   for (const mesh of meshes) {
@@ -623,6 +648,6 @@ export function isLootSpotClear(x, z, obstacles, mesas) {
       }
     }
   }
-  if (sampleGroundHeight(x, z, mesas) > 0.5) return false;
+  if (isOnAnyMesaPlateau(x, z, mesas)) return false;
   return true;
 }

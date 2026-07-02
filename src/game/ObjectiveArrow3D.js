@@ -1,10 +1,16 @@
 import * as THREE from 'three';
 
-/** Height above player and distance in front of the player (along facing). */
-const ARROW_HEIGHT_ABOVE = 8.8;
-const ARROW_AHEAD_DIST = 11;
+/** Distance in front of the camera along the top-center screen ray. */
+const ARROW_SCREEN_DEPTH = 16;
+/** NDC anchor: center-top of the viewport (x=0, y toward top). */
+const ARROW_SCREEN_NDC = new THREE.Vector2(0, 0.78);
 
-/** Crazy Taxi–style 3D yellow arrow floating above the player. */
+/** Flat arrow mesh tip points local -Z; yaw aims that tip at the world target on XZ. */
+export function objectiveArrowYaw(dx, dz) {
+  return Math.atan2(-dx, -dz);
+}
+
+/** Crazy Taxi–style 3D yellow arrow locked to the top-center of the screen. */
 export class ObjectiveArrow3D {
   constructor(scene) {
     this.scene = scene;
@@ -17,6 +23,7 @@ export class ObjectiveArrow3D {
     this.citizenArrow.visible = false;
     this.burgerArrow.visible = false;
     this._time = 0;
+    this._ray = new THREE.Raycaster();
   }
 
   reset() {
@@ -25,7 +32,7 @@ export class ObjectiveArrow3D {
     this._time = 0;
   }
 
-  /** Flat arrow in the XZ plane, tip along +Z. */
+  /** Flat arrow in the XZ plane, tip along local -Z (see extrude +X rotation). */
   _buildArrow(bodyColor) {
     const group = new THREE.Group();
     const yellow = new THREE.MeshLambertMaterial({
@@ -56,45 +63,40 @@ export class ObjectiveArrow3D {
     );
     body.rotation.x = -Math.PI / 2;
     body.position.y = 0.11;
-    body.castShadow = true;
+    body.castShadow = false;
     group.add(body);
 
     group.scale.setScalar(2.2);
     return group;
   }
 
-  _aimArrow(arrow, px, py, pz, frontHeading, target) {
+  _aimArrow(arrow, camera, playerX, playerZ, target) {
     if (!target) {
       arrow.visible = false;
       return;
     }
     arrow.visible = true;
 
-    const dx = target.x - px;
-    const dz = target.z - pz;
-    const yaw = Math.atan2(dx, dz) + Math.PI;
-    const bounce = Math.sin(this._time * 5.5) * 0.35;
-    const height = py + ARROW_HEIGHT_ABOVE + bounce;
-    const fx = Math.sin(frontHeading);
-    const fz = Math.cos(frontHeading);
+    this._ray.setFromCamera(ARROW_SCREEN_NDC, camera);
+    arrow.position
+      .copy(this._ray.ray.origin)
+      .addScaledVector(this._ray.ray.direction, ARROW_SCREEN_DEPTH);
+    arrow.position.y += Math.sin(this._time * 5.5) * 0.35;
 
-    arrow.position.set(
-      px + fx * ARROW_AHEAD_DIST,
-      height,
-      pz + fz * ARROW_AHEAD_DIST
-    );
-    arrow.rotation.set(0, yaw, 0);
+    const dx = target.x - playerX;
+    const dz = target.z - playerZ;
+    arrow.rotation.set(0, objectiveArrowYaw(dx, dz), 0);
   }
 
-  update(dt, playerX, playerY, playerZ, frontHeading, citizenTarget, burgerTarget) {
+  update(dt, camera, playerX, playerZ, citizenTarget, burgerTarget) {
     this._time += dt;
     this.citizenArrow.visible = false;
     this.burgerArrow.visible = false;
 
     const target = burgerTarget || citizenTarget;
-    if (!target) return;
+    if (!target || !camera) return;
 
     const arrow = burgerTarget ? this.burgerArrow : this.citizenArrow;
-    this._aimArrow(arrow, playerX, playerY, playerZ, frontHeading, target);
+    this._aimArrow(arrow, camera, playerX, playerZ, target);
   }
 }

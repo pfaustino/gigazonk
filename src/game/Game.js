@@ -16,7 +16,8 @@ import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
 import {
-  ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC, ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, gobbleHealForType, OBJECTIVE_ARROW_HIDE_DIST,
+  ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC,   ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, gobbleHealForType, OBJECTIVE_ARROW_HIDE_DIST,
+  THORN_CONTACT_RADIUS, THORN_FLOAT_INTERVAL, THORN_VFX_INTERVAL,
 } from './constants.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
@@ -57,6 +58,7 @@ import { CombatController } from './CombatController.js';
 import { CitizenRescue } from './CitizenRescue.js';
 import { ArenaBurger } from './ArenaBurger.js';
 import { ObjectiveArrow3D } from './ObjectiveArrow3D.js';
+import { BlastRadiusFx } from './BlastRadiusFx.js';
 
 export class Game {
   constructor(canvas) {
@@ -332,6 +334,7 @@ export class Game {
     this.rifts = new RiftManager(this.scene);
     this.synergy = new SynergyNova(this.scene);
     this.particles = new ParticleSystem(this.scene);
+    this.blastRadiusFx = new BlastRadiusFx(this.scene);
     this.combat = new CombatController(this);
     this.citizenRescue = new CitizenRescue(this.scene);
     this.citizenRescue.onRescued = (citizen) => this._onCitizenRescued(citizen);
@@ -487,6 +490,7 @@ export class Game {
       this.rifts,
       this.synergy,
       this.particles,
+      this.blastRadiusFx,
     ];
   }
 
@@ -608,6 +612,10 @@ export class Game {
     saveData.data.totalRuns++;
     saveData.save();
     this.ui.toast(`Entering ${this.currentBiome.name}`, 'synergy');
+    const char = CHARACTERS.find((c) => c.id === this.player.characterId);
+    if (char?.perks?.length) {
+      queueMicrotask(() => this.ui.toast(`${char.icon} ${char.perks.slice(0, 2).join(' · ')}`, 'synergy'));
+    }
     const perkToast = formatVillagePerksToast(this._activeVillagePerks);
     if (perkToast) {
       queueMicrotask(() => this.ui.toast(`Village blessings: ${perkToast}`, 'synergy'));
@@ -679,6 +687,7 @@ export class Game {
     this._bossTelegraph = null;
     this._tutorialShownStep = getCurrentTutorialStep() ? getTutorialStepIndex() : -1;
     this.initRunRng();
+    this.arena?.applyTerrainRelief(this.runSeed);
     this.ui.dismissLevelUp();
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
@@ -692,6 +701,57 @@ export class Game {
     this._floatHealAcc = 0;
     this._floatHurtTimer = 0;
     this._floatHealTimer = 0;
+    this._thornVfxTimer = 0;
+    this._thornFloatTimer = 0;
+    this._thornDmgAccum = 0;
+  }
+
+  _updateThorns(dt) {
+    const player = this.player;
+    if (player.thorns <= 0) return;
+
+    const px = player.position.x;
+    const pz = player.position.z;
+    const py = player.getViewY?.() ?? player.mesh.position.y;
+    const nearby = this.enemies.getNearby(px, pz, THORN_CONTACT_RADIUS);
+    if (!nearby.length) return;
+
+    let hitAny = false;
+    for (const { enemy } of nearby) {
+      const tickDmg = player.thorns * dt;
+      const result = this.enemies.damageEnemy(enemy, tickDmg, null);
+      if (!result) continue;
+      hitAny = true;
+      this._thornDmgAccum += tickDmg;
+      if (player.lifesteal > 0) player.heal(tickDmg * player.lifesteal);
+      if (result.killed) {
+        this.combat.handleCombatHit(tickDmg, result, null, enemy, { skipProcs: true, source: 'thorn' });
+      }
+    }
+
+    if (!hitAny) return;
+
+    this._thornVfxTimer -= dt;
+    if (this._thornVfxTimer <= 0) {
+      this._thornVfxTimer = THORN_VFX_INTERVAL;
+      this.particles.thornSpikesFromPlayer(
+        px,
+        py,
+        pz,
+        nearby.map((entry) => entry.enemy)
+      );
+      this.audio.thornPop();
+    }
+
+    this._thornFloatTimer -= dt;
+    if (this._thornDmgAccum >= 0.5 && this._thornFloatTimer <= 0) {
+      this._thornFloatTimer = THORN_FLOAT_INTERVAL;
+      const show = Math.round(this._thornDmgAccum);
+      if (show >= 1) {
+        this.particles.floatingNumber(px, pz, show, 'thorn', py + 0.55);
+      }
+      this._thornDmgAccum = 0;
+    }
   }
 
   hideCombat() {
@@ -883,6 +943,7 @@ export class Game {
 
   restoreArenaFromSnapshot(snap) {
     applyRunSnapshot(this, snap);
+    this.arena?.applyTerrainRelief(this.runSeed ?? 0);
   }
 
   startArenaFromSnapshot(snap) {
@@ -1222,9 +1283,15 @@ export class Game {
 
     this.combat.tryAutoFire();
 
-    this.projectiles.update(dt, this.enemies, this.arena, (dmg, result, el, enemy, isCrit, opts = {}) =>
-      this.handleCombatHit(dmg, result, el, enemy, { isCrit, ...opts })
+    this.projectiles.update(
+      dt,
+      this.enemies,
+      this.arena,
+      (dmg, result, el, enemy, isCrit, opts = {}) =>
+        this.handleCombatHit(dmg, result, el, enemy, { isCrit, ...opts }),
+      (x, y, z, radius, element) => this.blastRadiusFx.spawn(x, y, z, radius, element)
     );
+    this.blastRadiusFx.update(dt);
 
     const { xp, gems } = this.gems.update(dt, this.player);
     if (gems > 0) this.quests.track('gems', gems);
@@ -1233,13 +1300,7 @@ export class Game {
       if (levels > 0) this.queueLevelUp(levels);
     }
 
-    if (this.player.thorns > 0) {
-      const nearby = this.enemies.getNearby(this.player.position.x, this.player.position.z, 2);
-      for (const { enemy } of nearby) {
-        const result = this.enemies.damageEnemy(enemy, this.player.thorns * dt, null);
-        if (result) this.handleCombatHit(this.player.thorns, result, null, enemy);
-      }
-    }
+    this._updateThorns(dt);
 
     this.familiars.setCount(this.player.familiars, this.player.getAttackRate());
     this.familiars.update(
@@ -1249,6 +1310,7 @@ export class Game {
       this.player.getAttackRate(),
       {
         playerY: this.player.mesh.position.y,
+        player: this.player,
         onHit: (dmg, result) => this.handleCombatHit(dmg, result, 'lightning', null),
         onZap: () => this.audio.familiarZap(),
       }
@@ -1477,10 +1539,9 @@ export class Game {
     }
     this.objectiveArrow3D?.update(
       dt,
+      this.camera,
       px,
-      this.player.getViewY(),
       pz,
-      this.player.facing,
       citizenForArrow,
       burgerForArrow
     );

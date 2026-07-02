@@ -133,9 +133,56 @@ export class Audio {
   }
 
   familiarZap() {
-    this.tone(880 + Math.random() * 120, 0.04, 'square', 0.07);
-    this.tone(440, 0.06, 'sawtooth', 0.05);
-    this.noise(0.03, 0.05);
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const dur = 0.065;
+    const vol = 0.085;
+
+    const buzz = this.ctx.createOscillator();
+    const buzzGain = this.ctx.createGain();
+    buzz.type = 'sawtooth';
+    const startHz = 1200 + Math.random() * 500;
+    buzz.frequency.setValueAtTime(startHz, now);
+    buzz.frequency.exponentialRampToValueAtTime(160, now + dur);
+    buzzGain.gain.setValueAtTime(vol, now);
+    buzzGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    buzz.connect(buzzGain);
+    buzzGain.connect(this.masterGain);
+    buzz.start(now);
+    buzz.stop(now + dur + 0.01);
+
+    const snap = this.ctx.createOscillator();
+    const snapGain = this.ctx.createGain();
+    snap.type = 'square';
+    snap.frequency.setValueAtTime(2400 + Math.random() * 400, now);
+    snap.frequency.exponentialRampToValueAtTime(900, now + 0.025);
+    snapGain.gain.setValueAtTime(vol * 0.55, now);
+    snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.028);
+    snap.connect(snapGain);
+    snapGain.connect(this.masterGain);
+    snap.start(now);
+    snap.stop(now + 0.03);
+
+    const bufferSize = Math.max(1, Math.floor(this.ctx.sampleRate * 0.04));
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const crackle = this.ctx.createBufferSource();
+    crackle.buffer = buffer;
+    const crackleFilter = this.ctx.createBiquadFilter();
+    crackleFilter.type = 'highpass';
+    crackleFilter.frequency.value = 1800;
+    const crackleGain = this.ctx.createGain();
+    crackleGain.gain.setValueAtTime(vol * 0.7, now);
+    crackleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    crackle.connect(crackleFilter);
+    crackleFilter.connect(crackleGain);
+    crackleGain.connect(this.masterGain);
+    crackle.start(now);
   }
 
   /** Alternating waka + bite — volume ducks when many chomps land same frame. */
@@ -340,6 +387,7 @@ export class Audio {
 
   shoot() { this.tone(440 + Math.random() * 100, 0.08, 'square', 0.06); }
   hit() { this.tone(180, 0.06, 'sawtooth', 0.08); }
+  thornPop() { this.tone(320, 0.04, 'triangle', 0.045); }
   kill() { this.tone(320, 0.1, 'square', 0.1); this.tone(480, 0.12, 'square', 0.06); }
   levelUp() {
     [392, 523, 659, 784, 988, 1175].forEach((f, i) => {

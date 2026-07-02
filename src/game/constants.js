@@ -210,8 +210,12 @@ export const THORN_FLOAT_INTERVAL = 0.5;
 /** Level N→N+1 XP = floor(XP_LEVEL_BASE * XP_LEVEL_GROWTH^(N-1)). Tune with XP_PICKUP_MULT. */
 export const XP_LEVEL_BASE = 48;
 export const XP_LEVEL_GROWTH = 1.172;
-/** Scales kill/gem/chest XP before player xpMult (horde density runs hot otherwise). */
+/** Scales kill/gem XP before player xpMult (horde density runs hot otherwise). */
 export const XP_PICKUP_MULT = 0.88;
+/** Flat XP on every chest open (in addition to rolled loot). */
+export const CHEST_GUARANTEED_XP = 10;
+/** Flat XP on every mesa treasure chest (boss-guardian reward). */
+export const MESA_CACHE_GUARANTEED_XP = 25;
 
 import { runRandomInt } from '../lib/runRandom.js';
 import { ENEMY_TYPES, GRUNT_COLORS } from './gameData.js';

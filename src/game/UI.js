@@ -857,11 +857,13 @@ export class UI {
       active: citizenOn,
       distance: citizen?.distance ?? null,
       lane: 0,
+      variant: 'citizen',
     });
     updateObjectiveDistanceLabel(document.getElementById('objective-dist-burger'), {
       active: burgerOn,
       distance: burger?.distance ?? null,
       lane: 0,
+      variant: 'burger',
     });
     updateBurgerCountdown(document.getElementById('burger-spawn-countdown'), {
       active: burgerCountdownSec != null && !burgerOn,

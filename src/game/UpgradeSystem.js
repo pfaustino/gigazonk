@@ -201,6 +201,19 @@ export const LOOT_REWARD_ICONS = {
   xp_boost: '⌚',
 };
 
+/** Show full XP gain (rolled loot + guaranteed chest bonus) on the reward tile. */
+export function mergeChestXpPreview(preview, xpBefore, xpAfter) {
+  const lines = [...preview];
+  const xpLine = lines.find((line) => line.label === 'XP');
+  if (xpLine) {
+    xpLine.before = fmtNum(xpBefore);
+    xpLine.after = fmtNum(xpAfter);
+    return lines;
+  }
+  lines.unshift({ label: 'XP', before: fmtNum(xpBefore), after: fmtNum(xpAfter) });
+  return lines;
+}
+
 export function getLootPreview(player, loot) {
   const lines = [];
   const add = (label, before, after, format = fmtNum) => {

@@ -509,8 +509,10 @@ export class Player {
   }
 
   addXp(amount, opts = {}) {
+    if (amount <= 0) return 0;
     const pickup = opts.ignorePickupMult ? 1 : XP_PICKUP_MULT;
-    this.xp += Math.floor(amount * pickup * this.xpMult);
+    const gained = Math.max(1, Math.floor(amount * pickup * this.xpMult));
+    this.xp += gained;
     let levelsGained = 0;
     while (this.xp >= this.xpToNext) {
       this.xp -= this.xpToNext;

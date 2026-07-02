@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatObjectiveCountdown } from '../src/game/ui/CrazyObjectiveArrow.js';
+import { formatObjectiveCountdown, formatObjectiveDistanceLabel } from '../src/game/ui/CrazyObjectiveArrow.js';
 import { objectiveArrowYaw } from '../src/game/ObjectiveArrow3D.js';
 
 describe('objective arrow helpers', () => {
@@ -7,6 +7,11 @@ describe('objective arrow helpers', () => {
     expect(formatObjectiveCountdown(185)).toBe('3:05');
     expect(formatObjectiveCountdown(0.2)).toBe('0:01');
     expect(formatObjectiveCountdown(30)).toBe('0:30');
+  });
+
+  it('labels objective distance by target type', () => {
+    expect(formatObjectiveDistanceLabel('citizen', 114.4)).toBe('Rescue 114m');
+    expect(formatObjectiveDistanceLabel('burger', 88.6)).toBe('Gobble Burger 89m');
   });
 
   it('yaws flat arrow tip toward target on XZ', () => {

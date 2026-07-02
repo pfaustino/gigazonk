@@ -67,7 +67,7 @@ export function formatOfferDesc(template, effect) {
   if (effect.projectileCount) return `+${effect.projectileCount} projectile${effect.projectileCount > 1 ? 's' : ''}`;
   if (effect.pierce) return 'Projectiles penetrate +1 enemy';
   if (effect.doubleJump) return `+${effect.doubleJump} air jump`;
-  if (effect.familiars) return `+${effect.familiars} familiar — lightning zaps (chips Zonk Lords)`;
+  if (effect.familiars) return `+${effect.familiars} familiar — orbiting lightning zaps`;
   if (effect.element) return formatElementOfferDesc(effect);
   if (effect.magnetRadius) return `+${effect.magnetRadius.toFixed(1)} magnet radius`;
   if (effect.fireTrail) return `Drop burning oil (+${effect.fireTrail} trail level)`;

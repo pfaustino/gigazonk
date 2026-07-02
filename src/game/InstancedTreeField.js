@@ -23,14 +23,14 @@ export class InstancedTreeField {
     const trunkGeo = new THREE.CylinderGeometry(0.2, 0.28, 1.4, 5);
     const trunkMat = new THREE.MeshLambertMaterial({ color: trunkColor });
     this.trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, ARENA_TREE_COUNT);
-    this.trunkMesh.castShadow = false;
+    this.trunkMesh.castShadow = true;
     this.trunkMesh.receiveShadow = false;
     this.trunkMesh.frustumCulled = true;
 
     const canopyGeo = new THREE.SphereGeometry(1.05, 6, 5);
     const canopyMat = new THREE.MeshLambertMaterial({ color: foliageColor });
     this.canopyMesh = new THREE.InstancedMesh(canopyGeo, canopyMat, ARENA_TREE_COUNT);
-    this.canopyMesh.castShadow = false;
+    this.canopyMesh.castShadow = true;
     this.canopyMesh.receiveShadow = false;
     this.canopyMesh.frustumCulled = true;
 

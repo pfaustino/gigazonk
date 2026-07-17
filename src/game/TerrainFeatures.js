@@ -619,6 +619,20 @@ export function repositionFeatureMeshesToTerrain(meshes) {
   }
 }
 
+/** Match wall AABB block height to relief-seated wall tops. */
+export function realignWallObstacleHeights(obstacles) {
+  if (!obstacles?.length) return;
+  for (const obs of obstacles) {
+    if (obs.type !== 'aabb') continue;
+    const w = obs.maxX - obs.minX;
+    const d = obs.maxZ - obs.minZ;
+    const cx = (obs.minX + obs.maxX) / 2;
+    const cz = (obs.minZ + obs.maxZ) / 2;
+    const baseY = sampleWallBaseY(cx, cz, w, d);
+    obs.blockBelowY = baseY + WALL_HEIGHT;
+  }
+}
+
 export function applyRockTextureToFeatureMeshes(meshes, texture, rockColor) {
   if (!texture || !meshes?.length) return;
   for (const mesh of meshes) {

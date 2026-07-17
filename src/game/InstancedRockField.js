@@ -9,6 +9,14 @@ import { sampleGroundHeight } from './TerrainFeatures.js';
 
 const _dummy = new THREE.Object3D();
 
+function rockCenterY(groundY, radius, scaleY) {
+  return groundY + radius * scaleY * 0.5;
+}
+
+function rockTopY(groundY, radius, scaleY) {
+  return groundY + radius * scaleY * 1.5;
+}
+
 /**
  * Instanced scatter rocks for arena performance (replaces per-rock Mesh).
  */
@@ -17,6 +25,8 @@ export class InstancedRockField {
     this.group = group;
     this.mesas = mesas;
     this.obstacles = [];
+    /** @type {Array<{ x: number, z: number, radius: number, scaleXZ: number, scaleY: number, isBoulder: boolean, rotX: number, rotY: number, rotZ: number }>} */
+    this.placements = [];
     this.instances = [];
 
     const smallGeo = new THREE.DodecahedronGeometry(1, 0);
@@ -43,8 +53,6 @@ export class InstancedRockField {
     const maxR = ARENA_ROCK_MAX_RADIUS;
     const minR2 = minR * minR;
     const maxR2 = maxR * maxR;
-    let si = 0;
-    let bi = 0;
 
     for (let i = 0; i < ARENA_ROCK_COUNT; i++) {
       const isBoulder = i >= smallCount;
@@ -55,19 +63,31 @@ export class InstancedRockField {
       const dist = Math.sqrt(minR2 + Math.random() * (maxR2 - minR2));
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
-      const groundY = sampleGroundHeight(x, z, this.mesas);
-      const y = groundY + radius * scaleY * 0.5;
+      const rotX = (Math.random() - 0.5) * 0.35;
+      const rotY = Math.random() * Math.PI * 2;
+      const rotZ = (Math.random() - 0.5) * 0.35;
+      this.placements.push({ x, z, radius, scaleXZ, scaleY, isBoulder, rotX, rotY, rotZ });
+    }
 
-      _dummy.position.set(x, y, z);
-      _dummy.rotation.set(
-        (Math.random() - 0.5) * 0.35,
-        Math.random() * Math.PI * 2,
-        (Math.random() - 0.5) * 0.35
-      );
-      _dummy.scale.set(radius * scaleXZ, radius * scaleY, radius * scaleXZ);
+    this.realignToTerrain(this.mesas);
+  }
+
+  /** Re-seat rock meshes + collision tops after per-run terrain relief. */
+  realignToTerrain(mesas, mesaIndex = null) {
+    this.obstacles = [];
+    let si = 0;
+    let bi = 0;
+
+    for (const p of this.placements) {
+      const groundY = sampleGroundHeight(p.x, p.z, mesas, mesaIndex);
+      const y = rockCenterY(groundY, p.radius, p.scaleY);
+
+      _dummy.position.set(p.x, y, p.z);
+      _dummy.rotation.set(p.rotX, p.rotY, p.rotZ);
+      _dummy.scale.set(p.radius * p.scaleXZ, p.radius * p.scaleY, p.radius * p.scaleXZ);
       _dummy.updateMatrix();
 
-      if (isBoulder) {
+      if (p.isBoulder) {
         this.boulderMesh.setMatrixAt(bi, _dummy.matrix);
         bi++;
       } else {
@@ -75,13 +95,12 @@ export class InstancedRockField {
         si++;
       }
 
-      const collisionRadius = radius * scaleXZ;
       this.obstacles.push({
         type: 'circle',
-        x,
-        z,
-        radius: collisionRadius,
-        blockBelowY: y + radius * scaleY,
+        x: p.x,
+        z: p.z,
+        radius: p.radius * p.scaleXZ,
+        blockBelowY: rockTopY(groundY, p.radius, p.scaleY),
       });
     }
 

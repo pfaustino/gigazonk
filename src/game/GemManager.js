@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAX_GEMS } from './constants.js';
+import { MAX_GEMS, gemVisualScale } from './constants.js';
 import { buildGemGeometry } from './EntityVisuals.js';
 import { runRandom } from '../lib/runRandom.js';
 import { assert } from '../lib/assert.js';
@@ -29,7 +29,7 @@ export class GemManager {
     this.mesh.count = 0;
   }
 
-  spawn(x, z, value = 3, nearX = 0, nearZ = 0) {
+  spawn(x, z, value = 3, nearX = 0, nearZ = 0, opts = {}) {
     if (this.freeSlots.length === 0) {
       this._evictFarthestGem(nearX, nearZ);
     }
@@ -38,7 +38,8 @@ export class GemManager {
     assert(this.freeSlots.length > 0, 'GEM_POOL_EMPTY');
     const slot = this.freeSlots.pop();
     assert(slot !== undefined && slot >= 0 && slot < MAX_GEMS, 'GEM_SLOT_INVALID');
-    const g = { slot, x, z, value, alive: true, vy: 2 + runRandom() * 2 };
+    const visualValue = opts.visualValue ?? value;
+    const g = { slot, x, z, value, visualValue, alive: true, vy: 2 + runRandom() * 2 };
     this.gems.push(g);
     this.mesh.count = Math.max(this.mesh.count, slot + 1);
     return 0;
@@ -84,7 +85,7 @@ export class GemManager {
       dummy.scale.set(0, 0, 0);
     } else {
       dummy.position.set(g.x, 0.5 + Math.sin(Date.now() * 0.005 + g.slot) * 0.2, g.z);
-      const s = 0.5 + g.value * 0.05;
+      const s = gemVisualScale(g.visualValue ?? g.value);
       dummy.scale.set(s, s, s);
       dummy.rotation.y = Date.now() * 0.003;
     }

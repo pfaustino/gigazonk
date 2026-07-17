@@ -2,10 +2,13 @@ import { expect, type Page } from '@playwright/test';
 import { waitForGameReady } from './gameReady.js';
 import { GAME_READY } from '../../src/lib/gameReady.js';
 import { dismissTutorialStep } from './tutorialFlow.js';
+import { completeRunContract } from './runContract.js';
+
+export { completeRunContract };
 
 const ARENA_HUD_TIMEOUT = process.env.CI ? 90_000 : 20_000;
 
-/** Title → character select → quick arena (same path as smoke play flow). */
+/** Title → character select → Run Contract → quick arena (same path as smoke play flow). */
 export async function startQuickArena(page: Page) {
   await dismissTutorialStep(page);
   await page.getByRole('button', { name: 'Play' }).click();
@@ -15,6 +18,7 @@ export async function startQuickArena(page: Page) {
   await expect(confirm).toBeVisible();
   await confirm.scrollIntoViewIfNeeded();
   await confirm.evaluate((el) => (el as HTMLButtonElement).click());
+  await completeRunContract(page);
   await waitForGameReady(page, GAME_READY.ARENA_HUD, ARENA_HUD_TIMEOUT);
   await expect(page.locator('#hp-bar')).toBeVisible();
   await dismissTutorialStep(page);

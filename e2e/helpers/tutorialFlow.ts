@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { completeRunContract } from './runContract.js';
 
 /** Dismiss one tutorial overlay click (next step may appear immediately). */
 export async function dismissTutorialStep(page: Page) {
@@ -34,6 +35,7 @@ export async function completeTutorialThroughArenaMove(page: Page) {
   const confirm = page.locator('#btn-confirm');
   await confirm.scrollIntoViewIfNeeded();
   await confirm.evaluate((el) => (el as HTMLButtonElement).click());
+  await completeRunContract(page);
 
   await expect(page.locator('#tutorial-overlay')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.tutorial-card h3').filter({ hasText: 'Move' })).toBeVisible();

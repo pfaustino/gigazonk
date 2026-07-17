@@ -212,6 +212,16 @@ export const XP_LEVEL_BASE = 48;
 export const XP_LEVEL_GROWTH = 1.172;
 /** Scales kill/gem XP before player xpMult (horde density runs hot otherwise). */
 export const XP_PICKUP_MULT = 0.88;
+
+/** Gem XP from kills (rift + killXpMult only — bar growth handled by spawn rate, not gem inflation). */
+export function scaledKillGemXp(baseXp, { killXpMult = 0, inRift = false } = {}) {
+  return baseXp * (inRift ? 2 : 1) * (1 + killXpMult);
+}
+
+/** Mesh scale from enemy base XP — not inflated pickup value. */
+export function gemVisualScale(baseXp) {
+  return 0.5 + Math.min(baseXp, 12) * 0.05;
+}
 /** Flat XP on every chest open (in addition to rolled loot). */
 export const CHEST_GUARANTEED_XP = 10;
 /** Flat XP on every mesa treasure chest (boss-guardian reward). */

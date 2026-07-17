@@ -17,8 +17,9 @@ import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
 import {
   ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC,   ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, gobbleHealForType, OBJECTIVE_ARROW_HIDE_DIST,
-  THORN_CONTACT_RADIUS, THORN_FLOAT_INTERVAL, THORN_VFX_INTERVAL,
+  THORN_CONTACT_RADIUS, THORN_FLOAT_INTERVAL, THORN_VFX_INTERVAL, RUN_MODIFIERS_ENABLED,
 } from './constants.js';
+import { applyRunModifiers, formatRunModifiersToast } from './RunModifiers.js';
 import { getDifficultyFromId } from './settings.js';
 import { CameraController } from './CameraController.js';
 import { parseDevFlags } from '../lib/parseDevFlags.js';
@@ -555,9 +556,12 @@ export class Game {
     this.ui.showCharacterSelect(
       () => {
         this._charSelectOpen = false;
-        this.ui.removeScreens();
-        if (this.pendingAction === 'village') this.enterVillage();
-        else this.startArena();
+        if (this.pendingAction === 'village') {
+          this.ui.removeScreens();
+          this.enterVillage();
+        } else {
+          this._beginNewArenaRun();
+        }
       },
       () => {
         this._charSelectOpen = false;
@@ -593,12 +597,31 @@ export class Game {
     this._tryShowTutorial({ force: true });
   }
 
-  startArena({ keepBiome = false, quickRetry = false, fromVillagePortal = false } = {}) {
+  _beginNewArenaRun({ fromVillagePortal = false, keepBiome = false, quickRetry = false, onCancel } = {}) {
+    const start = (runModifiers) => {
+      this.ui.removeScreens();
+      this.startArena({ fromVillagePortal, keepBiome, quickRetry, runModifiers });
+    };
+    if (!RUN_MODIFIERS_ENABLED || quickRetry) {
+      start(null);
+      return;
+    }
+    this.ui.showRunModifierPicker(
+      (selection) => start(selection),
+      () => {
+        if (onCancel) onCancel();
+        else this.ui.removeScreens();
+      }
+    );
+  }
+
+  startArena({ keepBiome = false, quickRetry = false, fromVillagePortal = false, runModifiers = null } = {}) {
     this._gameOverActive = false;
     this._ensureCombatManagers();
     this._ensureArena();
     saveData.data.runSnapshot = null;
     this.transitionTo('arena');
+    this._pendingRunModifiers = runModifiers;
     this.resetRun();
     this.quests.assignNewQuests();
     this.ui.clear();
@@ -619,6 +642,10 @@ export class Game {
     const perkToast = formatVillagePerksToast(this._activeVillagePerks);
     if (perkToast) {
       queueMicrotask(() => this.ui.toast(`Village blessings: ${perkToast}`, 'synergy'));
+    }
+    const modToast = formatRunModifiersToast(this._activeRunModifiers);
+    if (modToast) {
+      queueMicrotask(() => this.ui.toast(`Run contract: ${modToast}`, 'synergy'));
     }
     if (shouldShowTutorial() && !fromVillagePortal && !quickRetry) {
       skipTutorialStepsUntil('move');
@@ -692,6 +719,14 @@ export class Game {
     this.player.characterId = saveData.data.selectedCharacter;
     this.player.reset();
     this._activeVillagePerks = applyVillagePerksToRun(this.player, this);
+    this.runModifierEnemyHpMult = 1;
+    this.runModifierEnemySpeedMult = 1;
+    this._activeRunModifiers = null;
+    if (this._pendingRunModifiers) {
+      applyRunModifiers(this.player, this, this._pendingRunModifiers);
+      this._activeRunModifiers = { ...this._pendingRunModifiers };
+      this._pendingRunModifiers = null;
+    }
     this.resetRunManagers({ upgrades: true, questsRun: true });
     if (this._gobbleSirenActive) {
       this.audio.stopGobbleSiren();
@@ -1024,7 +1059,9 @@ export class Game {
   }
 
   _finishBossSpawn(x, z) {
-    this.enemies.spawnBoss(x, z, this.player.getEffectiveDamage());
+    const hpMult = this.runModifierEnemyHpMult ?? 1;
+    const speedMult = this.runModifierEnemySpeedMult ?? 1;
+    this.enemies.spawnBoss(x, z, this.player.getEffectiveDamage(), hpMult, speedMult);
     this.audio.boss();
     this.cameraController.addShake(0.85);
     this.ui.showBossIntro(this.bossCount);
@@ -1246,8 +1283,10 @@ export class Game {
     }
 
     const spawnResult = this.enemies.spawnWave(
-      this.player.position, this.elapsed, this.inRift, diffMult, dt, diffSetting.hpMult,
-      this.player.getEffectiveDamage(), this.pendingGigaSpawn
+      this.player.position, this.elapsed, this.inRift, diffMult, dt,
+      diffSetting.hpMult * (this.runModifierEnemyHpMult ?? 1),
+      this.player.getEffectiveDamage(), this.pendingGigaSpawn,
+      this.runModifierEnemySpeedMult ?? 1
     );
     if (spawnResult.spawned > 0 && this.pendingGigaSpawn) {
       this.pendingGigaSpawn = false;
@@ -1623,7 +1662,7 @@ export class Game {
                 saveData.data.runSnapshot = null;
                 saveData.save();
                 this.ui.showCharacterSelect(
-                  () => { this.ui.removeScreens(); this.startArena({ fromVillagePortal: true }); },
+                  () => this._beginNewArenaRun({ fromVillagePortal: true }),
                   () => { this.ui.removeScreens(); }
                 );
               },
@@ -1631,7 +1670,7 @@ export class Game {
             );
           } else {
             this.ui.showCharacterSelect(
-              () => { this.ui.removeScreens(); this.startArena({ fromVillagePortal: true }); },
+              () => this._beginNewArenaRun({ fromVillagePortal: true }),
               () => { this.ui.removeScreens(); }
             );
           }

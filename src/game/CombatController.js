@@ -1,5 +1,5 @@
 import { runRandom, runRandomInt } from '../lib/runRandom.js';
-import { COMBAT_AOE_PROC_MAX_TARGETS, COMBAT_HORDE_FX_LIMIT } from './constants.js';
+import { COMBAT_AOE_PROC_MAX_TARGETS, COMBAT_HORDE_FX_LIMIT, scaledKillGemXp } from './constants.js';
 
 /**
  * Combat hit resolution, proc chains, and player auto-fire.
@@ -73,11 +73,16 @@ export class CombatController {
     g.quests.track('kills', n);
     if (this._batchElites > 0) g.quests.track('elites', this._batchElites);
 
-    const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
-    const totalXp = this._batchXp * xpMult;
+    const totalXp = scaledKillGemXp(this._batchXp, {
+      killXpMult: g.player.killXpMult,
+      inRift: g.inRift,
+    });
+    const avgBaseXp = this._batchXp / n;
     const ax = this._batchPosX / this._batchPosN;
     const az = this._batchPosZ / this._batchPosN;
-    const overflow = g.gems.spawn(ax, az, totalXp, g.player.position.x, g.player.position.z);
+    const overflow = g.gems.spawn(ax, az, totalXp, g.player.position.x, g.player.position.z, {
+      visualValue: avgBaseXp,
+    });
     if (overflow > 0) {
       const levels = g.player.addXp(overflow);
       if (levels > 0) g.queueLevelUp(levels);
@@ -108,11 +113,14 @@ export class CombatController {
     }
 
     g.player.addKill();
-    const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
-    const xpValue = killResult.xp * xpMult;
+    const xpValue = scaledKillGemXp(killResult.xp, {
+      killXpMult: g.player.killXpMult,
+      inRift: g.inRift,
+    });
     const overflow = g.gems.spawn(
       killResult.pos.x, killResult.pos.z, xpValue,
-      g.player.position.x, g.player.position.z
+      g.player.position.x, g.player.position.z,
+      { visualValue: killResult.xp },
     );
     if (overflow > 0) {
       const levels = g.player.addXp(overflow);
@@ -139,11 +147,14 @@ export class CombatController {
   _resolveBossKill(killResult, enemy, _element) {
     const g = this.game;
     g.player.addKill();
-    const xpMult = (g.inRift ? 2 : 1) * (1 + g.player.killXpMult);
-    const xpValue = killResult.xp * xpMult;
+    const xpValue = scaledKillGemXp(killResult.xp, {
+      killXpMult: g.player.killXpMult,
+      inRift: g.inRift,
+    });
     const overflow = g.gems.spawn(
       killResult.pos.x, killResult.pos.z, xpValue,
-      g.player.position.x, g.player.position.z
+      g.player.position.x, g.player.position.z,
+      { visualValue: killResult.xp },
     );
     if (overflow > 0) {
       const levels = g.player.addXp(overflow);

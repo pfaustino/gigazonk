@@ -1,5 +1,16 @@
 /** HUD distance labels + burger/gobble countdowns (3D arrows live in ObjectiveArrow3D). */
 
+const OBJECTIVE_ACTION_LABELS = {
+  citizen: 'Rescue',
+  burger: 'Gobble Burger',
+};
+
+export function formatObjectiveDistanceLabel(variant, distance) {
+  const action = OBJECTIVE_ACTION_LABELS[variant] ?? '';
+  const meters = `${Math.round(distance)}m`;
+  return action ? `${action} ${meters}` : meters;
+}
+
 export function formatObjectiveCountdown(seconds) {
   const total = Math.max(0, Math.ceil(seconds));
   const mins = Math.floor(total / 60);
@@ -33,9 +44,9 @@ export function createGobbleCountdownElement() {
 
 /**
  * @param {HTMLElement | null} el
- * @param {{ active?: boolean, distance?: number | null, lane?: number }} opts
+ * @param {{ active?: boolean, distance?: number | null, lane?: number, variant?: 'citizen' | 'burger' }} opts
  */
-export function updateObjectiveDistanceLabel(el, { active = false, distance = null, lane = 0 } = {}) {
+export function updateObjectiveDistanceLabel(el, { active = false, distance = null, lane = 0, variant = '' } = {}) {
   if (!el) return;
   if (!active || distance == null || !Number.isFinite(distance)) {
     el.classList.add('hidden');
@@ -48,7 +59,7 @@ export function updateObjectiveDistanceLabel(el, { active = false, distance = nu
   const cx = window.innerWidth / 2 + lane * 88;
   el.style.left = `${cx}px`;
   el.style.top = `${topY}px`;
-  el.textContent = `${Math.round(distance)}m`;
+  el.textContent = formatObjectiveDistanceLabel(variant, distance);
 }
 
 export function updateBurgerCountdown(el, { active = false, secondsRemaining = 0 } = {}) {

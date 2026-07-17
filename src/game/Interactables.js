@@ -4,10 +4,17 @@ import {
   ARENA_LOOT_MIN_RADIUS,
   ARENA_SHRINE_RADIUS,
   ARENA_SIZE,
+  CHEST_GUARANTEED_XP,
   CRIT_CHANCE_CAP,
+  MESA_CACHE_GUARANTEED_XP,
 } from './constants.js';
 import { isLootSpotClear } from './TerrainFeatures.js';
-import { getLootPreview, getShrinePreview, LOOT_REWARD_ICONS } from './UpgradeSystem.js';
+import {
+  getLootPreview,
+  getShrinePreview,
+  LOOT_REWARD_ICONS,
+  mergeChestXpPreview,
+} from './UpgradeSystem.js';
 import { runRandom } from '../lib/runRandom.js';
 import {
   CHEST_REWARD_UI_DELAY_MS,
@@ -513,7 +520,11 @@ export class Interactables {
     item._pending = null;
     item.opened = true;
     item.opening = false;
-    const levelsGained = this.applyLoot(pending.loot, pending.player, pending.callbacks);
+    const xpBefore = pending.player.xp;
+    let levelsGained = this.applyLoot(pending.loot, pending.player, pending.callbacks);
+    const guaranteedXp = item.type === 'mesa_cache' ? MESA_CACHE_GUARANTEED_XP : CHEST_GUARANTEED_XP;
+    levelsGained += pending.player.addXp(guaranteedXp, { ignorePickupMult: true });
+    const preview = mergeChestXpPreview(pending.preview, xpBefore, pending.player.xp);
     if (item.type === 'mesa_cache') {
       let burstY = (item.surfaceY ?? 0) + 0.87;
       if (item.mesh) {
@@ -532,7 +543,7 @@ export class Interactables {
     const result = {
       type: item.type,
       loot: pending.loot,
-      preview: pending.preview,
+      preview,
       levelsGained,
       icon: LOOT_REWARD_ICONS[pending.loot.type] || (item.type === 'mesa_cache' ? '🏔️' : '🎁'),
       name: pending.loot.label,

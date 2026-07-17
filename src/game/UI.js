@@ -26,6 +26,7 @@ import {
   updateGobbleCountdown,
 } from './ui/CrazyObjectiveArrow.js';
 import { showRunSummary as renderRunSummary } from './ui/RunSummaryScreen.js';
+import { showRunModifierPicker as renderRunModifierPicker } from './ui/RunModifierScreen.js';
 import { showTutorialOverlay, hideTutorialOverlay } from './ui/TutorialOverlay.js';
 import { checkSkillAchievement } from './AchievementSystem.js';
 import { setGameReady, GAME_READY } from '../lib/gameReady.js';
@@ -195,6 +196,10 @@ export class UI {
 
   showCharacterSelect(onSelect, onBack) {
     renderCharacterSelect(this, onSelect, onBack);
+  }
+
+  showRunModifierPicker(onConfirm, onCancel) {
+    renderRunModifierPicker(this, onConfirm, onCancel);
   }
 
   showQuestBoard(questSystem, onClose) {
@@ -852,11 +857,13 @@ export class UI {
       active: citizenOn,
       distance: citizen?.distance ?? null,
       lane: 0,
+      variant: 'citizen',
     });
     updateObjectiveDistanceLabel(document.getElementById('objective-dist-burger'), {
       active: burgerOn,
       distance: burger?.distance ?? null,
       lane: 0,
+      variant: 'burger',
     });
     updateBurgerCountdown(document.getElementById('burger-spawn-countdown'), {
       active: burgerCountdownSec != null && !burgerOn,

@@ -13,6 +13,7 @@ import {
   FAMILIAR_BOLT_LIFE,
   FAMILIAR_ORBIT_SPEED,
   FAMILIAR_ZAP_DAMAGE_MULT,
+  scaledKillGemXp,
 } from './constants.js';
 import { runRandom } from '../lib/runRandom.js';
 
@@ -292,7 +293,14 @@ export class SynergyNova {
     for (const { enemy } of nearby) {
       const result = enemyManager.damageEnemy(enemy, player.getEffectiveDamage() * 3, 'fire');
       if (result) {
-        gemManager.spawn(result.pos.x, result.pos.z, result.xp * 2, player.position.x, player.position.z);
+        gemManager.spawn(
+          result.pos.x,
+          result.pos.z,
+          scaledKillGemXp(result.xp * 2, { killXpMult: player.killXpMult }),
+          player.position.x,
+          player.position.z,
+          { visualValue: result.xp * 2 },
+        );
         onHit(player.getEffectiveDamage() * 3, result, 'fire');
       }
     }

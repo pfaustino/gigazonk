@@ -27,6 +27,9 @@ export function captureRunSnapshot(game) {
     biomeId: game.currentBiome?.id,
     runSeed: game.runSeed,
     rngState: getActiveRunRng()?.getState() ?? null,
+    runModifiers: game._activeRunModifiers,
+    runModifierEnemyHpMult: game.runModifierEnemyHpMult ?? 1,
+    runModifierEnemySpeedMult: game.runModifierEnemySpeedMult ?? 1,
   };
 }
 
@@ -48,6 +51,9 @@ export function restoreArenaTimers(game, snap) {
       setActiveRunRng(new RunRng(snap.runSeed));
     }
   }
+  game._activeRunModifiers = snap.runModifiers ?? null;
+  game.runModifierEnemyHpMult = snap.runModifierEnemyHpMult ?? 1;
+  game.runModifierEnemySpeedMult = snap.runModifierEnemySpeedMult ?? 1;
 }
 
 export function restoreBiomeFromSnapshot(game, snap) {

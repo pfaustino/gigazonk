@@ -17,6 +17,7 @@ import {
   GROUND_WALL_HEIGHT,
   isInsideMesaRamp,
   repositionFeatureMeshesToTerrain,
+  realignWallObstacleHeights,
   resolveCircleAabb,
   sampleGroundHeight,
   tintFeatureMeshes,
@@ -146,10 +147,11 @@ export class Arena {
     this.featureMeshes = buildFeatureMeshes(this.group, features.featureMeshes, 0x666666);
     this._loadTerrainTextures();
 
-    this.obstacles = [...features.obstacles];
+    this.staticObstacles = [...features.obstacles];
+    this.obstacles = [...this.staticObstacles];
     this.rockField = new InstancedRockField(this.group, this.mesas, getBiomeRockColor(this.biome));
     this.rocks = [];
-    this.obstacles.push(...this.rockField.obstacles);
+    this._syncRockObstacles();
     this.treeField = null;
     this._syncTreeField(this.biome);
 
@@ -165,11 +167,20 @@ export class Arena {
     this.applyTerrainRelief(0);
   }
 
+  _syncRockObstacles() {
+    if (!this.rockField) return;
+    this.obstacles = [...this.staticObstacles, ...this.rockField.obstacles];
+    this.obstacleGrid?.rebuild(this.obstacles);
+  }
+
   /** Rebuild ground hills from run seed — mesh + gameplay height share TerrainRelief. */
   applyTerrainRelief(seed) {
     initTerrainRelief(seed);
     applyTerrainReliefToGeometry(this.groundGeo);
     repositionFeatureMeshesToTerrain(this.featureMeshes);
+    realignWallObstacleHeights(this.obstacles);
+    this.rockField?.realignToTerrain(this.mesas, this.mesaHeightIndex);
+    this._syncRockObstacles();
   }
 
   _syncTreeField(biome) {

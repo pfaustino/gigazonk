@@ -767,7 +767,7 @@ export class EnemyManager {
     return spawned;
   }
 
-  spawnWave(playerPos, elapsed, inRift, diffMult = 1, dt = 0, hpMultBonus = 1, playerDmg = 10, isGigaspawn = false) {
+  spawnWave(playerPos, elapsed, inRift, diffMult = 1, dt = 0, hpMultBonus = 1, playerDmg = 10, isGigaspawn = false, speedMultBonus = 1) {
     this._cullDistant(playerPos);
 
     const baseInterval = 3;
@@ -807,17 +807,17 @@ export class EnemyManager {
     const groupSize = this._getGroupSize(elapsed, isGigaspawn);
     const timeHpBonus = 1 + Math.max(0, elapsed - 30) * 0.0018;
     const hpMult = timeHpBonus * diffMult * hpMultBonus * (isGigaspawn ? 1.1 : 1);
-    const speedMult = (1 + Math.max(0, elapsed - 20) * 0.0018) * (1 + (diffMult - 1) * 0.3);
+    const speedMult = (1 + Math.max(0, elapsed - 20) * 0.0018) * (1 + (diffMult - 1) * 0.3) * speedMultBonus;
     const spawned = this._spawnCluster(anchorX, anchorZ, groupSize, type, playerDmg, hpMult, speedMult);
 
     return { spawned, isGigaspawn, groupSize, anchorX, anchorZ };
   }
 
-  spawnBoss(x, z, playerDmg = 10) {
-    const boss = this.spawn('elite', x, z, playerDmg, 1, 0.8);
+  spawnBoss(x, z, playerDmg = 10, hpMult = 1, speedMult = 1) {
+    const boss = this.spawn('elite', x, z, playerDmg, hpMult, 0.8 * speedMult);
     if (boss) {
       const bossHits = 35;
-      boss.hp = playerDmg * bossHits;
+      boss.hp = playerDmg * bossHits * hpMult;
       boss.maxHp = boss.hp;
       boss.damage = 35;
       boss.xp = 100;

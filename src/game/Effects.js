@@ -12,7 +12,7 @@ import {
   FAMILIAR_ZAP_RANGE,
   FAMILIAR_BOLT_LIFE,
   FAMILIAR_ORBIT_SPEED,
-  FAMILIAR_BOSS_DAMAGE_MULT,
+  FAMILIAR_ZAP_DAMAGE_MULT,
   scaledKillGemXp,
 } from './constants.js';
 import { runRandom } from '../lib/runRandom.js';
@@ -23,15 +23,13 @@ function zapCooldown(attackRate) {
   return 1 / Math.max(0.05, attackRate);
 }
 
-/** Trash one-shot; Zonk Lords take scaled chip damage (respects player boss-damage perks). */
+/** Scaled lightning zap damage (respects player damage perks per target). */
 export function familiarZapDamage(enemy, player) {
-  if (enemy.isBoss && !enemy.isMesaGuardian && player) {
-    return Math.max(1, Math.round(player.computeDamageForEnemy(enemy) * FAMILIAR_BOSS_DAMAGE_MULT));
-  }
-  return enemy.hp + 1;
+  if (!player) return Math.max(1, enemy.hp);
+  return Math.max(1, Math.round(player.computeDamageForEnemy(enemy) * FAMILIAR_ZAP_DAMAGE_MULT));
 }
 
-/** Orbiting soul orbs — visible lightning zaps that one-shot the nearest foe. */
+/** Orbiting soul orbs — visible lightning zaps on the player's attack cadence. */
 export class FamiliarManager {
   constructor(scene) {
     this.scene = scene;

@@ -1,6 +1,8 @@
 import { CONFIRM_HINT, bindMenuList } from './MenuNavigation.js';
 import { ACHIEVEMENTS } from '../AchievementSystem.js';
 import { saveData } from '../SaveData.js';
+import { isGlobalLeaderboardConfigured } from '../../lib/globalLeaderboard.js';
+import { showLeaderboard } from './LeaderboardScreen.js';
 
 /** Rich end-of-run summary replacing bare game-over screen. */
 export function showRunSummary(ui, stats, onAction) {
@@ -38,6 +40,16 @@ export function showRunSummary(ui, stats, onAction) {
     ? `<p class="run-summary-pr">${prLines.join(' ')}</p>`
     : '';
 
+  const globalName = saveData.data.leaderboardName?.trim();
+  let globalLine = '';
+  if (isGlobalLeaderboardConfigured()) {
+    if (globalName) {
+      globalLine = '<p class="run-summary-global">Score sent to global leaderboard as <strong>' + escapeHtml(globalName) + '</strong></p>';
+    } else {
+      globalLine = '<p class="run-summary-global run-summary-global-hint">Set a global name on the leaderboard to compete worldwide.</p>';
+    }
+  }
+
   ui.layer.classList.add('run-summary-open');
 
   const unlockedCount = saveData.data.unlockedAchievements.length;
@@ -66,9 +78,11 @@ export function showRunSummary(ui, stats, onAction) {
     <div class="run-summary-build"><h3>Your build</h3><div class="run-summary-buffs">${buffs}</div></div>
     ${achievements ? `<div class="run-summary-new"><h3>New achievements</h3><div class="run-summary-achievements">${achievements}</div></div>` : ''}
     ${dailyLine}
+    ${globalLine}
     <p class="menu-hint menu-hint-desktop run-summary-hint">↑ ↓ or W S to select | ${CONFIRM_HINT}</p>
     <div class="run-summary-actions">
       <button class="btn btn-primary" id="btn-retry">Try Again</button>
+      <button class="btn btn-secondary" id="btn-leaderboard">Leaderboard</button>
       <button class="btn btn-secondary" id="btn-village">Return to Village</button>
     </div>
   `;
@@ -81,8 +95,30 @@ export function showRunSummary(ui, stats, onAction) {
   };
 
   const retry = screen.querySelector('#btn-retry');
+  const leaderboard = screen.querySelector('#btn-leaderboard');
   const village = screen.querySelector('#btn-village');
+
+  const bindSummaryNav = () => {
+    ui._navCleanup = bindMenuList(
+      { layer: ui.layer, audio: ui._audio },
+      [retry, leaderboard, village],
+      () => closeSummary('village'),
+    );
+  };
+
   retry.onclick = () => { ui._audio?.ui(); closeSummary('retry'); };
   village.onclick = () => { ui._audio?.ui(); closeSummary('village'); };
-  ui._navCleanup = bindMenuList([retry, village]);
+  leaderboard.onclick = () => {
+    ui._audio?.ui();
+    showLeaderboard(ui, () => bindSummaryNav());
+  };
+  bindSummaryNav();
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

@@ -172,12 +172,14 @@ export class CombatController {
 
     if (enemy?.isMesaGuardian) {
       g.quests.track('guardians');
-      g.interactables.removeMesaBeaconForGuardian(enemy);
-      const surfaceY = enemy.mesa?.topY ?? killY;
-      g.interactables.spawnMesaCache(x, z, surfaceY);
+      const beaconSpot = g.interactables.removeMesaBeaconForGuardian(enemy);
+      const cx = beaconSpot?.x ?? x;
+      const cz = beaconSpot?.z ?? z;
+      const surfaceY = beaconSpot?.surfaceY ?? enemy.mesa?.topY ?? killY;
+      g.interactables.spawnMesaCache(cx, cz, surfaceY);
       g.audio.mesaTreasureBurstSfx();
       g.cameraController.addShake(0.42);
-      g.particles.treasureBurstAt(x, surfaceY + 0.35, z);
+      g.particles.treasureBurstAt(cx, surfaceY + 0.35, cz);
       g.ui.toast('Guardian defeated! Mesa treasure unlocked!', 'synergy');
     } else {
       g.interactables.spawnChest(x, z, killY);

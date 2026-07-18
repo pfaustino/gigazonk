@@ -20,7 +20,7 @@ RMB drag / Right stick — Orbit camera
 Shift / L3 — Sprint
 Space / RT — Jump
 Q / LB — Dodge roll
-F / LT — Interact (chests, NPCs, village portal)
+F / LT — Interact (village NPCs, return portal)
 D-pad Up/Down — Zoom camera (gamepad)
 Mouse wheel — Zoom camera
 A — Confirm menus | B — Back

@@ -562,13 +562,13 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
     if (f.kind === 'wall') {
       const geo = new THREE.BoxGeometry(f.w, WALL_HEIGHT, f.d);
       const mesh = new THREE.Mesh(geo, wallMat.clone());
-      const baseY = sampleWallBaseY(f.x, f.z, f.w, f.d);
-      mesh.position.set(f.x, baseY + WALL_HEIGHT / 2, f.z);
+      mesh.position.set(f.x, WALL_HEIGHT / 2, f.z);
       mesh.userData.terrainAnchor = { kind: 'wall', x: f.x, z: f.z, w: f.w, d: f.d };
       mesh.userData.rockTexRepeat = {
         x: Math.max(f.w, f.d) / tile,
         y: WALL_HEIGHT / tile,
       };
+      seatWallMeshOnTerrain(mesh);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -597,25 +597,45 @@ export function buildFeatureMeshes(group, featureMeshes, rockColor) {
   return meshes;
 }
 
-function sampleWallBaseY(x, z, w, d) {
+/** Corner heights for a wall footprint on rolling terrain. */
+export function sampleWallCornerHeights(x, z, w, d) {
   const hw = w / 2;
   const hd = d / 2;
-  return (
-    sampleBaseTerrainHeight(x - hw, z - hd) +
-    sampleBaseTerrainHeight(x + hw, z - hd) +
-    sampleBaseTerrainHeight(x + hw, z + hd) +
-    sampleBaseTerrainHeight(x - hw, z + hd)
-  ) / 4;
+  const corners = [
+    sampleBaseTerrainHeight(x - hw, z - hd),
+    sampleBaseTerrainHeight(x + hw, z - hd),
+    sampleBaseTerrainHeight(x + hw, z + hd),
+    sampleBaseTerrainHeight(x - hw, z + hd),
+  ];
+  let min = corners[0];
+  let max = corners[0];
+  let sum = 0;
+  for (const y of corners) {
+    if (y < min) min = y;
+    if (y > max) max = y;
+    sum += y;
+  }
+  return { min, max, avg: sum / 4 };
+}
+
+/**
+ * Seat wall mesh from the lowest corner so slopes do not leave a collider gap
+ * under a floating average-height box.
+ */
+export function seatWallMeshOnTerrain(mesh) {
+  const anchor = mesh?.userData?.terrainAnchor;
+  if (anchor?.kind !== 'wall') return;
+  const { min, max } = sampleWallCornerHeights(anchor.x, anchor.z, anchor.w, anchor.d);
+  const meshH = WALL_HEIGHT + (max - min);
+  mesh.scale.y = meshH / WALL_HEIGHT;
+  mesh.position.y = min + meshH / 2;
 }
 
 /** Re-seat wall meshes after terrain relief changes (per-run seed). */
 export function repositionFeatureMeshesToTerrain(meshes) {
   if (!meshes?.length) return;
   for (const mesh of meshes) {
-    const anchor = mesh.userData.terrainAnchor;
-    if (anchor?.kind !== 'wall') continue;
-    const baseY = sampleWallBaseY(anchor.x, anchor.z, anchor.w, anchor.d);
-    mesh.position.y = baseY + WALL_HEIGHT / 2;
+    if (mesh.userData.terrainAnchor?.kind === 'wall') seatWallMeshOnTerrain(mesh);
   }
 }
 
@@ -628,8 +648,10 @@ export function realignWallObstacleHeights(obstacles) {
     const d = obs.maxZ - obs.minZ;
     const cx = (obs.minX + obs.maxX) / 2;
     const cz = (obs.minZ + obs.maxZ) / 2;
-    const baseY = sampleWallBaseY(cx, cz, w, d);
-    obs.blockBelowY = baseY + WALL_HEIGHT;
+    const { min, max } = sampleWallCornerHeights(cx, cz, w, d);
+    obs.blockBelowY = max + WALL_HEIGHT;
+    // Keep min on the obs for debug / future ground-aware skips.
+    obs.blockAboveGroundY = min;
   }
 }
 

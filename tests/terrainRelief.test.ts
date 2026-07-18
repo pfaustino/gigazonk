@@ -5,8 +5,11 @@ import {
   initTerrainRelief,
   sampleBaseTerrainHeight,
 } from '../src/game/TerrainRelief.js';
-import { repositionFeatureMeshesToTerrain } from '../src/game/TerrainFeatures.js';
-import { sampleGroundHeight } from '../src/game/TerrainFeatures.js';
+import {
+  repositionFeatureMeshesToTerrain,
+  sampleGroundHeight,
+  sampleWallCornerHeights,
+} from '../src/game/TerrainFeatures.js';
 import { ARENA_RELIEF_AMPLITUDE, ARENA_SPAWN_PAD_RADIUS } from '../src/game/constants.js';
 
 const GROUND_WALL_HEIGHT = 2.8;
@@ -39,7 +42,7 @@ describe('TerrainRelief', () => {
     expect(Math.abs(h)).toBeLessThanOrEqual(ARENA_RELIEF_AMPLITUDE + 0.001);
   });
 
-  it('repositions wall meshes to sit on relief', () => {
+  it('repositions wall meshes from the lowest corner on relief', () => {
     initTerrainRelief(55);
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(10, GROUND_WALL_HEIGHT, 1.35),
@@ -48,14 +51,10 @@ describe('TerrainRelief', () => {
     mesh.userData.terrainAnchor = { kind: 'wall', x: 80, z: -60, w: 10, d: 1.35 };
     mesh.position.set(80, GROUND_WALL_HEIGHT / 2, -60);
     repositionFeatureMeshesToTerrain([mesh]);
-    const hw = 5;
-    const hd = 1.35 / 2;
-    const baseY =
-      (sampleBaseTerrainHeight(80 - hw, -60 - hd) +
-        sampleBaseTerrainHeight(80 + hw, -60 - hd) +
-        sampleBaseTerrainHeight(80 + hw, -60 + hd) +
-        sampleBaseTerrainHeight(80 - hw, -60 + hd)) /
-      4;
-    expect(mesh.position.y).toBeCloseTo(baseY + GROUND_WALL_HEIGHT / 2, 4);
+    const { min, max } = sampleWallCornerHeights(80, -60, 10, 1.35);
+    const meshH = GROUND_WALL_HEIGHT + (max - min);
+    expect(mesh.scale.y).toBeCloseTo(meshH / GROUND_WALL_HEIGHT, 4);
+    expect(mesh.position.y).toBeCloseTo(min + meshH / 2, 4);
+    expect(max - min).toBeGreaterThan(0.01);
   });
 });

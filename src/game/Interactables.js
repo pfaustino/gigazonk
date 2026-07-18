@@ -349,9 +349,27 @@ export class Interactables {
 
   removeMesaBeaconForGuardian(guardian) {
     const idx = this.items.findIndex(i => i.type === 'mesa_beacon' && i.guardian === guardian);
-    if (idx === -1) return;
-    this._disposeItemMeshes(this.items[idx]);
+    if (idx === -1) return null;
+    const item = this.items[idx];
+    const spot = { x: item.x, z: item.z, surfaceY: item.surfaceY };
+    this._disposeItemMeshes(item);
     this.items.splice(idx, 1);
+    return spot;
+  }
+
+  /** Nearest guardian marker crystal (not loot — marks a living mesa guardian). */
+  getNearestMesaBeacon(px, pz) {
+    let nearest = null;
+    let minDist = Infinity;
+    for (const item of this.items) {
+      if (item.type !== 'mesa_beacon') continue;
+      const dist = Math.hypot(item.x - px, item.z - pz);
+      if (dist < item.radius && dist < minDist) {
+        minDist = dist;
+        nearest = item;
+      }
+    }
+    return nearest;
   }
 
   getNearest(px, pz) {
@@ -584,6 +602,11 @@ export class Interactables {
       const inRange = !used && Math.hypot(item.x - px, item.z - pz) < item.radius;
 
       if (item.type === 'mesa_beacon') {
+        if (!item.guardian?.alive) {
+          this._disposeItemMeshes(item);
+          item._dead = true;
+          continue;
+        }
         item.mesh.rotation.y += dt * 1.6;
         item.mesh.position.y = item.surfaceY + 1.05 + Math.sin(time + item.x) * 0.12;
         continue;
@@ -599,6 +622,9 @@ export class Interactables {
         if (Math.abs(item.mesh.rotation.x) < 0.02) item.mesh.rotation.x = 0;
         if (Math.abs(item.mesh.rotation.z) < 0.02) item.mesh.rotation.z = 0;
       }
+    }
+    if (this.items.some((item) => item._dead)) {
+      this.items = this.items.filter((item) => !item._dead);
     }
   }
 }

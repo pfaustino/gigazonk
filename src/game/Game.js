@@ -373,7 +373,7 @@ export class Game {
     if (showToast) {
       queueMicrotask(() => {
         if (citizens > 0) {
-          this.ui.toast(`${citizens} citizens in distress nearby — look for orange beacons! Press F to rescue.`, 'synergy');
+          this.ui.toast(`${citizens} citizens in distress nearby — look for orange beacons! Run into them to rescue.`, 'synergy');
         }
       });
     }
@@ -1473,28 +1473,36 @@ export class Game {
     } else {
       this._citizenRespawnTimer = 0;
     }
+    const px = this.player.position.x;
+    const pz = this.player.position.z;
     if (!this.paused) {
-      const autoPot = this.interactables.getNearestPot(this.player.position.x, this.player.position.z);
+      const autoPot = this.interactables.getNearestPot(px, pz);
       if (autoPot) {
         this._handleInteractResult(this.interactables.interact(autoPot, this.player, this._getInteractCallbacks()));
       }
-    }
-    const px = this.player.position.x;
-    const pz = this.player.position.z;
-    const interact = this._pickArenaInteractTarget(px, pz);
-    if (!this.paused && interact) {
-      this.ui.showInteractPrompt(true, this._interactPromptLabel(interact.target, interact.kind));
-      if (this.input.wasPressed('KeyF')) {
-        if (interact.kind === 'citizen') {
-          if (this.citizenRescue.startRescue(interact.target)) {
-            this.audio.ui();
-          }
-        } else if (interact.target.type === 'village_portal') {
+      const interact = this._pickArenaInteractTarget(px, pz);
+      if (interact?.kind === 'citizen') {
+        if (this.citizenRescue.startRescue(interact.target)) {
+          this.audio.ui();
+        }
+        this.ui.showInteractPrompt(false);
+      } else if (interact?.target?.type === 'village_portal') {
+        // Portal sits on spawn — keep F so runs do not exit immediately.
+        this.ui.showInteractPrompt(true, this._interactPromptLabel(interact.target, interact.kind));
+        if (this.input.wasPressed('KeyF')) {
           this.audio.ui();
           this.leaveArenaForVillage();
-        } else {
-          this._handleInteractResult(this.interactables.interact(interact.target, this.player, this._getInteractCallbacks()));
         }
+      } else if (interact) {
+        this._handleInteractResult(
+          this.interactables.interact(interact.target, this.player, this._getInteractCallbacks())
+        );
+        this.ui.showInteractPrompt(false);
+      } else if (this.interactables.getNearestMesaBeacon(px, pz)) {
+        // Purple crystal is a guardian marker, not loot — gold mesa_cache drops after kill.
+        this.ui.showInteractPrompt(true, 'Defeat the Mesa Guardian to unlock treasure');
+      } else {
+        this.ui.showInteractPrompt(false);
       }
     } else {
       this.ui.showInteractPrompt(false);

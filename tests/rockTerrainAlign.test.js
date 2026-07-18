@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { clearTerrainRelief, initTerrainRelief } from '../src/game/TerrainRelief.js';
-import { realignWallObstacleHeights, sampleGroundHeight } from '../src/game/TerrainFeatures.js';
+import {
+  realignWallObstacleHeights,
+  sampleGroundHeight,
+  sampleWallCornerHeights,
+} from '../src/game/TerrainFeatures.js';
 import { InstancedRockField } from '../src/game/InstancedRockField.js';
 
 const GROUND_WALL_HEIGHT = 2.8;
@@ -27,7 +31,7 @@ describe('rock terrain alignment', () => {
     );
   });
 
-  it('raises wall blockBelowY with terrain base', () => {
+  it('raises wall blockBelowY to cover the highest corner plus wall height', () => {
     initTerrainRelief(77);
     const obs = {
       type: 'aabb',
@@ -37,7 +41,15 @@ describe('rock terrain alignment', () => {
       maxZ: -58.65,
       blockBelowY: GROUND_WALL_HEIGHT,
     };
+    const { max } = sampleWallCornerHeights(80, -59.825, 12, 2.35);
     realignWallObstacleHeights([obs]);
-    expect(obs.blockBelowY).toBeGreaterThan(GROUND_WALL_HEIGHT);
+    expect(obs.blockBelowY).toBeCloseTo(max + GROUND_WALL_HEIGHT, 4);
+  });
+
+  it('disables frustum culling so scattered rocks stay visible with their colliders', () => {
+    const group = new THREE.Group();
+    const field = new InstancedRockField(group, []);
+    expect(field.smallMesh.frustumCulled).toBe(false);
+    expect(field.boulderMesh.frustumCulled).toBe(false);
   });
 });

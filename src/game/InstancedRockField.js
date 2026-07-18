@@ -39,6 +39,10 @@ export class InstancedRockField {
 
     this.smallMesh = new THREE.InstancedMesh(smallGeo, this.smallMat, smallCount);
     this.boulderMesh = new THREE.InstancedMesh(boulderGeo, this.boulderMat, boulderCount);
+    // Instances are scattered across the arena; default cull uses origin-sized bounds
+    // and hides every rock while circle colliders keep blocking.
+    this.smallMesh.frustumCulled = false;
+    this.boulderMesh.frustumCulled = false;
     this.smallMesh.castShadow = true;
     this.smallMesh.receiveShadow = true;
     this.boulderMesh.castShadow = true;

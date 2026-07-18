@@ -32,6 +32,8 @@ jobs:
         run: npm ci
 
       - name: Quality check (itch build)
+        env:
+          VITE_LEADERBOARD_WRITE_KEY: ${{ secrets.VITE_LEADERBOARD_WRITE_KEY }}
         run: npm run check:itch
 
       - name: Read version

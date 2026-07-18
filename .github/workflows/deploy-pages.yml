@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Quality check
+        env:
+          VITE_LEADERBOARD_WRITE_KEY: ${{ secrets.VITE_LEADERBOARD_WRITE_KEY }}
         run: npm run check
 
       - name: Upload artifact

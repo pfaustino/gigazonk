@@ -14,7 +14,16 @@ test.describe('GigaZonk smoke', () => {
     await gotoClean(page);
     await expect(page.getByRole('heading', { name: 'GigaZonk', exact: true })).toBeVisible();
     await expect(page.locator('#btn-play')).toBeVisible();
+    await expect(page.locator('#btn-leaderboard')).toBeVisible();
     await expect(page.locator('#game-canvas')).toBeVisible();
+  });
+
+  test('leaderboard opens from title', async ({ page }) => {
+    await gotoClean(page);
+    await page.locator('#btn-leaderboard').click();
+    await expect(page.getByRole('heading', { name: /Leaderboard/i })).toBeVisible();
+    await page.locator('#btn-leaderboard-close').click();
+    await expect(page.locator('#btn-play')).toBeVisible();
   });
 
   test('play flow reaches arena HUD', async ({ page }) => {

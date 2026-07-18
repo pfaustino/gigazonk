@@ -31,6 +31,13 @@ export function showRunSummary(ui, stats, onAction) {
     ? `<p class="run-summary-daily">Daily challenge complete! +${stats.dailyBonus}🪙</p>`
     : '';
 
+  const prLines = [];
+  if (stats.isNewBestTime) prLines.push('New best survival time!');
+  if (stats.isNewBestKills) prLines.push('New kill record!');
+  const prBanner = prLines.length
+    ? `<p class="run-summary-pr">${prLines.join(' ')}</p>`
+    : '';
+
   ui.layer.classList.add('run-summary-open');
 
   const unlockedCount = saveData.data.unlockedAchievements.length;
@@ -43,6 +50,7 @@ export function showRunSummary(ui, stats, onAction) {
   screen.innerHTML = `
     <h2 class="run-summary-title">${title}</h2>
     ${causeLine}
+    ${prBanner}
     <p class="run-summary-sub">${timeStr} · Level ${stats.level} · ${stats.kills} kills</p>
     <div class="run-summary-grid">
       <div class="run-summary-stat"><span>Coins earned</span><strong>+${stats.coins}🪙</strong></div>

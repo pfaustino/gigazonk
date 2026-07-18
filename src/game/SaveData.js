@@ -7,6 +7,7 @@ import {
   migrateSkillLevels,
 } from './SkillTree.js';
 import { ErrorReporter } from '../lib/ErrorReporter.js';
+import { recordRun } from './Leaderboard.js';
 
 export const SAVE_KEY = 'gigazonk_save';
 
@@ -17,6 +18,9 @@ export const DEFAULT_SAVE = {
   totalKills: 0,
   totalRuns: 0,
   bestTime: 0,
+  bestKills: 0,
+  recentRuns: [],
+  leaderboardName: '',
   activeQuests: ['kill_50', 'chests_3', 'survive_5'],
   completedQuests: [],
   discoveredQuests: ['kill_50', 'chests_3', 'survive_5'],
@@ -32,7 +36,7 @@ export const DEFAULT_SAVE = {
   settings: { ...DEFAULT_SETTINGS },
   runSnapshot: null,
   savedAt: null,
-  saveVersion: '0.2.3',
+  saveVersion: '0.2.4',
 };
 
 const BURGER_QUEST_IDS = ['burgers_1', 'burgers_3', 'gobbles_10', 'gobbles_25'];
@@ -43,6 +47,17 @@ function migrateSave023(parsed, data) {
   const discovered = new Set(data.discoveredQuests);
   for (const id of BURGER_QUEST_IDS) discovered.add(id);
   return { ...data, discoveredQuests: [...discovered], saveVersion: '0.2.3' };
+}
+
+function migrateSave024(parsed, data) {
+  const version = parsed.saveVersion ?? '0.2.0';
+  if (version >= '0.2.4') return data;
+  return {
+    ...data,
+    bestKills: data.bestKills ?? 0,
+    recentRuns: data.recentRuns ?? [],
+    saveVersion: '0.2.4',
+  };
 }
 
 function migrateDiscoveredQuests(parsed) {
@@ -90,6 +105,9 @@ export function hydrateSave(parsed) {
     dailyChallengeDay: parsed.dailyChallengeDay ?? DEFAULT_SAVE.dailyChallengeDay,
     dailyChallengeCompleted: parsed.dailyChallengeCompleted ?? DEFAULT_SAVE.dailyChallengeCompleted,
     runStats: { ...DEFAULT_SAVE.runStats, ...parsed.runStats },
+    bestKills: parsed.bestKills ?? DEFAULT_SAVE.bestKills,
+    recentRuns: parsed.recentRuns ?? DEFAULT_SAVE.recentRuns,
+    leaderboardName: parsed.leaderboardName ?? DEFAULT_SAVE.leaderboardName,
     saveVersion: parsed.saveVersion ?? DEFAULT_SAVE.saveVersion,
     selectedCharacter: isCharacterPlayable(parsed.selectedCharacter)
       ? (parsed.selectedCharacter || DEFAULT_SAVE.selectedCharacter)
@@ -97,7 +115,7 @@ export function hydrateSave(parsed) {
     runSnapshot: parsed.runSnapshot ?? null,
     savedAt: parsed.savedAt ?? null,
   };
-  return migrateSave023(parsed, base);
+  return migrateSave024(parsed, migrateSave023(parsed, base));
 }
 
 export class SaveData {
@@ -176,6 +194,22 @@ export class SaveData {
   recordRunStats(partial) {
     this.data.runStats = { ...this.data.runStats, ...partial };
     this.save();
+  }
+
+  /** Append a completed arena run to personal leaderboard history. */
+  recordRunEntry(run) {
+    const updated = recordRun(this.data, run);
+    this.data.recentRuns = updated.recentRuns;
+    this.data.bestKills = updated.bestKills;
+    this.save();
+  }
+
+  setLeaderboardName(name) {
+    const trimmed = String(name ?? '').trim().slice(0, 24);
+    if (!trimmed) return false;
+    this.data.leaderboardName = trimmed;
+    this.save();
+    return true;
   }
 
   completeQuest(id) {

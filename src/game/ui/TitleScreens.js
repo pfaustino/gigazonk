@@ -32,6 +32,7 @@ export function showTitle(ui, onAction) {
         <div class="title-actions">
           <button class="btn btn-primary" id="btn-play">Play</button>
           <button class="btn btn-secondary" id="btn-village">Enter Village</button>
+          <button class="btn btn-secondary" id="btn-leaderboard">Leaderboard</button>
         </div>
         <p class="title-stats">
           Zonk Coins: ${saveData.data.zonkCoins} | Reputation: ${saveData.data.reputation} | Best: ${Math.floor(saveData.data.bestTime)}s
@@ -42,9 +43,11 @@ export function showTitle(ui, onAction) {
     `;
   const play = screen.querySelector('#btn-play');
   const village = screen.querySelector('#btn-village');
+  const leaderboard = screen.querySelector('#btn-leaderboard');
   play.onclick = () => { ui._audio?.ui(); onAction('arena'); };
   village.onclick = () => { ui._audio?.ui(); onAction('village'); };
-  ui._navCleanup = bindMenuList(navCtx(ui), [play, village]);
+  leaderboard.onclick = () => { ui._audio?.ui(); onAction('leaderboard'); };
+  ui._navCleanup = bindMenuList(navCtx(ui), [play, village, leaderboard]);
   setGameReady(GAME_READY.TITLE);
 }
 

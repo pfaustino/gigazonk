@@ -26,6 +26,7 @@ import {
   updateGobbleCountdown,
 } from './ui/CrazyObjectiveArrow.js';
 import { showRunSummary as renderRunSummary } from './ui/RunSummaryScreen.js';
+import { showLeaderboard as renderLeaderboard } from './ui/LeaderboardScreen.js';
 import { showRunModifierPicker as renderRunModifierPicker } from './ui/RunModifierScreen.js';
 import { showTutorialOverlay, hideTutorialOverlay } from './ui/TutorialOverlay.js';
 import { checkSkillAchievement } from './AchievementSystem.js';
@@ -960,6 +961,10 @@ export class UI {
 
   showRunSummary(stats, onAction) {
     return renderRunSummary(this, stats, onAction);
+  }
+
+  showLeaderboard(onClose) {
+    return renderLeaderboard(this, onClose);
   }
 
   showTutorial(onDismiss) {

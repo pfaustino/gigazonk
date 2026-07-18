@@ -15,6 +15,7 @@ import { FamiliarManager, RiftManager, SynergyNova, FireTrailManager, ZonkDomeMa
 import { Audio } from './Audio.js';
 import { ParticleSystem } from './Particles.js';
 import { saveData } from './SaveData.js';
+import { trySubmitGlobalRun } from './ui/LeaderboardScreen.js';
 import {
   ARENA_SIZE, ARENA_INTERACTABLE_COUNT, BIOMES, GIGA_SPAWN_INTERVAL, VILLAGE_SKY, TITLE_SKY, ZONK_DOME_FOLLOWUP_DAMAGE_MULT, ZONK_DOME_GROW_TIME, GAME_VERSION, MAX_ENEMIES, BOSS_SPAWN_INTERVAL, BOSS_TELEGRAPH_SECONDS, HIT_STOP_CRIT_SECONDS, CHARACTERS, SCENE_TONE_EXPOSURE, SCENE_DAY_HEMI_INTENSITY, SCENE_DAY_AMBIENT_INTENSITY, SCENE_DAY_SUN_INTENSITY, SCENE_NIGHT_HEMI_INTENSITY, SCENE_NIGHT_AMBIENT_INTENSITY, SCENE_NIGHT_SUN_INTENSITY, CITIZEN_RESCUE_COUNT, CITIZEN_RESCUE_COINS, CITIZEN_RESCUE_XP, CITIZEN_RESCUE_RESPAWN_SEC, ARENA_BURGER_FIRST_SPAWN_SEC, ARENA_BURGER_RESPAWN_SEC, ARENA_BURGER_FRENZY_SEC,   ARENA_BURGER_FLEE_SPEED_MULT, ARENA_BURGER_GOBBLE_RADIUS, gobbleHealForType, OBJECTIVE_ARROW_HIDE_DIST,
   THORN_CONTACT_RADIUS, THORN_FLOAT_INTERVAL, THORN_VFX_INTERVAL, RUN_MODIFIERS_ENABLED,
@@ -549,6 +550,14 @@ export class Game {
   }
 
   handleTitleAction(action) {
+    if (action === 'leaderboard') {
+      this.ui.showLeaderboard(() => {
+        this.ui.removeScreens();
+        this.ui.showTitle((a) => this.handleTitleAction(a));
+        queueMicrotask(() => this._tryShowTutorial({ force: true }));
+      });
+      return;
+    }
     this.audio.resume();
     this.pendingAction = action;
     this.ui.removeScreens();
@@ -1796,7 +1805,28 @@ export class Game {
     const coins = this.bankRunCoins();
     saveData.data.runSnapshot = null;
     saveData.data.totalKills += this.player.kills;
-    if (this.elapsed > saveData.data.bestTime) saveData.data.bestTime = this.elapsed;
+    const isNewBestTime = this.elapsed > saveData.data.bestTime;
+    if (isNewBestTime) saveData.data.bestTime = this.elapsed;
+    const prevBestKills = saveData.data.bestKills ?? 0;
+    const isNewBestKills = this.player.kills > prevBestKills;
+
+    saveData.recordRunEntry({
+      time: this.elapsed,
+      kills: this.player.kills,
+      level: this.player.level,
+      bosses: this._runBosses,
+      maxCombo: this._runMaxCombo,
+      biome: this.currentBiome?.name ?? '—',
+      character: this.player.characterId,
+      coins,
+    });
+    trySubmitGlobalRun({
+      time: this.elapsed,
+      kills: this.player.kills,
+      level: this.player.level,
+      character: this.player.characterId,
+      biome: this.currentBiome?.name ?? '—',
+    });
 
     const dailyBonus = tryCompleteDailyChallenge(this.elapsed);
     const runStats = {
@@ -1830,6 +1860,8 @@ export class Game {
       citizens: this._runCitizens,
       biome: this.currentBiome?.name,
       bestTime: saveData.data.bestTime,
+      isNewBestTime,
+      isNewBestKills,
       buffs: getActiveBuffs(this.player),
       newAchievements,
       dailyBonus,

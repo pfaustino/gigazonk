@@ -1,5 +1,5 @@
 export const ARENA_SIZE = 1200;
-export const GAME_VERSION = '0.2.3';
+export const GAME_VERSION = '0.2.5';
 
 export const ARENA_REFERENCE_SIZE = 120;
 export const ARENA_GROUND_SEGMENTS = 96;

@@ -39,9 +39,11 @@ describe('hydrateSave', () => {
       saveVersion: '0.2.2',
       discoveredQuests: ['kill_50'],
     });
-    expect(data.saveVersion).toBe('0.2.3');
+    expect(data.saveVersion).toBe('0.2.4');
     expect(data.discoveredQuests).toEqual(expect.arrayContaining([
       'burgers_1', 'burgers_3', 'gobbles_10', 'gobbles_25',
     ]));
+    expect(data.recentRuns).toEqual([]);
+    expect(data.bestKills).toBe(0);
   });
 });
